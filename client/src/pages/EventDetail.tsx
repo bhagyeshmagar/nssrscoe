@@ -1,0 +1,445 @@
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { eventsAPI, eventImagesAPI, uploadAPI } from '../services/api'; // Added eventImagesAPI, uploadAPI
+import { Calendar, MapPin, Download, X, CheckCircle, Share2, Clock, Users, ChevronLeft, ArrowRight, ZoomIn } from 'lucide-react'; // Added ZoomIn
+import { format } from 'date-fns';
+import { motion, AnimatePresence } from 'framer-motion';
+
+interface Event {
+    id: number;
+    title: string;
+    description: string;
+    date: string;
+    location: string;
+    imageUrl?: string; // Kept for backward compatibility or as fallback
+    type: 'upcoming' | 'past';
+    reportUrl?: string;
+    volunteersCount?: number;
+}
+
+interface EventImage {
+    id: number;
+    url: string;
+    isMaster: boolean;
+    caption?: string;
+}
+
+const EventDetail = () => {
+    const { id } = useParams();
+    const navigate = useNavigate();
+    const [event, setEvent] = useState<Event | null>(null);
+    const [eventImages, setEventImages] = useState<EventImage[]>([]); // State for multiple images
+    const [loading, setLoading] = useState(true);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isRegistered, setIsRegistered] = useState(false);
+
+    // Lightbox state
+    const [lightboxOpen, setLightboxOpen] = useState(false);
+    const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
+    useEffect(() => {
+        window.scrollTo(0, 0);
+        const fetchData = async () => {
+            try {
+                // Fetch event details
+                const eventsResponse = await eventsAPI.getAll();
+                const foundEvent = eventsResponse.data.find((e: Event) => e.id === Number(id));
+                setEvent(foundEvent || null);
+
+                // Fetch event images
+                if (foundEvent) {
+                    const imagesResponse = await eventImagesAPI.getByEvent(Number(id));
+                    setEventImages(imagesResponse.data);
+                }
+            } catch (error) {
+                console.error('Error fetching data:', error);
+            }
+            setLoading(false);
+        };
+        fetchData();
+    }, [id]);
+
+    if (loading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-gray-50">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-nss-blue"></div>
+            </div>
+        );
+    }
+
+    if (!event) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-gray-50">
+                <div className="text-center">
+                    <h2 className="text-2xl font-bold text-gray-800 mb-2">Event Not Found</h2>
+                    <button onClick={() => navigate('/events')} className="text-nss-blue hover:underline">Return to Events</button>
+                </div>
+            </div>
+        );
+    }
+
+    const handleRegisterSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        setTimeout(() => {
+            setIsRegistered(true);
+        }, 1500);
+    };
+
+    // Determine banner image: specific master image -> event.imageUrl -> first image -> fallback
+    const bannerImage = eventImages.find(img => img.isMaster)?.url || event?.imageUrl || eventImages[0]?.url;
+
+    const openLightbox = (index: number) => {
+        setCurrentImageIndex(index);
+        setLightboxOpen(true);
+    };
+
+    const nextImage = () => {
+        setCurrentImageIndex((prev) => (prev + 1) % eventImages.length);
+    };
+
+    const prevImage = () => {
+        setCurrentImageIndex((prev) => (prev - 1 + eventImages.length) % eventImages.length);
+    };
+
+    return (
+        <div className="bg-white min-h-screen font-sans">
+            {/* Immersive Hero Section with Master Image */}
+            <div className="relative h-[60vh] min-h-[400px] w-full overflow-hidden group">
+                <div className="absolute inset-0">
+                    {bannerImage ? (
+                        <img
+                            src={uploadAPI.getFullUrl(bannerImage)}
+                            alt={event.title}
+                            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                        />
+                    ) : (
+                        <div className="w-full h-full bg-gradient-to-br from-nss-blue to-nss-red" />
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-nss-blue/90 via-nss-blue/50 to-transparent" />
+                </div>
+
+                <div className="absolute inset-0 flex flex-col justify-end pb-16 px-4 sm:px-8 max-w-7xl mx-auto">
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.6 }}
+                    >
+                        <button
+                            onClick={() => navigate(-1)}
+                            className="flex items-center gap-2 text-white/80 hover:text-white mb-6 transition-colors bg-white/10 w-fit px-4 py-2 rounded-full backdrop-blur-sm hover:bg-white/20"
+                        >
+                            <ChevronLeft className="w-4 h-4" /> Back to Events
+                        </button>
+
+                        <div className="flex items-center gap-3 mb-4">
+                            <span className={`px-4 py-1.5 rounded-full text-sm font-bold uppercase tracking-wider shadow-sm ${event.type === 'upcoming' ? 'bg-green-500 text-white' : 'bg-orange-500 text-white'}`}>
+                                {event.type}
+                            </span>
+                            <span className="text-blue-100 flex items-center gap-1 bg-black/20 px-3 py-1.5 rounded-full backdrop-blur-sm">
+                                <Calendar className="w-4 h-4" /> {format(new Date(event.date), 'MMMM d, yyyy')}
+                            </span>
+                        </div>
+
+                        <h1 className="text-4xl md:text-6xl font-bold text-white mb-4 leading-tight max-w-4xl shadow-sm">
+                            {event.title}
+                        </h1>
+
+                        <div className="flex flex-wrap items-center gap-6 text-white/90">
+                            <div className="flex items-center gap-2">
+                                <MapPin className="w-5 h-5 text-red-400" />
+                                <span className="text-lg font-medium">{event.location}</span>
+                            </div>
+                            {/* Changed condition to show volunteers count if available, regardless of event type */}
+                            {event.volunteersCount && event.volunteersCount > 0 && (
+                                <div className="flex items-center gap-2">
+                                    <Users className="w-5 h-5 text-yellow-400" />
+                                    <span className="text-lg font-medium">{event.volunteersCount} NSS Volunteers Participated</span>
+                                </div>
+                            )}
+                        </div>
+                    </motion.div>
+                </div>
+            </div>
+
+            <div className="max-w-7xl mx-auto px-4 sm:px-8 py-12">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
+
+                    {/* Main Content */}
+                    <div className="lg:col-span-8 space-y-12">
+
+                        {/* About Section */}
+                        <motion.section
+                            initial={{ opacity: 0, y: 20 }}
+                            whileInView={{ opacity: 1, y: 0 }}
+                            viewport={{ once: true }}
+                        >
+                            <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2 border-l-4 border-nss-blue pl-4">
+                                About the Event
+                            </h2>
+                            <div className="prose prose-lg text-gray-600 leading-relaxed text-justify max-w-none">
+                                <p className="whitespace-pre-line">{event.description}</p>
+                            </div>
+                        </motion.section>
+
+                        {/* Event Gallery Grid */}
+                        {eventImages.length > 0 && (
+                            <motion.section
+                                initial={{ opacity: 0, y: 20 }}
+                                whileInView={{ opacity: 1, y: 0 }}
+                                viewport={{ once: true }}
+                            >
+                                <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2 border-l-4 border-nss-blue pl-4">
+                                    Event Gallery
+                                </h2>
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                    {eventImages.map((img, index) => (
+                                        <div
+                                            key={img.id}
+                                            className="relative group aspect-square overflow-hidden rounded-xl cursor-pointer shadow-md hover:shadow-xl transition-all"
+                                            onClick={() => openLightbox(index)}
+                                        >
+                                            <img
+                                                src={uploadAPI.getFullUrl(img.url)}
+                                                alt={`Gallery ${index + 1}`}
+                                                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                                            />
+                                            <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                <ZoomIn className="text-white w-8 h-8" />
+                                            </div>
+                                            {img.isMaster && (
+                                                <div className="absolute top-2 left-2 bg-yellow-500 text-white text-xs px-2 py-1 rounded shadow-sm">
+                                                    Featured
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </motion.section>
+                        )}
+
+                        {/* Report Section (for past events) */}
+                        {event.type === 'past' && (
+                            <motion.section
+                                initial={{ opacity: 0, y: 20 }}
+                                whileInView={{ opacity: 1, y: 0 }}
+                                viewport={{ once: true }}
+                                className="bg-blue-50 rounded-2xl p-8 border border-blue-100 relative overflow-hidden group"
+                            >
+                                <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                                    <Clock className="w-40 h-40" />
+                                </div>
+                                <h2 className="text-2xl font-bold text-nss-blue mb-4 relative z-10 flex items-center gap-2">
+                                    <Clock className="w-6 h-6" /> Event Completed
+                                </h2>
+                                <p className="text-gray-700 relative z-10">
+                                    This event has concluded. Thank you to all the volunteers who participated!
+                                </p>
+
+                                {event.reportUrl && (
+                                    <button className="flex items-center gap-2 bg-white text-nss-blue px-6 py-3 rounded-lg font-semibold shadow-sm hover:shadow-md transition relative z-10 border border-blue-100 hover:text-blue-700 mt-4">
+                                        <Download className="w-5 h-5" /> Download Report
+                                    </button>
+                                )}
+                            </motion.section>
+                        )}
+                    </div>
+
+                    {/* Sticky Sidebar */}
+                    <div className="lg:col-span-4 space-y-8">
+                        <div className="sticky top-24">
+                            <div className="bg-white rounded-2xl shadow-xl shadow-gray-200/50 border border-gray-100 p-8">
+                                <h3 className="text-xl font-bold text-gray-800 mb-6 border-b pb-4 flex items-center gap-2">
+                                    <Clock className="w-5 h-5 text-gray-400" /> Event Details
+                                </h3>
+
+                                <div className="space-y-6">
+                                    <div className="flex items-start gap-4">
+                                        <div className="bg-blue-50 p-3 rounded-lg text-nss-blue shrink-0">
+                                            <Calendar className="w-6 h-6" />
+                                        </div>
+                                        <div>
+                                            <p className="text-sm text-gray-500 font-medium uppercase tracking-wide">Date</p>
+                                            <p className="text-gray-900 font-semibold text-lg">{format(new Date(event.date), 'EEEE, MMM do, yyyy')}</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-start gap-4">
+                                        <div className="bg-green-50 p-3 rounded-lg text-green-600 shrink-0">
+                                            <MapPin className="w-6 h-6" />
+                                        </div>
+                                        <div>
+                                            <p className="text-sm text-gray-500 font-medium uppercase tracking-wide">Location</p>
+                                            <p className="text-gray-900 font-semibold text-lg leading-tight">{event.location}</p>
+                                        </div>
+                                    </div>
+
+                                    {event.volunteersCount && event.volunteersCount > 0 && (
+                                        <div className="flex items-start gap-4">
+                                            <div className="bg-yellow-50 p-3 rounded-lg text-yellow-600 shrink-0">
+                                                <Users className="w-6 h-6" />
+                                            </div>
+                                            <div>
+                                                <p className="text-sm text-gray-500 font-medium uppercase tracking-wide">Volunteers</p>
+                                                <p className="text-gray-900 font-semibold text-lg leading-tight">{event.volunteersCount}</p>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {event.type === 'upcoming' ? (
+                                    <button
+                                        onClick={() => setIsModalOpen(true)}
+                                        className="w-full mt-8 bg-nss-blue hover:bg-blue-900 text-white font-bold py-4 rounded-xl shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2 group"
+                                    >
+                                        Register Now <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                                    </button>
+                                ) : (
+                                    <div className="w-full mt-8 bg-gray-100 text-gray-500 font-bold py-4 rounded-xl flex items-center justify-center gap-2 cursor-not-allowed">
+                                        Registration Closed
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Share & Register Prompt */}
+                            <div className="bg-gradient-to-br from-nss-red to-red-700 rounded-2xl p-6 text-white shadow-lg">
+                                <h3 className="font-bold text-lg mb-2">Spread the Word!</h3>
+                                <p className="text-white/90 text-sm mb-4">Share this event with your friends and encourage them to join NSS.</p>
+                                <button className="w-full bg-white/20 hover:bg-white/30 text-white py-2 rounded-lg backdrop-blur-sm transition flex items-center justify-center gap-2">
+                                    <Share2 className="w-4 h-4" /> Share Event
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Registration Modal */}
+            <AnimatePresence>
+                {isModalOpen && (
+                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden"
+                        >
+                            {!isRegistered ? (
+                                <>
+                                    <div className="bg-gray-50 px-6 py-4 border-b flex justify-between items-center">
+                                        <h3 className="text-xl font-bold text-gray-800">Event Registration</h3>
+                                        <button onClick={() => setIsModalOpen(false)} className="text-gray-500 hover:text-gray-700">
+                                            <X className="w-6 h-6" />
+                                        </button>
+                                    </div>
+                                    <form onSubmit={handleRegisterSubmit} className="p-6 space-y-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+                                            <input type="text" required className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-nss-blue focus:border-nss-blue outline-none transition" placeholder="John Doe" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+                                            <input type="email" required className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-nss-blue focus:border-nss-blue outline-none transition" placeholder="john@example.com" />
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Department</label>
+                                                <select className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-nss-blue focus:border-nss-blue outline-none transition">
+                                                    <option>Select...</option>
+                                                    <option>Computer</option>
+                                                    <option>IT</option>
+                                                    <option>Mechanical</option>
+                                                    <option>Civil</option>
+                                                    <option>ENTC</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Year</label>
+                                                <select className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-nss-blue focus:border-nss-blue outline-none transition">
+                                                    <option>Select...</option>
+                                                    <option>FE</option>
+                                                    <option>SE</option>
+                                                    <option>TE</option>
+                                                    <option>BE</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <button type="submit" className="w-full bg-nss-blue hover:bg-blue-900 text-white font-bold py-3 rounded-xl shadow-md transition mt-2">
+                                            Confirm Registration
+                                        </button>
+                                    </form>
+                                </>
+                            ) : (
+                                <div className="p-12 text-center">
+                                    <div className="w-20 h-20 bg-green-100 text-green-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                                        <CheckCircle className="w-10 h-10" />
+                                    </div>
+                                    <h3 className="text-2xl font-bold text-gray-800 mb-2">Registration Successful!</h3>
+                                    <p className="text-gray-600 mb-8">You have successfully registered for "{event.title}". Check your email for details.</p>
+                                    <button
+                                        onClick={() => { setIsModalOpen(false); setIsRegistered(false); }}
+                                        className="bg-gray-800 text-white px-6 py-3 rounded-lg hover:bg-gray-900 transition"
+                                    >
+                                        Close
+                                    </button>
+                                </div>
+                            )}
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
+            {/* Lightbox Modal */}
+            <AnimatePresence>
+                {lightboxOpen && (
+                    <div className="fixed inset-0 z-[60] bg-black/95 flex items-center justify-center backdrop-blur-sm">
+                        <button
+                            onClick={() => setLightboxOpen(false)}
+                            className="absolute top-4 right-4 text-white/70 hover:text-white transition p-2 bg-white/10 rounded-full"
+                        >
+                            <X className="w-8 h-8" />
+                        </button>
+
+                        <button
+                            onClick={prevImage}
+                            className="absolute left-4 top-1/2 -translate-y-1/2 text-white/70 hover:text-white transition p-3 bg-white/10 hover:bg-white/20 rounded-full"
+                        >
+                            <ChevronLeft className="w-8 h-8" />
+                        </button>
+
+                        <div className="w-full h-full p-12 flex items-center justify-center relative">
+                            <motion.img
+                                key={currentImageIndex}
+                                initial={{ opacity: 0, scale: 0.9 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.9 }}
+                                transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                                src={uploadAPI.getFullUrl(eventImages[currentImageIndex]?.url)}
+                                alt="Gallery View"
+                                className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl"
+                            />
+                            {eventImages[currentImageIndex]?.isMaster && (
+                                <div className="absolute top-16 left-1/2 -translate-x-1/2 bg-yellow-500/90 text-white px-3 py-1 rounded-full text-sm font-medium backdrop-blur-sm">
+                                    Featured Image
+                                </div>
+                            )}
+                        </div>
+
+                        <button
+                            onClick={nextImage}
+                            className="absolute right-4 top-1/2 -translate-y-1/2 text-white/70 hover:text-white transition p-3 bg-white/10 hover:bg-white/20 rounded-full"
+                        >
+                            <ArrowRight className="w-8 h-8" />
+                        </button>
+
+                        {/* Image Counter */}
+                        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 text-white/80 bg-black/40 px-4 py-2 rounded-full backdrop-blur-md">
+                            {currentImageIndex + 1} / {eventImages.length}
+                        </div>
+                    </div>
+                )}
+            </AnimatePresence>
+        </div>
+    );
+};
+
+export default EventDetail;

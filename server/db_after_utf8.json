@@ -1,0 +1,51 @@
+﻿[dotenv@17.2.3] injecting env (3) from .env -- tip: ≡ƒ¢á∩╕Å  run anywhere with `dotenvx run -- yourcommand`
+[dotenv@17.2.3] injecting env (0) from .env -- tip: ΓÜÖ∩╕Å  override existing env vars with { override: true }
+--- Calling updateMyProfile ---
+DEBUG updateMyProfile req.body: {
+  fullName: 'Test User 2',
+  experienceText: 'Hello from tester backend mock',
+  profilePhotoUrl: 'tester.jpg'
+}
+Response JSON: {
+  id: 1,
+  volunteerId: 1,
+  fullName: 'Test User 2',
+  prnNo: 'RBT23CB021',
+  department: 'Computer Engineering',
+  academicYear: 'TE',
+  nssYear: 2,
+  marksheetUrl: '/uploads/file-1770322585778-687520892.pdf',
+  cgpa: '8.1',
+  eligibilityNo: '123',
+  religion: 'Hindu',
+  caste: 'Maratha',
+  casteCategory: 'General',
+  phoneNo: '9130263465',
+  emailId: 'bhagyeshgmagar007@gmail.com',
+  profilePhotoUrl: 'tester.jpg',
+  experienceText: 'Hello from tester backend mock',
+  updatedAt: 2026-03-10T11:58:53.858Z
+}
+--- Checking DB directly ---
+DB AFTER: [
+  {
+    "id": 1,
+    "volunteerId": 1,
+    "fullName": "Test User 2",
+    "prnNo": "RBT23CB021",
+    "department": "Computer Engineering",
+    "academicYear": "TE",
+    "nssYear": 2,
+    "marksheetUrl": "/uploads/file-1770322585778-687520892.pdf",
+    "cgpa": "8.1",
+    "eligibilityNo": "123",
+    "religion": "Hindu",
+    "caste": "Maratha",
+    "casteCategory": "General",
+    "phoneNo": "9130263465",
+    "emailId": "bhagyeshgmagar007@gmail.com",
+    "profilePhotoUrl": "tester.jpg",
+    "experienceText": "Hello from tester backend mock",
+    "updatedAt": "2026-03-10T11:58:53.858Z"
+  }
+]

@@ -1,0 +1,25 @@
+# Node modules
+node_modules/
+client/node_modules/
+server/node_modules/
+
+# Production builds
+client/dist/
+server/dist/
+
+# Environment variables
+.env
+server/.env
+
+# Uploaded assets (images, videos, documents, etc.)
+server/uploads/
+
+# IDEs and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Temp/logs
+*.log
+ts_errors.txt
