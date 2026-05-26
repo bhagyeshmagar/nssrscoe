@@ -7,11 +7,11 @@ import { AuthRequest } from '../middleware/auth';
 
 // Admin: Create new volunteer
 export const createVolunteer = async (req: Request, res: Response) => {
-    const { name, email, password } = req.body;
+    const { name, email, password, academicYearId, department } = req.body;
     const adminId = (req as AuthRequest).user?.id;
 
-    if (!name || !email || !password) {
-        return res.status(400).json({ message: 'Name, email, and password are required' });
+    if (!name || !email || !password || !academicYearId || !department) {
+        return res.status(400).json({ message: 'Name, email, password, academicYearId, and department are required' });
     }
 
     // Password validation
@@ -35,6 +35,8 @@ export const createVolunteer = async (req: Request, res: Response) => {
             name,
             email,
             passwordHash,
+            academicYearId: parseInt(academicYearId),
+            department,
             createdById: adminId,
         }).returning();
 
@@ -47,6 +49,8 @@ export const createVolunteer = async (req: Request, res: Response) => {
             id: newVolunteer.id,
             name: newVolunteer.name,
             email: newVolunteer.email,
+            department: newVolunteer.department,
+            academicYearId: newVolunteer.academicYearId,
             isActive: newVolunteer.isActive,
             createdAt: newVolunteer.createdAt,
         });
@@ -63,6 +67,8 @@ export const getAllVolunteers = async (req: Request, res: Response) => {
             id: volunteers.id,
             name: volunteers.name,
             email: volunteers.email,
+            department: volunteers.department,
+            academicYearId: volunteers.academicYearId,
             isActive: volunteers.isActive,
             createdAt: volunteers.createdAt,
         }).from(volunteers);
@@ -70,23 +76,15 @@ export const getAllVolunteers = async (req: Request, res: Response) => {
         // Fetch profiles for all volunteers
         const allProfiles = await db.select().from(volunteerProfiles);
 
-        console.log('DEBUG: All profiles from DB:', JSON.stringify(allProfiles, null, 2));
-
         // Map profiles to volunteers
         const volunteersWithProfiles = allVolunteers.map(volunteer => {
             const profile = allProfiles.find(p => p.volunteerId === volunteer.id);
-            console.log(`DEBUG: Volunteer ${volunteer.id} (${volunteer.name}) - Profile found:`, !!profile);
-            if (profile) {
-                console.log(`  - fullName: ${profile.fullName}, prnNo: ${profile.prnNo}, department: ${profile.department}`);
-            }
             return {
                 ...volunteer,
                 profile: profile || null,
                 profileData: profile || null,
             };
         });
-
-        console.log('DEBUG: Final response:', JSON.stringify(volunteersWithProfiles[0], null, 2));
 
         res.json(volunteersWithProfiles);
     } catch (error) {
@@ -102,13 +100,14 @@ export const getAllPublicVolunteers = async (req: Request, res: Response) => {
             id: volunteers.id,
             name: volunteers.name,
             email: volunteers.email,
+            department: volunteers.department,
+            academicYearId: volunteers.academicYearId,
         }).from(volunteers)
         .where(eq(volunteers.isActive, true));
-        
+
         const activeProfiles = await db.select({
             volunteerId: volunteerProfiles.volunteerId,
-            department: volunteerProfiles.department,
-            academicYear: volunteerProfiles.academicYear,
+            collegeYearAtEnrollment: volunteerProfiles.collegeYearAtEnrollment,
             profilePhotoUrl: volunteerProfiles.profilePhotoUrl,
         }).from(volunteerProfiles);
 
@@ -118,6 +117,8 @@ export const getAllPublicVolunteers = async (req: Request, res: Response) => {
                 id: volunteer.id,
                 name: volunteer.name,
                 email: volunteer.email,
+                department: volunteer.department,
+                academicYearId: volunteer.academicYearId,
                 profile: profile || null,
             };
         });
@@ -258,12 +259,12 @@ export const getMyProfile = async (req: Request, res: Response) => {
 // Volunteer: Update own profile
 export const updateMyProfile = async (req: Request, res: Response) => {
     const volunteerId = (req as AuthRequest).user?.id;
-    console.log('DEBUG updateMyProfile req.body:', req.body);
+    // Note: department is now on the volunteers table, not profiles.
+    // collegeYearAtEnrollment replaces the old academicYear field on profiles.
     const {
         fullName,
         prnNo,
-        department,
-        academicYear,
+        collegeYearAtEnrollment,
         nssYear,
         marksheetUrl,
         cgpa,
@@ -282,8 +283,7 @@ export const updateMyProfile = async (req: Request, res: Response) => {
             .set({
                 fullName,
                 prnNo,
-                department,
-                academicYear,
+                collegeYearAtEnrollment,
                 nssYear,
                 marksheetUrl,
                 cgpa,
@@ -306,8 +306,7 @@ export const updateMyProfile = async (req: Request, res: Response) => {
                 volunteerId: volunteerId!,
                 fullName,
                 prnNo,
-                department,
-                academicYear,
+                collegeYearAtEnrollment,
                 nssYear,
                 marksheetUrl,
                 cgpa,
@@ -373,16 +372,17 @@ export const updatePassword = async (req: Request, res: Response) => {
 export const getExperiences = async (req: Request, res: Response) => {
     try {
         const allProfiles = await db.select().from(volunteerProfiles);
-        
+
         // Filter profiles that have some experience text
         const experiences = allProfiles
             .filter(profile => profile.experienceText && profile.experienceText.trim() !== '')
             .map(profile => ({
                 id: profile.id,
                 name: profile.fullName || 'Anonymous',
-                role: `Volunteer, ${profile.academicYear} ${profile.department}`,
+                // department moved to volunteers table; collegeYearAtEnrollment replaces academicYear
+                role: `Volunteer, ${profile.collegeYearAtEnrollment ?? ''}`.trim(),
                 text: profile.experienceText,
-                image: profile.profilePhotoUrl || 'https://i.pravatar.cc/150?img=1', // Fallback image if needed
+                image: profile.profilePhotoUrl || 'https://i.pravatar.cc/150?img=1',
             }));
 
         res.json(experiences);

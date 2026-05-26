@@ -15,6 +15,41 @@
       "when": 1770183420667,
       "tag": "0001_harsh_mariko_yashida",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1748278200000,
+      "tag": "0002_academic_year_foundation",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1748278260000,
+      "tag": "0003_volunteers_ay_link",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1748278320000,
+      "tag": "0004_core_team",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1748278380000,
+      "tag": "0005_special_camps",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1748278440000,
+      "tag": "0006_events_ay_link",
+      "breakpoints": true
     }
   ]
 }
