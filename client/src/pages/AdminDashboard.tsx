@@ -1,179 +1,990 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { eventsAPI, galleryAPI, membersAPI, settingsAPI, uploadAPI, eventImagesAPI, volunteersAPI, registrationsAPI } from '../services/api';
-import type { EventData, GalleryData, MemberData, SiteSettings, EventImage, VolunteerData, CreateVolunteerData, EventRegistration } from '../services/api';
+import {
+    eventsAPI, galleryAPI, membersAPI, settingsAPI, uploadAPI,
+    eventImagesAPI, volunteersAPI, registrationsAPI,
+    academicYearsAPI, coreTeamAPI, specialCampsAPI, attendanceAPI
+} from '../services/api';
+import type {
+    EventData, GalleryData, MemberData, SiteSettings, EventImage,
+    AcademicYear, AYStats, VolunteerWithProfile, CoreTeamRole,
+    CoreTeamAssignment, SpecialCamp,
+    Department, CreateVolunteerData, EventRegistration,
+} from '../services/api';
 
-type TabType = 'overview' | 'events' | 'registrations' | 'gallery' | 'members' | 'volunteers' | 'settings';
+type TabType =
+    | 'overview' | 'academic-years' | 'volunteers' | 'core-team'
+    | 'attendance' | 'special-camps' | 'archive'
+    | 'events' | 'registrations' | 'gallery' | 'members' | 'settings';
+
+const TAB_GROUPS = [
+    {
+        label: 'AY Platform', tabs: [
+            { id: 'overview', label: 'Overview', icon: '#' },
+            { id: 'academic-years', label: 'Academic Years', icon: 'AY' },
+            { id: 'volunteers', label: 'Volunteers', icon: 'V' },
+            { id: 'core-team', label: 'Core Team', icon: 'CT' },
+            { id: 'attendance', label: 'Attendance', icon: 'A' },
+            { id: 'special-camps', label: 'Special Camps', icon: 'SC' },
+            { id: 'archive', label: 'Archive', icon: 'Z' },
+        ]
+    },
+    {
+        label: 'Site Management', tabs: [
+            { id: 'events', label: 'Events', icon: 'E' },
+            { id: 'registrations', label: 'Registrations', icon: 'R' },
+            { id: 'gallery', label: 'Gallery', icon: 'G' },
+            { id: 'members', label: 'Members', icon: 'M' },
+            { id: 'settings', label: 'Settings', icon: 'S' },
+        ]
+    },
+];
+
+const DEPT_LIST: Department[] = [
+    'Computer Engineering',
+    'Computer Science and Business Systems',
+    'Information Technology',
+    'Electronics and Telecommunication',
+    'Electrical Engineering',
+    'Automation and Robotics',
+    'Mechanical Engineering',
+    'Civil Engineering',
+    'Bachelor of Computer Applications',
+];
+
+//Status badge
+
+const AYStatusBadge = ({ ay }: { ay: AcademicYear }) => {
+    if (ay.isArchived) return <span className="px-2 py-0.5 text-xs rounded-full bg-gray-200 text-gray-600 font-medium">Archived</span>;
+    if (ay.isLocked) return <span className="px-2 py-0.5 text-xs rounded-full bg-red-100 text-red-700 font-medium">🔒 Locked</span>;
+    if (ay.isCurrent) return <span className="px-2 py-0.5 text-xs rounded-full bg-green-100 text-green-700 font-medium">Active</span>;
+    return <span className="px-2 py-0.5 text-xs rounded-full bg-yellow-100 text-yellow-700 font-medium">Draft</span>;
+};
+
+const CapBar = ({ regular, cap }: { regular: number; cap: number }) => {
+    const pct = Math.min(100, Math.round((regular / cap) * 100));
+    const colour = pct >= 100 ? 'bg-red-500' : pct >= 90 ? 'bg-yellow-500' : 'bg-emerald-500';
+    return (
+        <div>
+            <div className="flex justify-between text-xs text-gray-500 mb-1">
+                <span>Regular Volunteers</span>
+                <span className={pct >= 100 ? 'text-red-600 font-bold' : ''}>{regular} / {cap}</span>
+            </div>
+            <div className="h-2 rounded-full bg-gray-200 overflow-hidden">
+                <div className={`h-full rounded-full transition-all ${colour}`} style={{ width: `${pct}%` }} />
+            </div>
+        </div>
+    );
+};
+
+// Academic Years Tab 
+
+const AcademicYearsTab = ({ years, onRefresh }: { years: AcademicYear[]; onRefresh: () => void }) => {
+    const [form, setForm] = useState({ label: '', startDate: '', endDate: '', volunteerCap: '100' });
+    const [showForm, setShowForm] = useState(false);
+    const [msg, setMsg] = useState('');
+    const [busy, setBusy] = useState<number | null>(null);
+    const flash = (m: string) => { setMsg(m); setTimeout(() => setMsg(''), 3000); };
+
+    const handleCreate = async () => {
+        try {
+            await academicYearsAPI.create({ ...form, volunteerCap: Number(form.volunteerCap) });
+            setShowForm(false); setForm({ label: '', startDate: '', endDate: '', volunteerCap: '100' });
+            onRefresh(); flash('Academic year created.');
+        } catch (e: any) { flash(e.response?.data?.message ?? 'Error.'); }
+    };
+    const act = async (fn: () => Promise<any>, id: number) => {
+        setBusy(id); try { await fn(); onRefresh(); } catch (e: any) { flash(e.response?.data?.message ?? 'Error.'); } setBusy(null);
+    };
+
+    return (
+        <div>
+            <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-gray-800">Academic Years</h2>
+                <button onClick={() => setShowForm(!showForm)} className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm font-medium">+ New AY</button>
+            </div>
+            {msg && <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded text-blue-700 text-sm">{msg}</div>}
+            {showForm && (
+                <div className="mb-6 bg-white rounded-xl shadow p-6 border border-gray-100">
+                    <h3 className="font-semibold text-gray-700 mb-4">Create Academic Year</h3>
+                    <div className="grid grid-cols-2 gap-4 mb-4">
+                        <div><label className="block text-sm text-gray-600 mb-1">Label (e.g. 2025-26)</label>
+                            <input value={form.label} onChange={e => setForm({ ...form, label: e.target.value })} placeholder="2025-26" className="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" /></div>
+                        <div><label className="block text-sm text-gray-600 mb-1">Volunteer Cap</label>
+                            <input type="number" value={form.volunteerCap} onChange={e => setForm({ ...form, volunteerCap: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" /></div>
+                        <div><label className="block text-sm text-gray-600 mb-1">Start Date</label>
+                            <input type="date" value={form.startDate} onChange={e => setForm({ ...form, startDate: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" /></div>
+                        <div><label className="block text-sm text-gray-600 mb-1">End Date</label>
+                            <input type="date" value={form.endDate} onChange={e => setForm({ ...form, endDate: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" /></div>
+                    </div>
+                    <div className="flex gap-3">
+                        <button onClick={handleCreate} className="bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700 text-sm font-medium">Create</button>
+                        <button onClick={() => setShowForm(false)} className="border px-5 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
+                    </div>
+                </div>
+            )}
+            <div className="space-y-4">
+                {years.length === 0 && <p className="text-gray-500 text-sm">No academic years yet.</p>}
+                {years.map(ay => (
+                    <div key={ay.id} className={`bg-white rounded-xl shadow p-5 border-l-4 ${ay.isCurrent ? 'border-green-500' : ay.isLocked ? 'border-red-400' : ay.isArchived ? 'border-gray-300' : 'border-yellow-400'}`}>
+                        <div className="flex items-start justify-between">
+                            <div>
+                                <div className="flex items-center gap-3 mb-1"><span className="text-lg font-bold text-gray-800">{ay.label}</span><AYStatusBadge ay={ay} /></div>
+                                <p className="text-sm text-gray-500">{ay.startDate} → {ay.endDate} · Cap: {ay.volunteerCap}</p>
+                            </div>
+                            <div className="flex gap-2">
+                                {!ay.isCurrent && !ay.isLocked && !ay.isArchived && (
+                                    <button disabled={busy === ay.id} onClick={() => act(() => academicYearsAPI.activate(ay.id), ay.id)} className="text-xs bg-green-600 text-white px-3 py-1.5 rounded-lg hover:bg-green-700 disabled:opacity-50">Activate</button>
+                                )}
+                                {ay.isCurrent && !ay.isLocked && (
+                                    <button disabled={busy === ay.id} onClick={() => { if (confirm(`Lock AY ${ay.label}? This is irreversible.`)) act(() => academicYearsAPI.lock(ay.id), ay.id); }} className="text-xs bg-red-600 text-white px-3 py-1.5 rounded-lg hover:bg-red-700 disabled:opacity-50">🔒 Lock</button>
+                                )}
+                                {ay.isLocked && !ay.isArchived && (
+                                    <button disabled={busy === ay.id} onClick={() => { if (confirm(`Archive AY ${ay.label}?`)) act(() => academicYearsAPI.archive(ay.id), ay.id); }} className="text-xs bg-gray-500 text-white px-3 py-1.5 rounded-lg hover:bg-gray-600 disabled:opacity-50">Archive</button>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+};
+
+// // AY Volunteers Tab ////////////////////////////////////////////////////////
+
+const AYVolunteersTab = ({ years, currentAY }: { years: AcademicYear[]; currentAY: AcademicYear | null }) => {
+    const [selectedAyId, setSelectedAyId] = useState<number>(currentAY?.id ?? 0);
+    const [vols, setVols] = useState<VolunteerWithProfile[]>([]);
+    const [stats, setStats] = useState<AYStats | null>(null);
+    const [filter, setFilter] = useState({ dept: '', status: '' as '' | 'regular' | 'backup', search: '' });
+    const [showForm, setShowForm] = useState(false);
+    const [viewProfileId, setViewProfileId] = useState<number | null>(null);
+    const [form, setForm] = useState<CreateVolunteerData>({ name: '', email: '', password: '', department: 'Computer Engineering' as Department });
+    const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
+    const flash = (type: 'ok' | 'err', text: string) => { setMsg({ type, text }); setTimeout(() => setMsg(null), 4000); };
+
+    const load = useCallback(async () => {
+        if (!selectedAyId) return;
+        try {
+            const [vRes, sRes] = await Promise.all([
+                volunteersAPI.getByAY(selectedAyId, { ...(filter.dept && { department: filter.dept }), ...(filter.status && { status: filter.status }), ...(filter.search && { search: filter.search }) }),
+                academicYearsAPI.getStats(selectedAyId),
+            ]);
+            setVols((vRes.data as any)?.data ?? vRes.data); setStats((sRes.data as any)?.data ?? sRes.data);
+        } catch { }
+    }, [selectedAyId, filter]);
+
+    useEffect(() => { load(); }, [load]);
+    useEffect(() => { if (currentAY && !selectedAyId) setSelectedAyId(currentAY.id); }, [currentAY]);
+
+    const selectedAY = years.find(y => y.id === selectedAyId);
+
+    const handleCreate = async () => {
+        try { await volunteersAPI.create(selectedAyId, form); setShowForm(false); setForm({ name: '', email: '', password: '', department: 'Computer Engineering' as Department }); flash('ok', 'Volunteer added.'); load(); }
+        catch (e: any) { flash('err', e.response?.data?.message ?? 'Error.'); }
+    };
+    const handleDelete = async (id: number) => {
+        if (!confirm('Delete?')) return;
+        try { await volunteersAPI.delete(selectedAyId, id); flash('ok', 'Deleted.'); load(); } catch (e: any) { flash('err', e.response?.data?.message ?? 'Error.'); }
+    };
+    const handleStatusChange = async (id: number, s: 'regular' | 'backup') => {
+        try { await volunteersAPI.changeStatus(selectedAyId, id, s); load(); } catch (e: any) { flash('err', e.response?.data?.message ?? 'Error.'); }
+    };
+
+    return (
+        <div>
+            <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-gray-800">Volunteers</h2>
+                <div className="flex items-center gap-3">
+                    <select value={selectedAyId} onChange={e => setSelectedAyId(Number(e.target.value))} className="border rounded-lg px-3 py-2 text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500">
+                        {years.map(y => <option key={y.id} value={y.id}>{y.label} {y.isCurrent ? '(Active)' : y.isLocked ? '[Locked]' : ''}</option>)}
+                    </select>
+                    {selectedAY && !selectedAY.isLocked && <button onClick={() => setShowForm(!showForm)} className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm font-medium">+ Add</button>}
+                </div>
+            </div>
+
+            {selectedAY?.isLocked && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">[Locked] AY {selectedAY.label} is locked - read-only.</div>}
+
+            {stats && (
+                <div className="bg-white rounded-xl p-4 shadow mb-4">
+                    <div className="grid grid-cols-4 gap-4 mb-3">
+                        {[{ v: stats.volunteers.regular, l: 'Regular', c: 'text-blue-600' }, { v: stats.volunteers.backup, l: 'Backup', c: 'text-orange-500' }, { v: stats.volunteers.total, l: 'Total', c: 'text-gray-700' }, { v: stats.volunteers.active, l: 'Active', c: 'text-emerald-600' }].map(i => (
+                            <div key={i.l} className="text-center"><div className={`text-2xl font-bold ${i.c}`}>{i.v}</div><div className="text-xs text-gray-500">{i.l}</div></div>
+                        ))}
+                    </div>
+                    <CapBar regular={stats.volunteers.regular} cap={selectedAY?.volunteerCap ?? 100} />
+                </div>
+            )}
+
+            {msg && <div className={`mb-4 p-3 rounded-lg text-sm border ${msg.type === 'ok' ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700'}`}>{msg.text}</div>}
+
+            {showForm && (
+                <div className="mb-6 bg-white rounded-xl shadow p-6 border border-blue-100">
+                    <h3 className="font-semibold text-gray-700 mb-4">New Volunteer</h3>
+                    <div className="grid grid-cols-2 gap-4 mb-4">
+                        {[{ k: 'name', l: 'Name', t: 'text' }, { k: 'email', l: 'Email', t: 'email' }, { k: 'password', l: 'Password', t: 'text' }].map(f => (
+                            <div key={f.k}><label className="block text-sm text-gray-600 mb-1">{f.l}</label>
+                                <input type={f.t} value={(form as any)[f.k]} onChange={e => setForm({ ...form, [f.k]: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" /></div>
+                        ))}
+                        <div><label className="block text-sm text-gray-600 mb-1">Department</label>
+                            <select value={form.department} onChange={e => setForm({ ...form, department: e.target.value as Department })} className="w-full border rounded-lg px-3 py-2 text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500">
+                                {DEPT_LIST.map(d => <option key={d} value={d}>{d}</option>)}
+                            </select></div>
+                        <div><label className="block text-sm text-gray-600 mb-1">Status</label>
+                            <select value={form.status ?? 'regular'} onChange={e => setForm({ ...form, status: e.target.value as 'regular' | 'backup' })} className="w-full border rounded-lg px-3 py-2 text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="regular">Regular</option><option value="backup">Backup</option>
+                            </select></div>
+                    </div>
+                    <div className="flex gap-3">
+                        <button onClick={handleCreate} className="bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700 text-sm font-medium">Add</button>
+                        <button onClick={() => setShowForm(false)} className="border px-5 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
+                    </div>
+                </div>
+            )}
+
+            <div className="flex gap-3 mb-4 flex-wrap">
+                <input placeholder="Search..." value={filter.search} onChange={e => setFilter({ ...filter, search: e.target.value })} className="border rounded-lg px-3 py-2 text-sm flex-1 min-w-[180px] outline-none focus:ring-2 focus:ring-blue-500" />
+                <select value={filter.dept} onChange={e => setFilter({ ...filter, dept: e.target.value })} className="border rounded-lg px-3 py-2 text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">All Departments</option>{DEPT_LIST.map(d => <option key={d} value={d}>{d}</option>)}
+                </select>
+                <select value={filter.status} onChange={e => setFilter({ ...filter, status: e.target.value as '' | 'regular' | 'backup' })} className="border rounded-lg px-3 py-2 text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">All Status</option><option value="regular">Regular</option><option value="backup">Backup</option>
+                </select>
+            </div>
+
+            <div className="bg-white rounded-xl shadow overflow-hidden">
+                <table className="w-full text-sm">
+                    <thead className="bg-gray-50 border-b">
+                        <tr>{['Name', 'Email', 'Department', 'Status', 'Active', 'Actions'].map(h => <th key={h} className="text-left px-4 py-3 text-gray-600 font-medium">{h}</th>)}</tr>
+                    </thead>
+                    <tbody className="divide-y">
+                        {vols.length === 0 && <tr><td colSpan={6} className="text-center py-8 text-gray-400">No volunteers found.</td></tr>}
+                        {vols.map(v => (
+                            <tr key={v.id} className="hover:bg-gray-50">
+                                <td className="px-4 py-3 font-medium text-gray-800">{v.name}</td>
+                                <td className="px-4 py-3 text-gray-600">{v.email}</td>
+                                <td className="px-4 py-3 text-gray-600 text-xs">{v.department}</td>
+                                <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${v.status === 'regular' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}`}>{v.status}</span></td>
+                                <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded-full text-xs ${v.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>{v.isActive ? 'Active' : 'Inactive'}</span></td>
+                                <td className="px-4 py-3">
+                                    <div className="flex gap-1 flex-wrap">
+                                        <button onClick={() => setViewProfileId(v.id)} className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-700 hover:bg-blue-200">View</button>
+                                        {selectedAY && !selectedAY.isLocked && (
+                                            <>
+                                                <button onClick={() => handleStatusChange(v.id, v.status === 'regular' ? 'backup' : 'regular')} className="text-xs px-2 py-1 rounded bg-yellow-100 text-yellow-700 hover:bg-yellow-200">→ {v.status === 'regular' ? 'Backup' : 'Regular'}</button>
+                                                <button onClick={() => handleDelete(v.id)} className="text-xs px-2 py-1 rounded bg-red-100 text-red-700 hover:bg-red-200">Del</button>
+                                            </>
+                                        )}
+                                    </div>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+
+            {/* Profile Modal */}
+            {viewProfileId && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+                        <div className="flex justify-between items-center p-6 border-b sticky top-0 bg-white z-10">
+                            <h3 className="text-xl font-bold text-gray-800">Volunteer Profile</h3>
+                            <button onClick={() => setViewProfileId(null)} className="text-gray-400 hover:text-gray-600">✖</button>
+                        </div>
+                        <div className="p-6">
+                            {(() => {
+                                const vol = vols.find(v => v.id === viewProfileId);
+                                if (!vol) return <p>Loading...</p>;
+                                const p = vol.profile || {};
+                                const renderField = (label: string, value: any) => (
+                                    <div className="mb-4">
+                                        <div className="text-xs text-gray-500 font-medium">{label}</div>
+                                        <div className="text-sm font-medium text-gray-900 bg-gray-50 px-3 py-2 rounded mt-1">{value || '-'}</div>
+                                    </div>
+                                );
+                                return (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="col-span-full flex items-center gap-4 mb-4">
+                                            {p.profilePhotoUrl ? (
+                                                <img src={uploadAPI.getFullUrl(p.profilePhotoUrl)} alt="Profile" className="w-24 h-24 rounded-full object-cover border" />
+                                            ) : (
+                                                <div className="w-24 h-24 rounded-full bg-gray-200 flex items-center justify-center text-gray-400">No Photo</div>
+                                            )}
+                                            <div>
+                                                <h4 className="text-lg font-bold text-gray-800">{vol.name}</h4>
+                                                <p className="text-sm text-gray-500">{vol.email}</p>
+                                                <span className={`px-2 py-0.5 rounded-full text-xs font-medium inline-block mt-1 ${vol.status === 'regular' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}`}>{vol.status.toUpperCase()}</span>
+                                            </div>
+                                        </div>
+                                        {renderField("Full Name (Profile)", p.fullName)}
+                                        {renderField("PRN No", p.prnNo)}
+                                        {renderField("Department", vol.department)}
+                                        {renderField("College Year", p.collegeYearAtEnrollment)}
+                                        {renderField("NSS Year", p.nssYear)}
+                                        {renderField("CGPA", p.cgpa)}
+                                        {renderField("Eligibility No", p.eligibilityNo)}
+                                        {renderField("Religion", p.religion)}
+                                        {renderField("Caste", p.caste)}
+                                        {renderField("Caste Category", p.casteCategory)}
+                                        {renderField("Phone Number", p.phoneNo)}
+
+                                        <div className="col-span-full mt-2">
+                                            <div className="text-xs text-gray-500 font-medium mb-1">Volunteering Experience</div>
+                                            <div className="text-sm text-gray-800 bg-gray-50 px-4 py-3 rounded whitespace-pre-wrap">{p.experienceText || '-'}</div>
+                                        </div>
+
+                                        {p.marksheetUrl && (
+                                            <div className="col-span-full mt-4">
+                                                <a href={uploadAPI.getFullUrl(p.marksheetUrl)} target="_blank" rel="noreferrer" className="inline-block bg-blue-50 text-blue-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-100">
+                                                    📄 View Marksheet
+                                                </a>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })()}
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+// // Core Team Tab ////////////////////////////////////////////////////////////
+
+const CoreTeamTab = ({ years, currentAY }: { years: AcademicYear[]; currentAY: AcademicYear | null }) => {
+    const [selectedAyId, setSelectedAyId] = useState<number>(currentAY?.id ?? 0);
+    const [assignments, setAssignments] = useState<CoreTeamAssignment[]>([]);
+    const [roles, setRoles] = useState<CoreTeamRole[]>([]);
+    const [vols, setVols] = useState<VolunteerWithProfile[]>([]);
+    const [showForm, setShowForm] = useState(false);
+    const [form, setForm] = useState({ coreTeamRoleId: 0, volunteerId: 0, displayName: '', department: '' });
+    const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
+    const flash = (type: 'ok' | 'err', text: string) => { setMsg({ type, text }); setTimeout(() => setMsg(null), 4000); };
+
+    const load = useCallback(async () => {
+        if (!selectedAyId) return;
+        try {
+            const [aRes, rRes, vRes] = await Promise.all([coreTeamAPI.getByAY(selectedAyId), coreTeamAPI.getRoles(), volunteersAPI.getByAY(selectedAyId, { status: 'regular', isActive: true })]);
+            setAssignments((aRes.data as any)?.data ?? aRes.data); setRoles((rRes.data as any)?.data ?? rRes.data); setVols((vRes.data as any)?.data ?? vRes.data);
+        } catch { }
+    }, [selectedAyId]);
+
+    useEffect(() => { load(); }, [load]);
+    useEffect(() => { if (currentAY && !selectedAyId) setSelectedAyId(currentAY.id); }, [currentAY]);
+
+    const selectedAY = years.find(y => y.id === selectedAyId);
+    const selectedRole = roles.find(r => r.id === form.coreTeamRoleId);
+    const isInstitution = selectedRole?.roleType === 'institution';
+    const isDeptCoord = selectedRole?.code === 'department_coordinator';
+
+    const handleAssign = async () => {
+        try {
+            const payload: any = { coreTeamRoleId: form.coreTeamRoleId };
+            if (isInstitution) { payload.displayName = form.displayName; } else { payload.volunteerId = form.volunteerId; if (isDeptCoord) payload.department = form.department; }
+            await coreTeamAPI.assign(selectedAyId, payload);
+            setShowForm(false); flash('ok', 'Role assigned.'); load();
+        } catch (e: any) { flash('err', e.response?.data?.message ?? 'Assignment failed.'); }
+    };
+    const handleRemove = async (id: number) => {
+        if (!confirm('Remove?')) return;
+        try { await coreTeamAPI.removeAssignment(selectedAyId, id); flash('ok', 'Removed.'); load(); } catch (e: any) { flash('err', e.response?.data?.message ?? 'Error.'); }
+    };
+
+    return (
+        <div>
+            <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-gray-800">Core Team</h2>
+                <div className="flex gap-3">
+                    <select value={selectedAyId} onChange={e => setSelectedAyId(Number(e.target.value))} className="border rounded-lg px-3 py-2 text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500">
+                        {years.map(y => <option key={y.id} value={y.id}>{y.label} {y.isCurrent ? '(Active)' : y.isLocked ? '[Locked]' : ''}</option>)}
+                    </select>
+                    {selectedAY && !selectedAY.isLocked && <button onClick={() => setShowForm(!showForm)} className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm font-medium">+ Assign Role</button>}
+                </div>
+            </div>
+            {selectedAY?.isLocked && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">[Locked] Locked - read-only.</div>}
+            {msg && <div className={`mb-4 p-3 rounded-lg text-sm border ${msg.type === 'ok' ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700'}`}>{msg.text}</div>}
+            {showForm && (
+                <div className="mb-6 bg-white rounded-xl shadow p-6 border border-blue-100">
+                    <h3 className="font-semibold text-gray-700 mb-4">Assign Role</h3>
+                    <div className="grid grid-cols-2 gap-4 mb-4">
+                        <div className="col-span-2"><label className="block text-sm text-gray-600 mb-1">Role</label>
+                            <select value={form.coreTeamRoleId} onChange={e => setForm({ ...form, coreTeamRoleId: Number(e.target.value) })} className="w-full border rounded-lg px-3 py-2 text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value={0}>Select a role...</option>{roles.map(r => <option key={r.id} value={r.id}>{r.name} {r.roleType === 'institution' ? '(Institution)' : ''}</option>)}
+                            </select></div>
+                        {selectedRole && isInstitution && (
+                            <div className="col-span-2"><label className="block text-sm text-gray-600 mb-1">Display Name</label>
+                                <input value={form.displayName} onChange={e => setForm({ ...form, displayName: e.target.value })} placeholder="Prof. Dr. Name" className="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" /></div>
+                        )}
+                        {selectedRole && !isInstitution && (
+                            <div className={isDeptCoord ? '' : 'col-span-2'}><label className="block text-sm text-gray-600 mb-1">Volunteer</label>
+                                <select value={form.volunteerId} onChange={e => setForm({ ...form, volunteerId: Number(e.target.value) })} className="w-full border rounded-lg px-3 py-2 text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value={0}>Select...</option>{vols.map(v => <option key={v.id} value={v.id}>{v.name} - {v.department}</option>)}
+                                </select></div>
+                        )}
+                        {isDeptCoord && (
+                            <div><label className="block text-sm text-gray-600 mb-1">Department to Coordinate</label>
+                                <select value={form.department} onChange={e => setForm({ ...form, department: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="">Select dept...</option>{DEPT_LIST.map(d => <option key={d} value={d}>{d}</option>)}
+                                </select></div>
+                        )}
+                    </div>
+                    <div className="flex gap-3">
+                        <button onClick={handleAssign} className="bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700 text-sm font-medium">Assign</button>
+                        <button onClick={() => setShowForm(false)} className="border px-5 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
+                    </div>
+                </div>
+            )}
+            <div className="bg-white rounded-xl shadow overflow-hidden">
+                <table className="w-full text-sm">
+                    <thead className="bg-gray-50 border-b"><tr>{['Role', 'Name', 'Type', 'Dept', 'Actions'].map(h => <th key={h} className="text-left px-4 py-3 text-gray-600 font-medium">{h}</th>)}</tr></thead>
+                    <tbody className="divide-y">
+                        {assignments.length === 0 && <tr><td colSpan={5} className="text-center py-8 text-gray-400">No assignments yet.</td></tr>}
+                        {assignments.map(a => (
+                            <tr key={a.id} className="hover:bg-gray-50">
+                                <td className="px-4 py-3 font-medium text-gray-800">{a.role.name}</td>
+                                <td className="px-4 py-3">{a.volunteer?.name ?? a.displayName ?? '-'}</td>
+                                <td className="px-4 py-3"><span className={`px-2 py-0.5 text-xs rounded-full ${a.role.type === 'institution' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>{a.role.type}</span></td>
+                                <td className="px-4 py-3 text-gray-500 text-xs">{a.department ?? a.volunteer?.department ?? '-'}</td>
+                                <td className="px-4 py-3">{selectedAY && !selectedAY.isLocked && <button onClick={() => handleRemove(a.id)} className="text-xs px-2 py-1 rounded bg-red-100 text-red-700 hover:bg-red-200">Remove</button>}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+};
+
+// // Attendance Tab ////////////////////////////////////////////////////////////
+
+const AttendanceTab = ({ years, currentAY }: { years: AcademicYear[]; currentAY: AcademicYear | null }) => {
+    const [selectedAyId, setSelectedAyId] = useState<number>(currentAY?.id ?? 0);
+    const [eventsList, setEventsList] = useState<any[]>([]);
+    const [volunteersList, setVolunteersList] = useState<VolunteerWithProfile[]>([]);
+    const [selectedEvent, setSelectedEvent] = useState<any | null>(null);
+    const [attendanceMap, setAttendanceMap] = useState<Record<number, boolean>>({});
+    const [msg, setMsg] = useState('');
+    const flash = (m: string) => { setMsg(m); setTimeout(() => setMsg(''), 3000); };
+    
+    const load = useCallback(async () => {
+        if (!selectedAyId) return;
+        try {
+            const [eRes, vRes] = await Promise.all([
+                eventsAPI.getAll(),
+                volunteersAPI.getByAY(selectedAyId, { status: 'regular', isActive: true })
+            ]);
+            const selectedAY = years.find(y => y.id === selectedAyId);
+            if (selectedAY) {
+                const ayStart = new Date(selectedAY.startDate);
+                const ayEnd = new Date(selectedAY.endDate);
+                const filteredEvents = (eRes.data as any[]).filter(ev => {
+                    const evDate = new Date(ev.date);
+                    return evDate >= ayStart && evDate <= ayEnd;
+                });
+                setEventsList(filteredEvents);
+            } else {
+                setEventsList(eRes.data);
+            }
+            setVolunteersList((vRes.data as any)?.data ?? vRes.data);
+        } catch { }
+    }, [selectedAyId, years]);
+
+    useEffect(() => { load(); }, [load]);
+    useEffect(() => { if (currentAY && !selectedAyId) setSelectedAyId(currentAY.id); }, [currentAY]);
+    
+    const selectedAY = years.find(y => y.id === selectedAyId);
+
+    const handleManage = async (event: any) => {
+        try {
+            const res = await attendanceAPI.getEventAttendance(selectedAyId, event.id);
+            const data = (res.data as any).data || res.data;
+            const records = data?.records || [];
+            const map: Record<number, boolean> = {};
+            volunteersList.forEach(v => map[v.id] = false); // Default absent
+            records.forEach((r: any) => {
+                if (r.status === 'present') map[r.volunteerId] = true;
+            });
+            setAttendanceMap(map);
+            setSelectedEvent(event);
+        } catch (e: any) {
+            flash(e.response?.data?.message ?? 'Failed to load attendance.');
+        }
+    };
+
+    const handleSave = async () => {
+        if (!selectedEvent) return;
+        const records = volunteersList.map(v => ({
+            volunteerId: v.id,
+            status: attendanceMap[v.id] ? 'present' : 'absent' as 'present'|'absent'
+        }));
+        try {
+            await attendanceAPI.saveEventAttendance(selectedAyId, selectedEvent.id, records);
+            flash('Attendance saved successfully.');
+            setSelectedEvent(null);
+        } catch (e: any) {
+            flash(e.response?.data?.message ?? 'Failed to save attendance.');
+        }
+    };
+
+    return (
+        <div>
+            <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-gray-800">Event Attendance</h2>
+                <div className="flex gap-3">
+                    <select value={selectedAyId} onChange={e => setSelectedAyId(Number(e.target.value))} className="border rounded-lg px-3 py-2 text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500">
+                        {years.map(y => <option key={y.id} value={y.id}>{y.label} {y.isCurrent ? '(Active)' : ''}</option>)}
+                    </select>
+                </div>
+            </div>
+            {msg && <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded text-blue-700 text-sm">{msg}</div>}
+            {selectedAY?.isLocked && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">[Locked] Locked - read-only.</div>}
+            
+            {!selectedEvent ? (
+                <div className="bg-white rounded-xl shadow overflow-hidden">
+                    <table className="w-full text-sm">
+                        <thead className="bg-gray-50 border-b">
+                            <tr>
+                                {['Date', 'Event Title', 'Location', 'Actions'].map(h => <th key={h} className="text-left px-4 py-3 text-gray-600 font-medium">{h}</th>)}
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y">
+                            {eventsList.length === 0 && <tr><td colSpan={4} className="text-center py-8 text-gray-400">No events found for this Academic Year.</td></tr>}
+                            {eventsList.map(e => (
+                                <tr key={e.id} className="hover:bg-gray-50">
+                                    <td className="px-4 py-3 font-mono text-gray-700">{new Date(e.date).toLocaleDateString()}</td>
+                                    <td className="px-4 py-3 font-medium">{e.title}</td>
+                                    <td className="px-4 py-3 text-gray-500">{e.location}</td>
+                                    <td className="px-4 py-3">
+                                        <button onClick={() => handleManage(e)} className="text-xs px-3 py-1.5 rounded bg-blue-100 text-blue-700 hover:bg-blue-200 font-medium">
+                                            Manage Attendance
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            ) : (
+                <div className="bg-white rounded-xl shadow p-6 border border-blue-100">
+                    <div className="flex justify-between items-center mb-6 border-b pb-4">
+                        <div>
+                            <h3 className="text-xl font-bold text-gray-800">Attendance for: {selectedEvent.title}</h3>
+                            <p className="text-sm text-gray-500 mt-1">{new Date(selectedEvent.date).toLocaleDateString()} • {selectedEvent.location}</p>
+                        </div>
+                        <button onClick={() => setSelectedEvent(null)} className="text-gray-500 hover:bg-gray-100 px-3 py-1.5 rounded-lg text-sm">Close</button>
+                    </div>
+
+                    <div className="max-h-[500px] overflow-y-auto mb-6">
+                        <table className="w-full text-sm">
+                            <thead className="bg-gray-50 border-b sticky top-0">
+                                <tr>
+                                    <th className="px-4 py-3 text-left w-16">Present</th>
+                                    <th className="px-4 py-3 text-left">Volunteer Name</th>
+                                    <th className="px-4 py-3 text-left">Department</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y">
+                                {volunteersList.map(v => (
+                                    <tr key={v.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => !selectedAY?.isLocked && setAttendanceMap(p => ({ ...p, [v.id]: !p[v.id] }))}>
+                                        <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
+                                            <input 
+                                                type="checkbox" 
+                                                checked={!!attendanceMap[v.id]} 
+                                                onChange={e => setAttendanceMap(p => ({ ...p, [v.id]: e.target.checked }))}
+                                                disabled={!!selectedAY?.isLocked}
+                                                className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                            />
+                                        </td>
+                                        <td className="px-4 py-3 font-medium text-gray-800">{v.name}</td>
+                                        <td className="px-4 py-3 text-gray-500">{v.department}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    {!selectedAY?.isLocked && (
+                        <div className="flex justify-end gap-3 pt-4 border-t">
+                            <button onClick={() => setSelectedEvent(null)} className="border px-5 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
+                            <button onClick={handleSave} className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 text-sm font-medium">Save Attendance</button>
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+};
+
+// // Special Camps Tab /////////////////////////////////////////////////////////
+
+const SpecialCampsTab = ({ years, currentAY }: { years: AcademicYear[]; currentAY: AcademicYear | null }) => {
+    const [selectedAyId, setSelectedAyId] = useState<number>(currentAY?.id ?? 0);
+    const [camps, setCamps] = useState<SpecialCamp[]>([]);
+    const [showForm, setShowForm] = useState(false);
+    const [form, setForm] = useState({ name: '', location: '', startDate: '', endDate: '', description: '' });
+    const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
+    const flash = (type: 'ok' | 'err', text: string) => { setMsg({ type, text }); setTimeout(() => setMsg(null), 4000); };
+
+    // Manage Participants State
+    const [manageCampId, setManageCampId] = useState<number | null>(null);
+    const [campDetails, setCampDetails] = useState<any | null>(null);
+    const [ayVols, setAyVols] = useState<VolunteerWithProfile[]>([]);
+    const [selectedVolIds, setSelectedVolIds] = useState<Set<number>>(new Set());
+    const [savingParticipants, setSavingParticipants] = useState(false);
+
+    // Unlock State
+    const [unlockCampId, setUnlockCampId] = useState<number | null>(null);
+    const [unlockPassword, setUnlockPassword] = useState('');
+
+    const load = useCallback(async () => { if (!selectedAyId) return; try { const r = await specialCampsAPI.getByAY(selectedAyId); setCamps((r.data as any)?.data ?? r.data); } catch { } }, [selectedAyId]);
+    useEffect(() => { load(); }, [load]);
+    useEffect(() => { if (currentAY && !selectedAyId) setSelectedAyId(currentAY.id); }, [currentAY]);
+    const selectedAY = years.find(y => y.id === selectedAyId);
+
+    const handleCreate = async () => {
+        try { await specialCampsAPI.create(selectedAyId, form); setShowForm(false); setForm({ name: '', location: '', startDate: '', endDate: '', description: '' }); flash('ok', 'Camp created.'); load(); }
+        catch (e: any) { flash('err', e.response?.data?.message ?? 'Error.'); }
+    };
+
+    const openManage = async (campId: number) => {
+        try {
+            const [cRes, vRes] = await Promise.all([
+                specialCampsAPI.getById(campId),
+                volunteersAPI.getByAY(selectedAyId, { status: 'regular', isActive: true })
+            ]);
+            const cData = (cRes.data as any)?.data ?? cRes.data;
+            const vData = (vRes.data as any)?.data ?? vRes.data;
+            setCampDetails(cData);
+            setAyVols(vData);
+            setSelectedVolIds(new Set(cData.participants.map((p: any) => p.volunteerId)));
+            setManageCampId(campId);
+        } catch (e: any) {
+            flash('err', 'Failed to load camp details.');
+        }
+    };
+
+    const handleSaveParticipants = async () => {
+        if (!manageCampId) return;
+        setSavingParticipants(true);
+        try {
+            await specialCampsAPI.setParticipantsBulk(manageCampId, Array.from(selectedVolIds));
+            flash('ok', 'Participants updated.');
+            setManageCampId(null);
+        } catch (e: any) {
+            flash('err', e.response?.data?.message ?? 'Failed to update participants.');
+        } finally {
+            setSavingParticipants(false);
+        }
+    };
+    const handleFinalize = async (id: number) => {
+        if (!confirm('Finalize camp? This will permanently freeze participant data.')) return;
+        try { await specialCampsAPI.finalize(id); flash('ok', 'Finalized.'); load(); } catch (e: any) { flash('err', e.response?.data?.message ?? 'Error.'); }
+    };
+    const handleDelete = async (id: number) => {
+        if (!confirm('Delete?')) return;
+        try { await specialCampsAPI.delete(id); flash('ok', 'Deleted.'); load(); } catch (e: any) { flash('err', e.response?.data?.message ?? 'Error.'); }
+    };
+    const handleUnlock = async () => {
+        if (!unlockCampId) return;
+        try {
+            await specialCampsAPI.unlock(unlockCampId, unlockPassword);
+            flash('ok', 'Camp unlocked successfully.');
+            setUnlockCampId(null);
+            setUnlockPassword('');
+            load();
+        } catch (e: any) {
+            flash('err', e.response?.data?.message ?? 'Invalid password or failed to unlock.');
+        }
+    };
+    return (
+        <div>
+            <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-gray-800">Special Camps</h2>
+                <div className="flex gap-3">
+                    <select value={selectedAyId} onChange={e => setSelectedAyId(Number(e.target.value))} className="border rounded-lg px-3 py-2 text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500">
+                        {years.map(y => <option key={y.id} value={y.id}>{y.label} {y.isCurrent ? '(Active)' : ''}</option>)}
+                    </select>
+                    {selectedAY && !selectedAY.isLocked && <button onClick={() => setShowForm(!showForm)} className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm font-medium">+ New Camp</button>}
+                </div>
+            </div>
+            {msg && <div className={`mb-4 p-3 rounded-lg text-sm border ${msg.type === 'ok' ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700'}`}>{msg.text}</div>}
+            {selectedAY?.isLocked && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">[Locked] Locked - read-only.</div>}
+            {showForm && (
+                <div className="mb-6 bg-white rounded-xl shadow p-6 border border-blue-100">
+                    <div className="grid grid-cols-2 gap-4 mb-4">
+                        {[{ k: 'name', l: 'Camp Name' }, { k: 'location', l: 'Location' }].map(f => <div key={f.k}><label className="block text-sm text-gray-600 mb-1">{f.l}</label><input value={(form as any)[f.k]} onChange={e => setForm({ ...form, [f.k]: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" /></div>)}
+                        {[{ k: 'startDate', l: 'Start' }, { k: 'endDate', l: 'End' }].map(f => <div key={f.k}><label className="block text-sm text-gray-600 mb-1">{f.l}</label><input type="date" value={(form as any)[f.k]} onChange={e => setForm({ ...form, [f.k]: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" /></div>)}
+                        <div className="col-span-2"><label className="block text-sm text-gray-600 mb-1">Description</label><input value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" /></div>
+                    </div>
+                    <div className="flex gap-3"><button onClick={handleCreate} className="bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700 text-sm font-medium">Create</button><button onClick={() => setShowForm(false)} className="border px-5 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button></div>
+                </div>
+            )}
+            <div className="space-y-4">
+                {camps.length === 0 && <p className="text-gray-500 text-sm bg-white rounded-xl shadow p-6">No camps yet.</p>}
+                {camps.map(c => (
+                    <div key={c.id} className="bg-white rounded-xl shadow p-5">
+                        <div className="flex justify-between items-start">
+                            <div>
+                                <div className="flex items-center gap-3 mb-1"><span className="font-bold text-gray-800">{c.name}</span>{c.isFinalized ? <span className="px-2 py-0.5 text-xs rounded-full bg-gray-200 text-gray-600">Finalized</span> : <span className="px-2 py-0.5 text-xs rounded-full bg-yellow-100 text-yellow-700">Draft</span>}</div>
+                                <p className="text-sm text-gray-500">{c.location} · {c.startDate} → {c.endDate}</p>
+                            </div>
+                            {selectedAY && !selectedAY.isLocked && (
+                                <div className="flex gap-2">
+                                    <button onClick={() => openManage(c.id)} className="text-xs px-3 py-1.5 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200">Manage</button>
+                                    {!c.isFinalized ? (
+                                        <>
+                                            <button onClick={() => handleFinalize(c.id)} className="text-xs px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700">Finalize</button>
+                                            <button onClick={() => handleDelete(c.id)} className="text-xs px-3 py-1.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-200">Delete</button>
+                                        </>
+                                    ) : (
+                                        <button onClick={() => setUnlockCampId(c.id)} className="text-xs px-3 py-1.5 bg-yellow-100 text-yellow-700 rounded-lg hover:bg-yellow-200">Unlock</button>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+            {/* Manage Participants Modal */}
+            {manageCampId && campDetails && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col">
+                        <div className="flex justify-between items-center p-6 border-b">
+                            <h3 className="text-xl font-bold text-gray-800">Manage Participants: {campDetails.name}</h3>
+                            <button onClick={() => setManageCampId(null)} className="text-gray-400 hover:text-gray-600">✖</button>
+                        </div>
+                        <div className="p-6 overflow-y-auto flex-1">
+                            {campDetails.isFinalized ? (
+                                <div>
+                                    <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-800 text-sm">
+                                        This camp is finalized. Participants cannot be edited.
+                                    </div>
+                                    <h4 className="font-semibold mb-2">Finalized Participants ({campDetails.participants.length})</h4>
+                                    <ul className="divide-y border rounded-lg">
+                                        {campDetails.participants.map((p: any) => (
+                                            <li key={p.id} className="p-3 text-sm flex justify-between">
+                                                <span>{p.snapName}</span>
+                                                <span className="text-gray-500">{p.snapDepartment}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            ) : (
+                                <div>
+                                    <div className="flex justify-between items-center mb-4">
+                                        <h4 className="font-semibold">Select Volunteers</h4>
+                                        <span className="text-sm bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                                            {selectedVolIds.size} Selected
+                                        </span>
+                                    </div>
+                                    <div className="border rounded-lg max-h-96 overflow-y-auto">
+                                        <table className="w-full text-sm">
+                                            <thead className="bg-gray-50 sticky top-0">
+                                                <tr>
+                                                    <th className="px-4 py-2 text-left w-12">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={selectedVolIds.size === ayVols.length && ayVols.length > 0}
+                                                            onChange={(e) => {
+                                                                if (e.target.checked) setSelectedVolIds(new Set(ayVols.map(v => v.id)));
+                                                                else setSelectedVolIds(new Set());
+                                                            }}
+                                                        />
+                                                    </th>
+                                                    <th className="px-4 py-2 text-left">Name</th>
+                                                    <th className="px-4 py-2 text-left">Department</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y">
+                                                {ayVols.length === 0 && (
+                                                    <tr><td colSpan={3} className="text-center py-4 text-gray-500">No regular active volunteers found.</td></tr>
+                                                )}
+                                                {ayVols.map(v => (
+                                                    <tr key={v.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => {
+                                                        const newSet = new Set(selectedVolIds);
+                                                        if (newSet.has(v.id)) newSet.delete(v.id);
+                                                        else newSet.add(v.id);
+                                                        setSelectedVolIds(newSet);
+                                                    }}>
+                                                        <td className="px-4 py-2">
+                                                            <input type="checkbox" checked={selectedVolIds.has(v.id)} readOnly />
+                                                        </td>
+                                                        <td className="px-4 py-2 font-medium text-gray-800">{v.name}</td>
+                                                        <td className="px-4 py-2 text-gray-600">{v.department}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                        <div className="p-4 border-t bg-gray-50 flex justify-end gap-3">
+                            <button onClick={() => setManageCampId(null)} className="px-4 py-2 border rounded-lg text-gray-600 hover:bg-gray-100">Close</button>
+                            {!campDetails.isFinalized && (
+                                <button onClick={handleSaveParticipants} disabled={savingParticipants} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
+                                    {savingParticipants ? 'Saving...' : 'Save Participants'}
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Unlock Camp Modal */}
+            {unlockCampId && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6">
+                        <h3 className="text-lg font-bold text-gray-800 mb-2">Unlock Camp</h3>
+                        <p className="text-sm text-gray-600 mb-4">Enter your admin password to unlock this camp for editing.</p>
+                        <input
+                            type="password"
+                            placeholder="Admin Password"
+                            value={unlockPassword}
+                            onChange={(e) => setUnlockPassword(e.target.value)}
+                            className="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 mb-4"
+                        />
+                        <div className="flex gap-3 justify-end">
+                            <button onClick={() => { setUnlockCampId(null); setUnlockPassword(''); }} className="px-4 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
+                            <button onClick={handleUnlock} className="px-4 py-2 bg-yellow-500 text-white rounded-lg text-sm hover:bg-yellow-600">Unlock</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+// // Archive Tab ///////////////////////////////////////////////////////////////
+
+const ArchiveTab = ({ years }: { years: AcademicYear[] }) => {
+    const archived = years.filter(y => y.isArchived);
+    return (
+        <div>
+            <h2 className="text-2xl font-bold text-gray-800 mb-6">Archive</h2>
+            {archived.length === 0 && <p className="text-gray-500 text-sm bg-white rounded-xl shadow p-6">No archived academic years yet.</p>}
+            <div className="space-y-4">
+                {archived.map(ay => (
+                    <div key={ay.id} className="bg-white rounded-xl shadow p-5 border-l-4 border-gray-300">
+                        <div className="flex items-center gap-3 mb-1"><span className="text-lg font-bold text-gray-600">{ay.label}</span><AYStatusBadge ay={ay} /></div>
+                        <p className="text-sm text-gray-500">{ay.startDate} → {ay.endDate}</p>
+                        <p className="text-xs text-gray-400 mt-1">All data preserved and read-only</p>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+};
+
+// // Main AdminDashboard //////////////////////////////////////////////////////
 
 const AdminDashboard = () => {
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState<TabType>('overview');
     const [loading, setLoading] = useState(false);
 
-    // Data states
+    const [years, setYears] = useState<AcademicYear[]>([]);
+    const [currentAY, setCurrentAY] = useState<AcademicYear | null>(null);
+
     const [events, setEvents] = useState<any[]>([]);
     const [gallery, setGallery] = useState<any[]>([]);
     const [members, setMembers] = useState<any[]>([]);
-    const [volunteers, setVolunteers] = useState<VolunteerData[]>([]);
     const [settings, setSettings] = useState<SiteSettings | null>(null);
 
-    // Form states
     const [showEventForm, setShowEventForm] = useState(false);
     const [showGalleryForm, setShowGalleryForm] = useState(false);
     const [showMemberForm, setShowMemberForm] = useState(false);
-    const [showVolunteerForm, setShowVolunteerForm] = useState(false);
     const [editingItem, setEditingItem] = useState<any>(null);
 
-    const handleLogout = () => {
-        localStorage.removeItem('token');
-        localStorage.removeItem('userRole');
-        navigate('/login');
-    };
+    const handleLogout = () => { localStorage.removeItem('token'); localStorage.removeItem('userRole'); navigate('/login'); };
 
-    // Fetch data on mount and tab change
-    useEffect(() => {
-        fetchData();
-    }, [activeTab]);
+    const loadYears = useCallback(async () => {
+        try {
+            const [allRes, currRes] = await Promise.all([
+                academicYearsAPI.getAll(),
+                academicYearsAPI.getCurrent().catch(() => ({ data: { data: null } })),
+            ]);
+            const yearsArr = (allRes.data as any)?.data ?? allRes.data;
+            const currentAyObj = (currRes.data as any)?.data ?? null;
+            setYears(Array.isArray(yearsArr) ? yearsArr : []);
+            setCurrentAY(currentAyObj);
+        } catch { setYears([]); }
+    }, []);
 
-    const fetchData = async () => {
+    useEffect(() => { loadYears(); }, [loadYears]);
+
+    const fetchSiteData = useCallback(async () => {
+        const siteTabs = ['overview', 'events', 'gallery', 'members', 'settings'];
+        if (!siteTabs.includes(activeTab)) return;
         setLoading(true);
         try {
             switch (activeTab) {
-                case 'overview':
-                    const [evRes, galRes, memRes] = await Promise.all([
-                        eventsAPI.getAll(),
-                        galleryAPI.getAll(),
-                        membersAPI.getAll()
-                    ]);
-                    setEvents(evRes.data);
-                    setGallery(galRes.data);
-                    setMembers(memRes.data);
-                    break;
-                case 'events':
-                    const eventsRes = await eventsAPI.getAll();
-                    setEvents(eventsRes.data);
-                    break;
-                case 'gallery':
-                    const galleryRes = await galleryAPI.getAll();
-                    setGallery(galleryRes.data);
-                    break;
-                case 'members':
-                    const membersRes = await membersAPI.getAll();
-                    setMembers(membersRes.data);
-                    break;
-                case 'volunteers':
-                    const volunteersRes = await volunteersAPI.getAll();
-                    setVolunteers(volunteersRes.data);
-                    break;
-                case 'settings':
-                    const settingsRes = await settingsAPI.get();
-                    setSettings(settingsRes.data);
-                    break;
+                case 'overview': { const [eR, gR, mR] = await Promise.all([eventsAPI.getAll(), galleryAPI.getAll(), membersAPI.getAll()]); setEvents(eR.data); setGallery(gR.data); setMembers(mR.data); break; }
+                case 'events': { const r = await eventsAPI.getAll(); setEvents(r.data); break; }
+                case 'gallery': { const r = await galleryAPI.getAll(); setGallery(r.data); break; }
+                case 'members': { const r = await membersAPI.getAll(); setMembers(r.data); break; }
+                case 'settings': { const r = await settingsAPI.get(); setSettings(r.data); break; }
             }
-        } catch (error) {
-            console.error('Error fetching data:', error);
-        }
+        } catch (e) { console.error('fetchSiteData:', e); }
         setLoading(false);
-    };
+    }, [activeTab]);
 
-    const tabs = [
-        { id: 'overview', label: 'Overview', icon: '📊' },
-        { id: 'events', label: 'Events', icon: '📅' },
-        { id: 'registrations', label: 'Registrations', icon: '🎟️' },
-        { id: 'gallery', label: 'Gallery', icon: '🖼️' },
-        { id: 'members', label: 'Members', icon: '👥' },
-        { id: 'volunteers', label: 'Volunteers', icon: '🙋' },
-        { id: 'settings', label: 'Settings', icon: '⚙️' },
-    ];
+    useEffect(() => { fetchSiteData(); }, [fetchSiteData]);
 
     return (
-        <div className="min-h-screen bg-gray-100">
-            {/* Header */}
-            <div className="bg-nss-blue text-white px-6 py-4 flex justify-between items-center">
-                <h1 className="text-2xl font-bold">NSS Admin Dashboard</h1>
-                <button
-                    onClick={handleLogout}
-                    className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded transition"
-                >
-                    Logout
-                </button>
-            </div>
+        <div className="min-h-screen bg-gray-100 flex flex-col">
+            <header className="bg-nss-blue text-white px-6 py-4 flex justify-between items-center shadow-md flex-shrink-0">
+                <div className="flex items-center gap-4">
+                    <h1 className="text-xl font-bold">NSS Admin</h1>
+                    {currentAY && (
+                        <div className="flex items-center gap-2 bg-white/10 rounded-lg px-3 py-1.5 text-sm">
+                            <span className="font-medium">AY {currentAY.label}</span>
+                            <AYStatusBadge ay={currentAY} />
+                        </div>
+                    )}
+                </div>
+                <button onClick={handleLogout} className="bg-red-500/80 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium">Logout</button>
+            </header>
 
-            <div className="flex">
-                {/* Sidebar */}
-                <aside className="w-64 bg-white shadow-md min-h-[calc(100vh-72px)]">
-                    <nav className="py-4">
-                        {tabs.map(tab => (
-                            <button
-                                key={tab.id}
-                                onClick={() => setActiveTab(tab.id as TabType)}
-                                className={`w-full text-left px-6 py-3 flex items-center gap-3 transition ${activeTab === tab.id
-                                    ? 'bg-nss-blue/10 text-nss-blue border-r-4 border-nss-blue font-semibold'
-                                    : 'text-gray-600 hover:bg-gray-100'
-                                    }`}
-                            >
-                                <span>{tab.icon}</span>
-                                {tab.label}
-                            </button>
+            <div className="flex flex-1 overflow-hidden">
+                <aside className="w-56 bg-white shadow-md flex-shrink-0 overflow-y-auto">
+                    <nav className="py-3">
+                        {TAB_GROUPS.map(group => (
+                            <div key={group.label} className="mb-2">
+                                <p className="px-4 py-2 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">{group.label}</p>
+                                {group.tabs.map(tab => (
+                                    <button key={tab.id} onClick={() => setActiveTab(tab.id as TabType)}
+                                        className={`w-full text-left px-4 py-2.5 flex items-center gap-2.5 text-sm transition ${activeTab === tab.id ? 'bg-blue-50 text-blue-700 border-r-4 border-blue-600 font-semibold' : 'text-gray-600 hover:bg-gray-50'}`}>
+                                        <span className="inline-flex items-center justify-center w-5 h-5 rounded text-[10px] font-bold bg-gray-200 text-gray-600 flex-shrink-0">{tab.icon}</span>
+                                        {tab.label}
+                                    </button>
+                                ))}
+                            </div>
                         ))}
                     </nav>
                 </aside>
 
-                {/* Main Content */}
-                <main className="flex-1 p-6">
+                <main className="flex-1 overflow-y-auto p-6">
                     {loading ? (
-                        <div className="flex items-center justify-center h-64">
-                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-nss-blue"></div>
-                        </div>
+                        <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600" /></div>
                     ) : (
                         <>
                             {activeTab === 'overview' && <OverviewTab events={events} gallery={gallery} members={members} />}
-                            {activeTab === 'events' && (
-                                <EventsTab
-                                    events={events}
-                                    onRefresh={fetchData}
-                                    showForm={showEventForm}
-                                    setShowForm={setShowEventForm}
-                                    editingItem={editingItem}
-                                    setEditingItem={setEditingItem}
-                                />
-                            )}
-                            {activeTab === 'registrations' && (
-                                <RegistrationsTab events={events} />
-                            )}
-                            {activeTab === 'gallery' && (
-                                <GalleryTab
-                                    gallery={gallery}
-                                    onRefresh={fetchData}
-                                    showForm={showGalleryForm}
-                                    setShowForm={setShowGalleryForm}
-                                    editingItem={editingItem}
-                                    setEditingItem={setEditingItem}
-                                />
-                            )}
-                            {activeTab === 'members' && (
-                                <MembersTab
-                                    members={members}
-                                    onRefresh={fetchData}
-                                    showForm={showMemberForm}
-                                    setShowForm={setShowMemberForm}
-                                    editingItem={editingItem}
-                                    setEditingItem={setEditingItem}
-                                />
-                            )}
-                            {activeTab === 'volunteers' && (
-                                <VolunteersTab
-                                    volunteers={volunteers}
-                                    onRefresh={fetchData}
-                                    showForm={showVolunteerForm}
-                                    setShowForm={setShowVolunteerForm}
-                                    editingItem={editingItem}
-                                    setEditingItem={setEditingItem}
-                                />
-                            )}
-                            {activeTab === 'settings' && (
-                                <SettingsTab settings={settings} onRefresh={fetchData} />
-                            )}
+                            {activeTab === 'academic-years' && <AcademicYearsTab years={years} onRefresh={loadYears} />}
+                            {activeTab === 'volunteers' && <AYVolunteersTab years={years} currentAY={currentAY} />}
+                            {activeTab === 'core-team' && <CoreTeamTab years={years} currentAY={currentAY} />}
+                            {activeTab === 'attendance' && <AttendanceTab years={years} currentAY={currentAY} />}
+                            {activeTab === 'special-camps' && <SpecialCampsTab years={years} currentAY={currentAY} />}
+                            {activeTab === 'archive' && <ArchiveTab years={years} />}
+                            {activeTab === 'events' && <EventsTab events={events} onRefresh={fetchSiteData} showForm={showEventForm} setShowForm={setShowEventForm} editingItem={editingItem} setEditingItem={setEditingItem} />}
+                            {activeTab === 'registrations' && <RegistrationsTab events={events} />}
+                            {activeTab === 'gallery' && <GalleryTab gallery={gallery} onRefresh={fetchSiteData} showForm={showGalleryForm} setShowForm={setShowGalleryForm} editingItem={editingItem} setEditingItem={setEditingItem} />}
+                            {activeTab === 'members' && <MembersTab members={members} onRefresh={fetchSiteData} showForm={showMemberForm} setShowForm={setShowMemberForm} editingItem={editingItem} setEditingItem={setEditingItem} />}
+                            {activeTab === 'settings' && <SettingsTab settings={settings} onRefresh={fetchSiteData} />}
                         </>
                     )}
                 </main>
@@ -182,7 +993,7 @@ const AdminDashboard = () => {
     );
 };
 
-// Overview Tab Component
+// // Overview Tab Component ////////////////////////////////////////////////////
 const OverviewTab = ({ events, gallery, members }: { events: any[], gallery: any[], members: any[] }) => (
     <div>
         <h2 className="text-2xl font-bold text-gray-800 mb-6">Dashboard Overview</h2>
@@ -208,11 +1019,11 @@ const OverviewTab = ({ events, gallery, members }: { events: any[], gallery: any
             <div className="bg-white p-6 rounded-lg shadow">
                 <h3 className="text-lg font-semibold mb-4">Quick Actions</h3>
                 <div className="space-y-2">
-                    <p className="text-gray-600">• Go to <strong>Events</strong> tab to manage events</p>
-                    <p className="text-gray-600">• Go to <strong>Registrations</strong> to view event visitors</p>
-                    <p className="text-gray-600">• Go to <strong>Gallery</strong> tab to add photos</p>
-                    <p className="text-gray-600">• Go to <strong>Members</strong> tab to update team</p>
-                    <p className="text-gray-600">• Go to <strong>Settings</strong> to customize homepage</p>
+                    <p className="text-gray-600">- Go to <strong>Events</strong> tab to manage events</p>
+                    <p className="text-gray-600">- Go to <strong>Registrations</strong> to view event volunteers</p>
+                    <p className="text-gray-600">- Go to <strong>Gallery</strong> tab to add photos</p>
+                    <p className="text-gray-600">- Go to <strong>Members</strong> tab to update team</p>
+                    <p className="text-gray-600">- Go to <strong>Settings</strong> to customize homepage</p>
                 </div>
             </div>
         </div>
@@ -234,7 +1045,7 @@ const StatCard = ({ title, count, color }: { title: string, count: number, color
     );
 };
 
-// Events Tab Component
+// // Events Tab Component //////////////////////////////////////////////////////
 const EventsTab = ({ events, onRefresh, showForm, setShowForm, editingItem, setEditingItem }: any) => {
     const [formData, setFormData] = useState<EventData>({
         id: 0, title: '', description: '', date: '', location: '', type: 'upcoming', volunteersCount: 0
@@ -256,7 +1067,6 @@ const EventsTab = ({ events, onRefresh, showForm, setShowForm, editingItem, setE
                 type: editingItem.type || 'upcoming',
                 volunteersCount: editingItem.volunteersCount || 0
             });
-            // Fetch existing images for this event
             fetchEventImages(editingItem.id);
             setShowForm(true);
         }
@@ -318,7 +1128,6 @@ const EventsTab = ({ events, onRefresh, showForm, setShowForm, editingItem, setE
         try {
             let eventId = editingItem?.id;
 
-            // Save event first
             if (editingItem) {
                 await eventsAPI.update(editingItem.id, formData);
             } else {
@@ -326,7 +1135,6 @@ const EventsTab = ({ events, onRefresh, showForm, setShowForm, editingItem, setE
                 eventId = response.data.id;
             }
 
-            // Upload and save new images
             if (selectedFiles.length > 0 && eventId) {
                 const uploadedImages = await Promise.all(
                     selectedFiles.map(async (file, index) => {
@@ -418,7 +1226,6 @@ const EventsTab = ({ events, onRefresh, showForm, setShowForm, editingItem, setE
                             </div>
                         </div>
 
-                        {/* Existing Images (when editing) */}
                         {existingImages.length > 0 && (
                             <div>
                                 <p className="text-sm font-medium text-gray-700 mb-2">Current Images:</p>
@@ -435,7 +1242,7 @@ const EventsTab = ({ events, onRefresh, showForm, setShowForm, editingItem, setE
                                             )}
                                             <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-1">
                                                 <button type="button" onClick={() => setExistingMaster(img.id)} className="bg-yellow-500 text-white p-1 rounded text-xs">★</button>
-                                                <button type="button" onClick={() => removeExistingImage(img.id)} className="bg-red-500 text-white p-1 rounded text-xs">✕</button>
+                                                <button type="button" onClick={() => removeExistingImage(img.id)} className="bg-red-500 text-white p-1 rounded text-xs">✖</button>
                                             </div>
                                         </div>
                                     ))}
@@ -443,7 +1250,6 @@ const EventsTab = ({ events, onRefresh, showForm, setShowForm, editingItem, setE
                             </div>
                         )}
 
-                        {/* New Image Previews */}
                         {imagePreviews.length > 0 && (
                             <div>
                                 <p className="text-sm font-medium text-gray-700 mb-2">New Images to Upload:</p>
@@ -460,7 +1266,7 @@ const EventsTab = ({ events, onRefresh, showForm, setShowForm, editingItem, setE
                                             )}
                                             <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-1">
                                                 <button type="button" onClick={() => setMasterIndex(index)} className="bg-yellow-500 text-white p-1 rounded text-xs">★</button>
-                                                <button type="button" onClick={() => removeSelectedFile(index)} className="bg-red-500 text-white p-1 rounded text-xs">✕</button>
+                                                <button type="button" onClick={() => removeSelectedFile(index)} className="bg-red-500 text-white p-1 rounded text-xs">✖</button>
                                             </div>
                                         </div>
                                     ))}
@@ -520,7 +1326,7 @@ const EventsTab = ({ events, onRefresh, showForm, setShowForm, editingItem, setE
     );
 };
 
-// Registrations Tab Component
+// // Registrations Tab Component ///////////////////////////////////////////////
 const RegistrationsTab = ({ events }: { events: any[] }) => {
     const [selectedEventId, setSelectedEventId] = useState<string>('');
     const [registrations, setRegistrations] = useState<EventRegistration[]>([]);
@@ -550,12 +1356,12 @@ const RegistrationsTab = ({ events }: { events: any[] }) => {
             <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-bold text-gray-800">Event Registrations</h2>
             </div>
-            
+
             <div className="bg-white p-6 rounded-lg shadow mb-6">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Select Event to view registrations:</label>
-                <select 
-                    value={selectedEventId} 
-                    onChange={e => setSelectedEventId(e.target.value)} 
+                <select
+                    value={selectedEventId}
+                    onChange={e => setSelectedEventId(e.target.value)}
                     className="w-full md:w-1/2 border rounded px-3 py-2"
                 >
                     <option value="">-- Select an Event --</option>
@@ -619,7 +1425,7 @@ const RegistrationsTab = ({ events }: { events: any[] }) => {
     );
 };
 
-// Gallery Tab Component - Separate Images and Videos
+// // Gallery Tab Component /////////////////////////////////////////////////////
 const GalleryTab = ({ gallery, onRefresh, showForm, setShowForm, editingItem, setEditingItem }: any) => {
     const [formData, setFormData] = useState<GalleryData>({ title: '', url: '', type: 'image' });
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -653,7 +1459,6 @@ const GalleryTab = ({ gallery, onRefresh, showForm, setShowForm, editingItem, se
         try {
             let url = formData.url;
 
-            // Upload new file if selected
             if (selectedFile) {
                 const uploadResult = await uploadAPI.uploadFile(selectedFile);
                 url = uploadResult.url;
@@ -708,7 +1513,6 @@ const GalleryTab = ({ gallery, onRefresh, showForm, setShowForm, editingItem, se
 
     return (
         <div>
-            {/* Header with tabs */}
             <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-bold text-gray-800">Manage Gallery</h2>
                 <div className="flex gap-2">
@@ -727,7 +1531,6 @@ const GalleryTab = ({ gallery, onRefresh, showForm, setShowForm, editingItem, se
                 </div>
             </div>
 
-            {/* Upload Form */}
             {showForm && (
                 <div className="bg-white p-6 rounded-lg shadow mb-6 border-l-4 border-l-nss-blue">
                     <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
@@ -785,7 +1588,6 @@ const GalleryTab = ({ gallery, onRefresh, showForm, setShowForm, editingItem, se
                 </div>
             )}
 
-            {/* Media Type Tabs */}
             <div className="bg-white rounded-lg shadow mb-6">
                 <div className="flex border-b">
                     <button
@@ -795,7 +1597,7 @@ const GalleryTab = ({ gallery, onRefresh, showForm, setShowForm, editingItem, se
                             : 'text-gray-500 hover:text-gray-700'
                             }`}
                     >
-                        📷 Images <span className="bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full text-sm">{images.length}</span>
+                        📷 Images <span className="bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full text-xs ml-2">{images.length}</span>
                     </button>
                     <button
                         onClick={() => setActiveMediaTab('videos')}
@@ -804,12 +1606,11 @@ const GalleryTab = ({ gallery, onRefresh, showForm, setShowForm, editingItem, se
                             : 'text-gray-500 hover:text-gray-700'
                             }`}
                     >
-                        🎥 Videos <span className="bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full text-sm">{videos.length}</span>
+                        🎥 Videos <span className="bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full text-xs ml-2">{videos.length}</span>
                     </button>
                 </div>
             </div>
 
-            {/* Images Grid */}
             {activeMediaTab === 'images' && (
                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
                     {images.map((item: any) => (
@@ -833,7 +1634,6 @@ const GalleryTab = ({ gallery, onRefresh, showForm, setShowForm, editingItem, se
                 </div>
             )}
 
-            {/* Videos Grid */}
             {activeMediaTab === 'videos' && (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {videos.map((item: any) => (
@@ -867,7 +1667,7 @@ const GalleryTab = ({ gallery, onRefresh, showForm, setShowForm, editingItem, se
     );
 };
 
-// Members Tab Component
+// // Members Tab Component /////////////////////////////////////////////////////
 const MembersTab = ({ members, onRefresh, showForm, setShowForm, editingItem, setEditingItem }: any) => {
     const [formData, setFormData] = useState<MemberData>({ name: '', role: '', photoUrl: '', year: '' });
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -896,7 +1696,6 @@ const MembersTab = ({ members, onRefresh, showForm, setShowForm, editingItem, se
         try {
             let photoUrl = formData.photoUrl;
 
-            // Upload new file if selected
             if (selectedFile) {
                 const uploadResult = await uploadAPI.uploadFile(selectedFile);
                 photoUrl = uploadResult.url;
@@ -988,7 +1787,7 @@ const MembersTab = ({ members, onRefresh, showForm, setShowForm, editingItem, se
                             {member.photoUrl ? (
                                 <img src={uploadAPI.getFullUrl(member.photoUrl)} alt={member.name} className="w-full h-full object-cover" />
                             ) : (
-                                <div className="w-full h-full flex items-center justify-center text-3xl text-gray-400">👤</div>
+                                <div className="w-full h-full flex items-center justify-center text-3xl text-gray-300">🎥</div>
                             )}
                         </div>
                         <h3 className="font-bold text-lg">{member.name}</h3>
@@ -1010,327 +1809,6 @@ const MembersTab = ({ members, onRefresh, showForm, setShowForm, editingItem, se
     );
 };
 
-// Volunteers Tab Component
-const VolunteersTab = ({ volunteers, onRefresh, showForm, setShowForm, editingItem, setEditingItem }: any) => {
-    const [formData, setFormData] = useState<CreateVolunteerData>({ name: '', email: '', password: '' });
-    const [saving, setSaving] = useState(false);
-    const [error, setError] = useState('');
-    const [viewingVolunteer, setViewingVolunteer] = useState<VolunteerData | null>(null);
-
-    useEffect(() => {
-        if (editingItem) {
-            setFormData({
-                name: editingItem.name || '',
-                email: editingItem.email || '',
-                password: ''
-            });
-            setShowForm(true);
-        }
-    }, [editingItem]);
-
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setSaving(true);
-        setError('');
-
-        try {
-            if (editingItem) {
-                await volunteersAPI.update(editingItem.id, { name: formData.name, email: formData.email });
-            } else {
-                if (!formData.password || formData.password.length < 6) {
-                    setError('Password must be at least 6 characters');
-                    setSaving(false);
-                    return;
-                }
-                await volunteersAPI.create(formData);
-            }
-            resetForm();
-            onRefresh();
-        } catch (err: any) {
-            console.error('Error saving volunteer:', err);
-            setError(err.response?.data?.message || 'Error saving volunteer');
-        }
-        setSaving(false);
-    };
-
-    const handleDelete = async (id: number) => {
-        if (confirm('Are you sure you want to delete this volunteer?')) {
-            try {
-                await volunteersAPI.delete(id);
-                onRefresh();
-            } catch (err) {
-                console.error('Error deleting volunteer:', err);
-            }
-        }
-    };
-
-    const handleToggleActive = async (id: number) => {
-        try {
-            await volunteersAPI.toggleStatus(id);
-            onRefresh();
-        } catch (err) {
-            console.error('Error toggling status:', err);
-        }
-    };
-
-    const resetForm = () => {
-        setShowForm(false);
-        setEditingItem(null);
-        setFormData({ name: '', email: '', password: '' });
-        setError('');
-    };
-
-    // Volunteer Detail Modal
-    const VolunteerDetailModal = () => {
-        if (!viewingVolunteer) return null;
-        // Use profileData to see data even when profile is incomplete
-        const profile = (viewingVolunteer as any).profileData || (viewingVolunteer as any).profile;
-
-        // Required fields for profile completion
-        const requiredFields = [
-            { key: 'fullName', label: 'Full Name' },
-            { key: 'prnNo', label: 'PRN No' },
-            { key: 'department', label: 'Department' },
-            { key: 'academicYear', label: 'Academic Year' },
-            { key: 'nssYear', label: 'NSS Year' },
-            { key: 'phoneNo', label: 'Phone Number' },
-            { key: 'emailId', label: 'Email ID' },
-        ];
-
-        const optionalFields = [
-            { key: 'cgpa', label: 'CGPA' },
-            { key: 'eligibilityNo', label: 'Eligibility No' },
-            { key: 'religion', label: 'Religion' },
-            { key: 'caste', label: 'Caste' },
-            { key: 'casteCategory', label: 'Caste Category' },
-            { key: 'marksheetUrl', label: 'Marksheet' },
-        ];
-
-        // Count pending fields
-        const getPendingCount = () => {
-            if (!profile) return requiredFields.length;
-            return requiredFields.filter(f => !profile[f.key]).length;
-        };
-
-        const pendingCount = getPendingCount();
-
-
-        return (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                    <div className="p-6 border-b bg-nss-blue text-white rounded-t-xl">
-                        <div className="flex justify-between items-center">
-                            <div>
-                                <h2 className="text-xl font-bold">Volunteer Details</h2>
-                                {pendingCount > 0 && (
-                                    <span className="text-yellow-300 text-sm">⚠️ {pendingCount} required field(s) pending</span>
-                                )}
-                            </div>
-                            <button onClick={() => setViewingVolunteer(null)} className="text-white hover:text-gray-200 text-2xl">&times;</button>
-                        </div>
-                    </div>
-
-                    <div className="p-6">
-                        {/* Basic Info */}
-                        <div className="flex items-center gap-4 mb-6 pb-6 border-b">
-                            <div className="w-16 h-16 bg-nss-blue rounded-full flex items-center justify-center text-white text-2xl font-bold">
-                                {viewingVolunteer.name.charAt(0).toUpperCase()}
-                            </div>
-                            <div>
-                                <h3 className="text-xl font-bold text-gray-900">{viewingVolunteer.name}</h3>
-                                <p className="text-gray-500">{viewingVolunteer.email}</p>
-                                <span className={`inline-block mt-1 px-2 py-1 rounded text-xs ${viewingVolunteer.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                    {viewingVolunteer.isActive ? 'Active' : 'Inactive'}
-                                </span>
-                            </div>
-                        </div>
-
-                        {/* Profile Status Summary */}
-                        <div className={`mb-4 p-3 rounded-lg ${profile ? (pendingCount === 0 ? 'bg-green-50 border border-green-200' : 'bg-yellow-50 border border-yellow-200') : 'bg-red-50 border border-red-200'}`}>
-                            {!profile ? (
-                                <p className="text-red-700 font-medium">❌ Profile Not Started - Volunteer has not filled any details yet</p>
-                            ) : pendingCount === 0 ? (
-                                <p className="text-green-700 font-medium">✅ Profile Complete - All required fields are filled</p>
-                            ) : (
-                                <p className="text-yellow-700 font-medium">⚠️ Profile Incomplete - {pendingCount} required field(s) pending</p>
-                            )}
-                        </div>
-
-                        {/* Required Fields */}
-                        <div className="mb-6">
-                            <h4 className="text-sm font-semibold text-gray-600 mb-3 uppercase tracking-wide">Required Information</h4>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {requiredFields.map(field => {
-                                    const value = profile?.[field.key];
-                                    const displayValue = field.key === 'nssYear' && value ? `Year ${value}` : value;
-                                    const isPending = !value;
-                                    return (
-                                        <div key={field.key}>
-                                            <label className="block text-sm font-medium text-gray-500 mb-1">
-                                                {field.label}
-                                                {isPending && <span className="ml-1 text-red-500">*</span>}
-                                            </label>
-                                            <p className={`px-3 py-2 rounded-lg ${isPending ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-gray-50 text-gray-900'}`}>
-                                                {isPending ? '⚠️ Pending' : displayValue}
-                                            </p>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-
-                        {/* Optional Fields */}
-                        <div className="mb-6">
-                            <h4 className="text-sm font-semibold text-gray-600 mb-3 uppercase tracking-wide">Additional Information</h4>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {optionalFields.filter(f => f.key !== 'marksheetUrl').map(field => {
-                                    const value = profile?.[field.key];
-                                    return (
-                                        <div key={field.key}>
-                                            <label className="block text-sm font-medium text-gray-500 mb-1">{field.label}</label>
-                                            <p className="px-3 py-2 rounded-lg bg-gray-50 text-gray-900">{value || '-'}</p>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-
-                        {/* Marksheet Section */}
-                        <div className="border-t pt-4">
-                            <h4 className="text-sm font-semibold text-gray-600 mb-3 uppercase tracking-wide">Documents</h4>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-500 mb-1">Marksheet</label>
-                                {profile?.marksheetUrl ? (
-                                    <a
-                                        href={uploadAPI.getFullUrl(profile.marksheetUrl)}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="inline-flex items-center gap-2 px-4 py-2 bg-nss-blue text-white rounded-lg hover:bg-blue-900 transition"
-                                    >
-                                        📄 View Marksheet
-                                    </a>
-                                ) : (
-                                    <p className="px-3 py-2 rounded-lg bg-yellow-50 text-yellow-600 border border-yellow-200">
-                                        📎 Not uploaded yet
-                                    </p>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="p-4 border-t bg-gray-50 rounded-b-xl flex justify-end gap-2">
-                        <button
-                            onClick={() => { setViewingVolunteer(null); setEditingItem(viewingVolunteer); }}
-                            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"
-                        >
-                            Edit Account
-                        </button>
-                        <button
-                            onClick={() => setViewingVolunteer(null)}
-                            className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition"
-                        >
-                            Close
-                        </button>
-                    </div>
-                </div>
-            </div>
-        );
-    };
-    return (
-        <div>
-            <VolunteerDetailModal />
-
-            <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-gray-800">Manage Volunteers</h2>
-                <button
-                    onClick={() => { resetForm(); setShowForm(true); }}
-                    className="bg-nss-blue text-white px-4 py-2 rounded hover:bg-blue-900 transition"
-                >
-                    + Add Volunteer
-                </button>
-            </div>
-
-            {showForm && (
-                <div className="bg-white p-6 rounded-lg shadow mb-6">
-                    <h3 className="text-lg font-semibold mb-4">{editingItem ? 'Edit Volunteer' : 'Add New Volunteer'}</h3>
-                    {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">{error}</div>}
-                    <form onSubmit={handleSubmit} className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
-                                <input type="text" placeholder="Volunteer Name" required value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} className="w-full border rounded px-3 py-2" />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
-                                <input type="email" placeholder="volunteer@example.com" required value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} className="w-full border rounded px-3 py-2" />
-                            </div>
-                            {!editingItem && (
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Password *</label>
-                                    <input type="password" placeholder="Min 6 characters" required={!editingItem} value={formData.password} onChange={e => setFormData({ ...formData, password: e.target.value })} className="w-full border rounded px-3 py-2" />
-                                </div>
-                            )}
-                        </div>
-                        {editingItem && <p className="text-sm text-gray-500">Volunteers can change their password from their dashboard.</p>}
-                        <div className="flex gap-2">
-                            <button type="submit" disabled={saving} className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 disabled:bg-gray-400">{saving ? 'Saving...' : 'Save'}</button>
-                            <button type="button" onClick={resetForm} className="bg-gray-300 px-4 py-2 rounded hover:bg-gray-400">Cancel</button>
-                        </div>
-                    </form>
-                </div>
-            )}
-
-            <div className="bg-white rounded-lg shadow overflow-hidden">
-                <table className="w-full">
-                    <thead className="bg-gray-50">
-                        <tr>
-                            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600">Name</th>
-                            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600">Email</th>
-                            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600">Profile</th>
-                            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600">Status</th>
-                            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600">Created</th>
-                            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {volunteers.map((volunteer: VolunteerData) => (
-                            <tr key={volunteer.id} className="border-t hover:bg-gray-50">
-                                <td className="px-4 py-3">
-                                    <button
-                                        onClick={() => setViewingVolunteer(volunteer)}
-                                        className="text-nss-blue hover:underline font-medium"
-                                    >
-                                        {volunteer.name}
-                                    </button>
-                                </td>
-                                <td className="px-4 py-3">{volunteer.email}</td>
-                                <td className="px-4 py-3">
-                                    <button
-                                        onClick={() => setViewingVolunteer(volunteer)}
-                                        className={(volunteer as any).profile ? 'text-green-600 text-sm hover:underline' : 'text-yellow-600 text-sm hover:underline'}
-                                    >
-                                        {(volunteer as any).profile ? '✓ View Details' : 'Pending'}
-                                    </button>
-                                </td>
-                                <td className="px-4 py-3">
-                                    <button onClick={() => handleToggleActive(volunteer.id)} className={`px-2 py-1 rounded text-xs ${volunteer.isActive ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-red-100 text-red-700 hover:bg-red-200'}`}>
-                                        {volunteer.isActive ? 'Active' : 'Inactive'}
-                                    </button>
-                                </td>
-                                <td className="px-4 py-3 text-sm text-gray-500">{volunteer.createdAt ? new Date(volunteer.createdAt).toLocaleDateString() : '-'}</td>
-                                <td className="px-4 py-3">
-                                    <button onClick={() => setEditingItem(volunteer)} className="text-blue-600 hover:underline mr-3">Edit</button>
-                                    <button onClick={() => handleDelete(volunteer.id)} className="text-red-600 hover:underline">Delete</button>
-                                </td>
-                            </tr>
-                        ))}
-                        {volunteers.length === 0 && <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">No volunteers yet. Click "Add Volunteer" to create one.</td></tr>}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    );
-};
 
 // Settings Tab Component
 const SettingsTab = ({ settings, onRefresh }: { settings: SiteSettings | null, onRefresh: () => void }) => {
@@ -1352,9 +1830,9 @@ const SettingsTab = ({ settings, onRefresh }: { settings: SiteSettings | null, o
         socialTwitter: '',
     });
     const [saving, setSaving] = useState(false);
-    
+
     // State for managing home slider images
-    const [sliderImages, setSliderImages] = useState<{url: string, description: string}[]>([]);
+    const [sliderImages, setSliderImages] = useState<{ url: string, description: string }[]>([]);
     const [uploadingImage, setUploadingImage] = useState(false);
 
     useEffect(() => {
@@ -1477,7 +1955,7 @@ const SettingsTab = ({ settings, onRefresh }: { settings: SiteSettings | null, o
                         <h3 className="text-lg font-semibold text-nss-blue">Home Slider Images</h3>
                         <span className="text-sm text-gray-500">{sliderImages.length} / 6 Images</span>
                     </div>
-                    
+
                     <div className="space-y-4">
                         {sliderImages.map((img, index) => (
                             <div key={index} className="flex flex-col md:flex-row gap-4 items-start border p-4 rounded bg-gray-50">
@@ -1486,24 +1964,24 @@ const SettingsTab = ({ settings, onRefresh }: { settings: SiteSettings | null, o
                                 </div>
                                 <div className="flex-1 w-full space-y-2">
                                     <label className="block text-sm font-medium text-gray-700">Brief Description</label>
-                                    <textarea 
-                                        value={img.description} 
+                                    <textarea
+                                        value={img.description}
                                         onChange={e => {
                                             const newImages = [...sliderImages];
                                             newImages[index].description = e.target.value;
                                             setSliderImages(newImages);
-                                        }} 
-                                        className="w-full border rounded px-3 py-2" 
-                                        rows={3} 
-                                        placeholder="Enter brief description for this slide..." 
+                                        }}
+                                        className="w-full border rounded px-3 py-2"
+                                        rows={3}
+                                        placeholder="Enter brief description for this slide..."
                                     />
                                     <div className="flex justify-end">
-                                        <button 
-                                            type="button" 
+                                        <button
+                                            type="button"
                                             onClick={() => {
                                                 const newImages = sliderImages.filter((_, i) => i !== index);
                                                 setSliderImages(newImages);
-                                            }} 
+                                            }}
                                             className="text-red-500 hover:text-red-700 text-sm font-medium"
                                         >
                                             Remove Image
@@ -1519,10 +1997,10 @@ const SettingsTab = ({ settings, onRefresh }: { settings: SiteSettings | null, o
                                     <span className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 transition inline-block">
                                         {uploadingImage ? 'Uploading...' : '+ Add Slider Image'}
                                     </span>
-                                    <input 
-                                        type="file" 
-                                        accept="image/*" 
-                                        className="hidden" 
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        className="hidden"
                                         disabled={uploadingImage}
                                         onChange={async (e) => {
                                             const file = e.target.files?.[0];

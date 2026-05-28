@@ -1,0 +1,1 @@
+import 'dotenv/config'; import { updateVolunteerProfile } from './src/services/volunteerService'; updateVolunteerProfile(3, { fullName: 'Bhagyesh Test', collegeYearAtEnrollment: 'TE' }).then(console.log).catch(console.error).finally(() => process.exit(0));

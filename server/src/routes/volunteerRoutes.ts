@@ -1,36 +1,70 @@
 import { Router } from 'express';
-import {
-    createVolunteer,
-    getAllVolunteers,
-    getVolunteerById,
-    updateVolunteer,
-    deleteVolunteer,
-    toggleVolunteerStatus,
-    getMyProfile,
-    updateMyProfile,
-    updatePassword,
-    getExperiences,
-    getAllPublicVolunteers,
-} from '../controllers/volunteerController';
-import { authenticateToken, requireAdmin, requireVolunteer } from '../middleware/auth';
+import { authenticateToken, requireAdmin } from '../middleware/auth';
+import { requireAYUnlocked } from '../middleware/ayLock';
+import * as volCtrl from '../controllers/volunteerController';
 
 const router = Router();
 
-// Public routes
-router.get('/experiences', getExperiences);
+// ── AY-scoped admin routes ─────────────────────────────────────────────────────
+// Mounted under /api/academic-years/:ayId/volunteers (see index.ts)
 
-// Admin routes - requires admin role
-router.post('/', authenticateToken, requireAdmin, createVolunteer);
-router.get('/', authenticateToken, requireAdmin, getAllVolunteers);
-router.get('/admin/:id', authenticateToken, requireAdmin, getVolunteerById);
-router.put('/admin/:id', authenticateToken, requireAdmin, updateVolunteer);
-router.delete('/admin/:id', authenticateToken, requireAdmin, deleteVolunteer);
-router.patch('/admin/:id/toggle-status', authenticateToken, requireAdmin, toggleVolunteerStatus);
+export const ayVolunteerRouter = Router({ mergeParams: true });
 
-// Volunteer self-service routes - requires volunteer role
-router.get('/public', authenticateToken, requireVolunteer, getAllPublicVolunteers);
-router.get('/me', authenticateToken, requireVolunteer, getMyProfile);
-router.put('/me/profile', authenticateToken, requireVolunteer, updateMyProfile);
-router.put('/me/password', authenticateToken, requireVolunteer, updatePassword);
+ayVolunteerRouter.get(
+    '/',
+    authenticateToken, requireAdmin,
+    volCtrl.listVolunteersByAY,
+);
+
+ayVolunteerRouter.post(
+    '/',
+    authenticateToken, requireAdmin, requireAYUnlocked,
+    volCtrl.createVolunteer,
+);
+
+ayVolunteerRouter.post(
+    '/import',
+    authenticateToken, requireAdmin, requireAYUnlocked,
+    volCtrl.importVolunteers,
+);
+
+ayVolunteerRouter.get(
+    '/:id',
+    authenticateToken, requireAdmin,
+    volCtrl.getVolunteer,
+);
+
+ayVolunteerRouter.put(
+    '/:id',
+    authenticateToken, requireAdmin, requireAYUnlocked,
+    volCtrl.updateVolunteer,
+);
+
+ayVolunteerRouter.delete(
+    '/:id',
+    authenticateToken, requireAdmin, requireAYUnlocked,
+    volCtrl.deleteVolunteer,
+);
+
+ayVolunteerRouter.patch(
+    '/:id/status',
+    authenticateToken, requireAdmin, requireAYUnlocked,
+    volCtrl.changeVolunteerStatus,
+);
+
+ayVolunteerRouter.patch(
+    '/:id/toggle-active',
+    authenticateToken, requireAdmin, requireAYUnlocked,
+    volCtrl.toggleVolunteerActive,
+);
+
+// ── Volunteer self-service (flat routes under /api/volunteers) ─────────────────
+// Mounted at /api/volunteers
+
+router.get('/me',           authenticateToken, volCtrl.getMyProfile);
+router.put('/me/profile',   authenticateToken, volCtrl.updateMyProfile);
+router.put('/me/password',  authenticateToken, volCtrl.updateMyPassword);
+router.get('/public',       authenticateToken, volCtrl.getPublicVolunteers);
+router.get('/experiences',  volCtrl.getExperiences);
 
 export default router;

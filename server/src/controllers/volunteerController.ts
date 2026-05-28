@@ -1,393 +1,168 @@
 import { Request, Response } from 'express';
-import { db } from '../db';
-import { volunteers, volunteerProfiles } from '../db/schema';
-import bcrypt from 'bcryptjs';
-import { eq } from 'drizzle-orm';
+import * as volService from '../services/volunteerService';
+import { ok, created, noContent, handleError } from '../lib/response';
 import { AuthRequest } from '../middleware/auth';
+import { db } from '../db';
+import { volunteerProfiles, volunteers } from '../db/schema';
+import { eq } from 'drizzle-orm';
 
-// Admin: Create new volunteer
+// ── Admin: AY-scoped volunteer management ─────────────────────────────────────
+
+export const listVolunteersByAY = async (req: Request, res: Response) => {
+    try {
+        const ayId = Number(req.params.ayId);
+        const { department, status, search, isActive } = req.query;
+        const data = await volService.listVolunteersForAY(ayId, {
+            department: department as string | undefined,
+            status: status as 'regular' | 'backup' | undefined,
+            search: search as string | undefined,
+            isActive: isActive !== undefined ? isActive === 'true' : undefined,
+        });
+        console.log('DEBUG API OUTPUT:', JSON.stringify(data[0], null, 2));
+        ok(res, data);
+    } catch (err) { handleError(res, err); }
+};
+
 export const createVolunteer = async (req: Request, res: Response) => {
-    const { name, email, password, academicYearId, department } = req.body;
-    const adminId = (req as AuthRequest).user?.id;
-
-    if (!name || !email || !password || !academicYearId || !department) {
-        return res.status(400).json({ message: 'Name, email, password, academicYearId, and department are required' });
-    }
-
-    // Password validation
-    if (password.length < 6) {
-        return res.status(400).json({ message: 'Password must be at least 6 characters' });
-    }
-
     try {
-        // Check if email already exists
-        const existing = await db.select().from(volunteers)
-            .where(eq(volunteers.email, email))
-            .limit(1);
-
-        if (existing.length > 0) {
-            return res.status(400).json({ message: 'A volunteer with this email already exists' });
-        }
-
-        const passwordHash = await bcrypt.hash(password, 10);
-
-        const [newVolunteer] = await db.insert(volunteers).values({
-            name,
-            email,
-            passwordHash,
-            academicYearId: parseInt(academicYearId),
-            department,
-            createdById: adminId,
-        }).returning();
-
-        // Create empty profile for the volunteer
-        await db.insert(volunteerProfiles).values({
-            volunteerId: newVolunteer.id,
-        });
-
-        res.status(201).json({
-            id: newVolunteer.id,
-            name: newVolunteer.name,
-            email: newVolunteer.email,
-            department: newVolunteer.department,
-            academicYearId: newVolunteer.academicYearId,
-            isActive: newVolunteer.isActive,
-            createdAt: newVolunteer.createdAt,
-        });
-    } catch (error) {
-        console.error('Create volunteer error:', error);
-        res.status(500).json({ message: 'Server error', error });
-    }
+        const adminId = (req as AuthRequest).user!.id;
+        const ayId = Number(req.params.ayId);
+        const vol = await volService.createVolunteer(ayId, req.body, adminId);
+        created(res, vol, `Volunteer "${vol.name}" added to academic year.`);
+    } catch (err) { handleError(res, err); }
 };
 
-// Admin: Get all volunteers
-export const getAllVolunteers = async (req: Request, res: Response) => {
+export const getVolunteer = async (req: Request, res: Response) => {
     try {
-        const allVolunteers = await db.select({
-            id: volunteers.id,
-            name: volunteers.name,
-            email: volunteers.email,
-            department: volunteers.department,
-            academicYearId: volunteers.academicYearId,
-            isActive: volunteers.isActive,
-            createdAt: volunteers.createdAt,
-        }).from(volunteers);
-
-        // Fetch profiles for all volunteers
-        const allProfiles = await db.select().from(volunteerProfiles);
-
-        // Map profiles to volunteers
-        const volunteersWithProfiles = allVolunteers.map(volunteer => {
-            const profile = allProfiles.find(p => p.volunteerId === volunteer.id);
-            return {
-                ...volunteer,
-                profile: profile || null,
-                profileData: profile || null,
-            };
-        });
-
-        res.json(volunteersWithProfiles);
-    } catch (error) {
-        console.error('Get volunteers error:', error);
-        res.status(500).json({ message: 'Server error', error });
-    }
+        const data = await volService.getVolunteerById(Number(req.params.id));
+        ok(res, data);
+    } catch (err) { handleError(res, err); }
 };
 
-// Volunteer: Get public data of all active volunteers
-export const getAllPublicVolunteers = async (req: Request, res: Response) => {
-    try {
-        const activeVolunteers = await db.select({
-            id: volunteers.id,
-            name: volunteers.name,
-            email: volunteers.email,
-            department: volunteers.department,
-            academicYearId: volunteers.academicYearId,
-        }).from(volunteers)
-        .where(eq(volunteers.isActive, true));
-
-        const activeProfiles = await db.select({
-            volunteerId: volunteerProfiles.volunteerId,
-            collegeYearAtEnrollment: volunteerProfiles.collegeYearAtEnrollment,
-            profilePhotoUrl: volunteerProfiles.profilePhotoUrl,
-        }).from(volunteerProfiles);
-
-        const result = activeVolunteers.map(volunteer => {
-            const profile = activeProfiles.find(p => p.volunteerId === volunteer.id);
-            return {
-                id: volunteer.id,
-                name: volunteer.name,
-                email: volunteer.email,
-                department: volunteer.department,
-                academicYearId: volunteer.academicYearId,
-                profile: profile || null,
-            };
-        });
-
-        res.json(result);
-    } catch (error) {
-        console.error('Get public volunteers error:', error);
-        res.status(500).json({ message: 'Server error', error });
-    }
-};
-
-
-// Admin: Get single volunteer with profile
-export const getVolunteerById = async (req: Request, res: Response) => {
-    const { id } = req.params;
-
-    try {
-        const volunteer = await db.select().from(volunteers)
-            .where(eq(volunteers.id, parseInt(id)))
-            .limit(1);
-
-        if (volunteer.length === 0) {
-            return res.status(404).json({ message: 'Volunteer not found' });
-        }
-
-        const profile = await db.select().from(volunteerProfiles)
-            .where(eq(volunteerProfiles.volunteerId, parseInt(id)))
-            .limit(1);
-
-        res.json({
-            ...volunteer[0],
-            profile: profile[0] || null,
-        });
-    } catch (error) {
-        console.error('Get volunteer error:', error);
-        res.status(500).json({ message: 'Server error', error });
-    }
-};
-
-// Admin: Update volunteer basic info
 export const updateVolunteer = async (req: Request, res: Response) => {
-    const { id } = req.params;
-    const { name, email } = req.body;
-
     try {
-        const [updated] = await db.update(volunteers)
-            .set({ name, email, updatedAt: new Date() })
-            .where(eq(volunteers.id, parseInt(id)))
-            .returning();
-
-        if (!updated) {
-            return res.status(404).json({ message: 'Volunteer not found' });
-        }
-
-        res.json(updated);
-    } catch (error) {
-        console.error('Update volunteer error:', error);
-        res.status(500).json({ message: 'Server error', error });
-    }
+        const adminId = (req as AuthRequest).user!.id;
+        const vol = await volService.updateVolunteer(Number(req.params.id), req.body, adminId);
+        ok(res, vol, 'Volunteer updated.');
+    } catch (err) { handleError(res, err); }
 };
 
-// Admin: Delete volunteer
 export const deleteVolunteer = async (req: Request, res: Response) => {
-    const { id } = req.params;
-
     try {
-        const deleted = await db.delete(volunteers)
-            .where(eq(volunteers.id, parseInt(id)))
-            .returning();
-
-        if (deleted.length === 0) {
-            return res.status(404).json({ message: 'Volunteer not found' });
-        }
-
-        res.json({ message: 'Volunteer deleted successfully' });
-    } catch (error) {
-        console.error('Delete volunteer error:', error);
-        res.status(500).json({ message: 'Server error', error });
-    }
+        const adminId = (req as AuthRequest).user!.id;
+        await volService.deleteVolunteer(Number(req.params.id), adminId);
+        noContent(res);
+    } catch (err) { handleError(res, err); }
 };
 
-// Admin: Toggle volunteer active status
-export const toggleVolunteerStatus = async (req: Request, res: Response) => {
-    const { id } = req.params;
-
+export const changeVolunteerStatus = async (req: Request, res: Response) => {
     try {
-        const volunteer = await db.select().from(volunteers)
-            .where(eq(volunteers.id, parseInt(id)))
-            .limit(1);
-
-        if (volunteer.length === 0) {
-            return res.status(404).json({ message: 'Volunteer not found' });
+        const adminId = (req as AuthRequest).user!.id;
+        const { status } = req.body;
+        if (!['regular', 'backup'].includes(status)) {
+            return res.status(400).json({ success: false, code: 'VALIDATION_ERROR', message: 'status must be "regular" or "backup".' });
         }
-
-        const [updated] = await db.update(volunteers)
-            .set({ isActive: !volunteer[0].isActive, updatedAt: new Date() })
-            .where(eq(volunteers.id, parseInt(id)))
-            .returning();
-
-        res.json({
-            id: updated.id,
-            isActive: updated.isActive,
-            message: updated.isActive ? 'Volunteer activated' : 'Volunteer deactivated'
-        });
-    } catch (error) {
-        console.error('Toggle status error:', error);
-        res.status(500).json({ message: 'Server error', error });
-    }
+        const vol = await volService.changeVolunteerStatus(Number(req.params.id), status, adminId);
+        ok(res, vol, `Volunteer status changed to "${status}".`);
+    } catch (err) { handleError(res, err); }
 };
 
-// Volunteer: Get own profile
+export const toggleVolunteerActive = async (req: Request, res: Response) => {
+    try {
+        const adminId = (req as AuthRequest).user!.id;
+        const vol = await volService.toggleVolunteerActive(Number(req.params.id), adminId);
+        ok(res, vol, `Volunteer ${vol.isActive ? 'activated' : 'deactivated'}.`);
+    } catch (err) { handleError(res, err); }
+};
+
+export const importVolunteers = async (req: Request, res: Response) => {
+    try {
+        const adminId = (req as AuthRequest).user!.id;
+        const ayId = Number(req.params.ayId);
+        const result = await volService.importVolunteersFromAY({ ...req.body, targetAyId: ayId }, adminId);
+        ok(res, result, `Import complete. ${result.imported.length} imported, ${result.skipped.length} skipped.`);
+    } catch (err) { handleError(res, err); }
+};
+
+// ── Volunteer self-service ────────────────────────────────────────────────────
+
 export const getMyProfile = async (req: Request, res: Response) => {
-    const volunteerId = (req as AuthRequest).user?.id;
-
     try {
-        const profile = await db.select().from(volunteerProfiles)
-            .where(eq(volunteerProfiles.volunteerId, volunteerId!))
-            .limit(1);
-
-        const volunteer = await db.select({
-            id: volunteers.id,
-            name: volunteers.name,
-            email: volunteers.email,
-        }).from(volunteers)
-            .where(eq(volunteers.id, volunteerId!))
-            .limit(1);
-
-        res.json({
-            ...volunteer[0],
-            profile: profile[0] || null,
-        });
-    } catch (error) {
-        console.error('Get profile error:', error);
-        res.status(500).json({ message: 'Server error', error });
-    }
+        const volunteerId = (req as AuthRequest).user!.id;
+        const data = await volService.getVolunteerById(volunteerId);
+        ok(res, data);
+    } catch (err) { handleError(res, err); }
 };
 
-// Volunteer: Update own profile
 export const updateMyProfile = async (req: Request, res: Response) => {
-    const volunteerId = (req as AuthRequest).user?.id;
-    // Note: department is now on the volunteers table, not profiles.
-    // collegeYearAtEnrollment replaces the old academicYear field on profiles.
-    const {
-        fullName,
-        prnNo,
-        collegeYearAtEnrollment,
-        nssYear,
-        marksheetUrl,
-        cgpa,
-        eligibilityNo,
-        religion,
-        caste,
-        casteCategory,
-        phoneNo,
-        emailId,
-        profilePhotoUrl,
-        experienceText,
-    } = req.body;
-
     try {
-        const [updated] = await db.update(volunteerProfiles)
-            .set({
-                fullName,
-                prnNo,
-                collegeYearAtEnrollment,
-                nssYear,
-                marksheetUrl,
-                cgpa,
-                eligibilityNo,
-                religion,
-                caste,
-                casteCategory,
-                phoneNo,
-                emailId,
-                profilePhotoUrl,
-                experienceText,
-                updatedAt: new Date(),
-            })
-            .where(eq(volunteerProfiles.volunteerId, volunteerId!))
-            .returning();
-
-        if (!updated) {
-            // Create profile if it doesn't exist
-            const [newProfile] = await db.insert(volunteerProfiles).values({
-                volunteerId: volunteerId!,
-                fullName,
-                prnNo,
-                collegeYearAtEnrollment,
-                nssYear,
-                marksheetUrl,
-                cgpa,
-                eligibilityNo,
-                religion,
-                caste,
-                casteCategory,
-                phoneNo,
-                emailId,
-                profilePhotoUrl,
-                experienceText,
-            }).returning();
-            return res.json(newProfile);
-        }
-
-        res.json(updated);
-    } catch (error) {
-        console.error('Update profile error:', error);
-        res.status(500).json({ message: 'Server error', error });
-    }
+        const volunteerId = (req as AuthRequest).user!.id;
+        const profile = await volService.updateVolunteerProfile(volunteerId, req.body);
+        ok(res, profile, 'Profile updated.');
+    } catch (err) { handleError(res, err); }
 };
 
-// Volunteer: Update password
-export const updatePassword = async (req: Request, res: Response) => {
-    const volunteerId = (req as AuthRequest).user?.id;
-    const { currentPassword, newPassword } = req.body;
-
-    if (!currentPassword || !newPassword) {
-        return res.status(400).json({ message: 'Current and new password are required' });
-    }
-
-    if (newPassword.length < 6) {
-        return res.status(400).json({ message: 'New password must be at least 6 characters' });
-    }
-
+export const updateMyPassword = async (req: Request, res: Response) => {
     try {
-        const volunteer = await db.select().from(volunteers)
-            .where(eq(volunteers.id, volunteerId!))
+        const volunteerId = (req as AuthRequest).user!.id;
+        const { currentPassword, newPassword } = req.body;
+        if (!currentPassword || !newPassword) {
+            return res.status(400).json({ success: false, code: 'VALIDATION_ERROR', message: 'currentPassword and newPassword are required.' });
+        }
+        await volService.changePassword(volunteerId, currentPassword, newPassword);
+        ok(res, null, 'Password updated.');
+    } catch (err) { handleError(res, err); }
+};
+
+/** Volunteer-to-volunteer: list active volunteers in the same AY (limited fields). */
+export const getPublicVolunteers = async (req: Request, res: Response) => {
+    try {
+        const volunteerUser = (req as AuthRequest).user!;
+        // Find AY for the requesting volunteer
+        const [vol] = await db
+            .select({ academicYearId: volunteers.academicYearId })
+            .from(volunteers)
+            .where(eq(volunteers.id, volunteerUser.id))
             .limit(1);
+        if (!vol) return res.status(404).json({ success: false, message: 'Volunteer not found.' });
 
-        if (volunteer.length === 0) {
-            return res.status(404).json({ message: 'Volunteer not found' });
-        }
-
-        const validPassword = await bcrypt.compare(currentPassword, volunteer[0].passwordHash);
-        if (!validPassword) {
-            return res.status(401).json({ message: 'Current password is incorrect' });
-        }
-
-        const newPasswordHash = await bcrypt.hash(newPassword, 10);
-        await db.update(volunteers)
-            .set({ passwordHash: newPasswordHash, updatedAt: new Date() })
-            .where(eq(volunteers.id, volunteerId!));
-
-        res.json({ message: 'Password updated successfully' });
-    } catch (error) {
-        console.error('Update password error:', error);
-        res.status(500).json({ message: 'Server error', error });
-    }
+        const data = await volService.listVolunteersForAY(vol.academicYearId, { isActive: true });
+        // Strip sensitive fields
+        const safe = data.map(v => ({
+            id: v.id,
+            name: v.name,
+            department: v.department,
+            status: v.status,
+            fullName: v.profile?.fullName,
+            profilePhotoUrl: v.profile?.profilePhotoUrl,
+        }));
+        ok(res, safe);
+    } catch (err) { handleError(res, err); }
 };
 
-// Public: Get all volunteer experiences
+/** Public: volunteer experience testimonials */
 export const getExperiences = async (req: Request, res: Response) => {
     try {
-        const allProfiles = await db.select().from(volunteerProfiles);
+        const profiles = await db
+            .select({
+                id: volunteerProfiles.id,
+                fullName: volunteerProfiles.fullName,
+                profilePhotoUrl: volunteerProfiles.profilePhotoUrl,
+                experienceText: volunteerProfiles.experienceText,
+                collegeYearAtEnrollment: volunteerProfiles.collegeYearAtEnrollment,
+            })
+            .from(volunteerProfiles);
 
-        // Filter profiles that have some experience text
-        const experiences = allProfiles
-            .filter(profile => profile.experienceText && profile.experienceText.trim() !== '')
-            .map(profile => ({
-                id: profile.id,
-                name: profile.fullName || 'Anonymous',
-                // department moved to volunteers table; collegeYearAtEnrollment replaces academicYear
-                role: `Volunteer, ${profile.collegeYearAtEnrollment ?? ''}`.trim(),
-                text: profile.experienceText,
-                image: profile.profilePhotoUrl || 'https://i.pravatar.cc/150?img=1',
+        const experiences = profiles
+            .filter(p => p.experienceText && p.experienceText.trim() !== '')
+            .map(p => ({
+                id: p.id,
+                name: p.fullName ?? 'Anonymous',
+                role: p.collegeYearAtEnrollment ? `Volunteer, ${p.collegeYearAtEnrollment}` : 'Volunteer',
+                text: p.experienceText,
+                image: p.profilePhotoUrl ?? 'https://i.pravatar.cc/150?img=1',
             }));
 
-        res.json(experiences);
-    } catch (error) {
-        console.error('Get experiences error:', error);
-        res.status(500).json({ message: 'Server error', error });
-    }
+        ok(res, experiences);
+    } catch (err) { handleError(res, err); }
 };

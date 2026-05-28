@@ -6,13 +6,14 @@ import type { VolunteerProfileData, VolunteerData } from '../services/api';
 // JSPMS RSCOE Departments
 const DEPARTMENTS = [
     'Computer Engineering',
+    'Computer Science and Business Systems',
     'Information Technology',
-    'Electronics & Telecommunication Engineering',
+    'Electronics and Telecommunication',
+    'Electrical Engineering',
+    'Automation and Robotics',
     'Mechanical Engineering',
     'Civil Engineering',
-    'Electrical Engineering',
-    'Artificial Intelligence & Data Science',
-    'AIDS (AI & DS)',
+    'Bachelor of Computer Applications',
 ];
 
 const ACADEMIC_YEARS = ['FE', 'SE', 'TE', 'BE'];
@@ -44,11 +45,11 @@ const VolunteerDashboard = () => {
     const [changingPassword, setChangingPassword] = useState(false);
 
     // Profile form state
-    const [profile, setProfile] = useState<VolunteerProfileData>({
+    const [profile, setProfile] = useState<VolunteerProfileData & { department?: string }>({
         fullName: '',
         prnNo: '',
         department: '',
-        academicYear: '',
+        collegeYearAtEnrollment: '',
         nssYear: undefined,
         marksheetUrl: '',
         cgpa: '',
@@ -84,14 +85,16 @@ const VolunteerDashboard = () => {
     const fetchProfile = async () => {
         try {
             const response = await volunteerProfileAPI.getMyProfile();
-            const data = response.data;
+            // Since the backend uses ok(res, data) wrapper, response.data has { success: true, data: { ... } }
+            // So we need to extract .data from response.data!
+            const data = (response.data as any).data || response.data;
             if (data.profile) {
                 setHasProfile(true);
                 setProfile({
                     fullName: data.profile.fullName || '',
                     prnNo: data.profile.prnNo || '',
-                    department: data.profile.department || '',
-                    academicYear: data.profile.academicYear || '',
+                    department: data.department || '', // From VolunteerData
+                    collegeYearAtEnrollment: data.profile.collegeYearAtEnrollment || '',
                     nssYear: data.profile.nssYear || undefined,
                     marksheetUrl: data.profile.marksheetUrl || '',
                     cgpa: data.profile.cgpa || '',
@@ -107,7 +110,12 @@ const VolunteerDashboard = () => {
             } else {
                 setHasProfile(false);
                 setIsEditing(true); // No profile, start in edit mode
-                setProfile(prev => ({ ...prev, emailId: data.email }));
+                setProfile(prev => ({ 
+                    ...prev, 
+                    emailId: data.email || '',
+                    department: data.department || '',
+                    fullName: data.name || ''
+                }));
             }
         } catch (error) {
             console.error('Error fetching profile:', error);
@@ -121,7 +129,8 @@ const VolunteerDashboard = () => {
         setLoadingVolunteers(true);
         try {
             const response = await volunteersAPI.getAllPublic();
-            setAllVolunteers(response.data);
+            const volunteersArr = (response.data as any)?.data ?? response.data;
+            setAllVolunteers(Array.isArray(volunteersArr) ? volunteersArr : []);
         } catch (error) {
             console.error('Error fetching volunteers:', error);
         } finally {
@@ -271,9 +280,9 @@ const VolunteerDashboard = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {renderInfoField("Full Name", profile.fullName || '-')}
                 {renderInfoField("PRN No", profile.prnNo || '-')}
-                {renderInfoField("Department", profile.department || '-')}
-                {renderInfoField("Academic Year", profile.academicYear || '-')}
-                {renderInfoField("NSS Year", profile.nssYear ? `Year ${profile.nssYear}` : '-')}
+                {renderInfoField('Department', profile.department || '-')}
+                {renderInfoField('Academic Year', profile.collegeYearAtEnrollment || '-')}
+                {renderInfoField('NSS Year', profile.nssYear ? `Year ${profile.nssYear}` : '')}
                 {renderInfoField("CGPA", profile.cgpa || '-')}
                 {renderInfoField("Eligibility No", profile.eligibilityNo || '-')}
                 {renderInfoField("Religion", profile.religion || '-')}
@@ -398,8 +407,8 @@ const VolunteerDashboard = () => {
                         Academic Year <span className="text-red-500">*</span>
                     </label>
                     <select
-                        value={profile.academicYear}
-                        onChange={(e) => setProfile(prev => ({ ...prev, academicYear: e.target.value }))}
+                        value={profile.collegeYearAtEnrollment}
+                        onChange={(e) => setProfile(prev => ({ ...prev, collegeYearAtEnrollment: e.target.value }))}
                         className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-nss-blue focus:border-nss-blue outline-none transition"
                         required
                     >
@@ -515,8 +524,9 @@ const VolunteerDashboard = () => {
                         type="email"
                         value={profile.emailId}
                         onChange={(e) => setProfile(prev => ({ ...prev, emailId: e.target.value }))}
-                        className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-nss-blue focus:border-nss-blue outline-none transition"
-                        placeholder="Enter email"
+                        className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-nss-blue focus:border-nss-blue outline-none transition bg-gray-100 text-gray-500 cursor-not-allowed"
+                        placeholder="Enter email address"
+                        disabled={true}
                         required
                     />
                 </div>

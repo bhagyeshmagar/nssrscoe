@@ -1,117 +1,122 @@
+/**
+ * AY Lock Middleware
+ *
+ * requireAYUnlocked — blocks all writes when the target AY is locked.
+ * requireAYNotArchived — blocks writes to archived AYs.
+ * requireCurrentAY — restricts to the currently active AY only.
+ *
+ * Resolution priority for AY id:
+ *   1. req.params.ayId
+ *   2. req.params.academicYearId
+ *   3. req.body.academicYearId
+ *   4. req.query.academicYearId
+ */
 import { Request, Response, NextFunction } from 'express';
+import { eq } from 'drizzle-orm';
 import { db } from '../db';
 import { academicYears } from '../db/schema';
-import { eq } from 'drizzle-orm';
 
-/**
- * Middleware: requireAYUnlocked
- *
- * Protects write routes (POST, PUT, PATCH, DELETE) that modify data scoped to
- * an academic year.  Reads the `ayId` from `req.params` (or falls back to
- * `req.body.academicYearId`) and checks whether the AY is locked.
- *
- * Usage (in any router where ayId is a route param):
- *   router.post('/:ayId/volunteers', authenticateToken, requireAdmin, requireAYUnlocked, createVolunteer);
- *
- * Returns 403 if the AY is locked, 404 if the AY does not exist,
- * 400 if no AY identifier can be resolved.
- */
+type AYRow = { isLocked: boolean; isArchived: boolean; isCurrent: boolean; label: string };
+
+const resolveAYId = (req: Request): number | null => {
+    const raw =
+        req.params.ayId ??
+        req.params.academicYearId ??
+        req.body?.academicYearId ??
+        req.query?.academicYearId;
+    if (!raw) return null;
+    const id = parseInt(String(raw), 10);
+    return isNaN(id) ? null : id;
+};
+
+const fetchAY = async (id: number): Promise<AYRow | null> => {
+    const [row] = await db
+        .select({
+            isLocked: academicYears.isLocked,
+            isArchived: academicYears.isArchived,
+            isCurrent: academicYears.isCurrent,
+            label: academicYears.label,
+        })
+        .from(academicYears)
+        .where(eq(academicYears.id, id))
+        .limit(1);
+    return row ?? null;
+};
+
+/** Blocks write routes when the AY is locked. Read routes pass through. */
 export const requireAYUnlocked = async (
-    req: Request,
-    res: Response,
-    next: NextFunction,
+    req: Request, res: Response, next: NextFunction,
 ): Promise<void> => {
-    // Resolve the AY id from route param or request body
-    const rawId = req.params.ayId ?? req.params.academicYearId ?? req.body?.academicYearId;
-
-    if (!rawId) {
-        res.status(400).json({ message: 'Academic year identifier is required for this operation.' });
+    const ayId = resolveAYId(req);
+    if (!ayId) {
+        res.status(400).json({ success: false, code: 'MISSING_AY_ID', message: 'Academic year identifier is required.' });
         return;
     }
-
-    const ayId = parseInt(rawId, 10);
-    if (isNaN(ayId)) {
-        res.status(400).json({ message: 'Academic year identifier must be a number.' });
-        return;
-    }
-
     try {
-        const [ay] = await db
-            .select({ isLocked: academicYears.isLocked, label: academicYears.label })
-            .from(academicYears)
-            .where(eq(academicYears.id, ayId))
-            .limit(1);
-
+        const ay = await fetchAY(ayId);
         if (!ay) {
-            res.status(404).json({ message: `Academic year with id ${ayId} not found.` });
+            res.status(404).json({ success: false, code: 'NOT_FOUND', message: `Academic year ${ayId} not found.` });
             return;
         }
-
         if (ay.isLocked) {
-            res.status(403).json({
-                message: `Academic year "${ay.label}" is locked and cannot be modified.`,
-                code: 'AY_LOCKED',
-            });
+            res.status(403).json({ success: false, code: 'AY_LOCKED', message: `Academic year "${ay.label}" is locked and cannot be modified.` });
             return;
         }
-
         next();
-    } catch (error) {
-        console.error('requireAYUnlocked error:', error);
-        res.status(500).json({ message: 'Server error while checking academic year lock status.' });
+    } catch (err) {
+        console.error('requireAYUnlocked error:', err);
+        res.status(500).json({ success: false, code: 'INTERNAL_ERROR', message: 'Server error checking AY lock status.' });
     }
 };
 
-/**
- * Middleware: requireCurrentAY
- *
- * Ensures the targeted AY is the currently active one.
- * Use on routes that should only operate on the active AY
- * (e.g. creating new volunteers, assigning core team).
- *
- * Must be used AFTER requireAYUnlocked (or combine both as needed).
- */
-export const requireCurrentAY = async (
-    req: Request,
-    res: Response,
-    next: NextFunction,
+/** Blocks writes when the AY is archived. */
+export const requireAYNotArchived = async (
+    req: Request, res: Response, next: NextFunction,
 ): Promise<void> => {
-    const rawId = req.params.ayId ?? req.params.academicYearId ?? req.body?.academicYearId;
-
-    if (!rawId) {
-        res.status(400).json({ message: 'Academic year identifier is required for this operation.' });
+    const ayId = resolveAYId(req);
+    if (!ayId) {
+        res.status(400).json({ success: false, code: 'MISSING_AY_ID', message: 'Academic year identifier is required.' });
         return;
     }
-
-    const ayId = parseInt(rawId, 10);
-    if (isNaN(ayId)) {
-        res.status(400).json({ message: 'Academic year identifier must be a number.' });
-        return;
-    }
-
     try {
-        const [ay] = await db
-            .select({ isCurrent: academicYears.isCurrent, label: academicYears.label })
-            .from(academicYears)
-            .where(eq(academicYears.id, ayId))
-            .limit(1);
-
+        const ay = await fetchAY(ayId);
         if (!ay) {
-            res.status(404).json({ message: `Academic year with id ${ayId} not found.` });
+            res.status(404).json({ success: false, code: 'NOT_FOUND', message: `Academic year ${ayId} not found.` });
             return;
         }
-
-        if (!ay.isCurrent) {
-            res.status(403).json({
-                message: `Academic year "${ay.label}" is not the current active year. Switch to the current AY to perform this action.`,
-                code: 'AY_NOT_CURRENT',
-            });
+        if (ay.isArchived) {
+            res.status(403).json({ success: false, code: 'AY_ARCHIVED', message: `Academic year "${ay.label}" is archived.` });
             return;
         }
-
         next();
-    } catch (error) {
-        console.error('requireCurrentAY error:', error);
-        res.status(500).json({ message: 'Server error while checking academic year status.' });
+    } catch (err) {
+        console.error('requireAYNotArchived error:', err);
+        res.status(500).json({ success: false, code: 'INTERNAL_ERROR', message: 'Server error checking AY archive status.' });
+    }
+};
+
+/** Restricts to the currently active AY only. */
+export const requireCurrentAY = async (
+    req: Request, res: Response, next: NextFunction,
+): Promise<void> => {
+    const ayId = resolveAYId(req);
+    if (!ayId) {
+        res.status(400).json({ success: false, code: 'MISSING_AY_ID', message: 'Academic year identifier is required.' });
+        return;
+    }
+    try {
+        const ay = await fetchAY(ayId);
+        if (!ay) {
+            res.status(404).json({ success: false, code: 'NOT_FOUND', message: `Academic year ${ayId} not found.` });
+            return;
+        }
+        if (!ay.isCurrent) {
+            res.status(403).json({ success: false, code: 'AY_NOT_CURRENT', message: `Academic year "${ay.label}" is not the active year. Switch to the current AY to perform this action.` });
+            return;
+        }
+        next();
+    } catch (err) {
+        console.error('requireCurrentAY error:', err);
+        res.status(500).json({ success: false, code: 'INTERNAL_ERROR', message: 'Server error checking AY status.' });
     }
 };

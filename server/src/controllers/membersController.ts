@@ -12,7 +12,7 @@
  */
 import { Request, Response } from 'express';
 import { db } from '../db';
-import { coreTeamAssignments, coreTeamRoles, academicYears, volunteers } from '../db/schema';
+import { coreTeamAssignments, coreTeamRoles, academicYears, volunteers, volunteerProfiles } from '../db/schema';
 import { eq, desc, and } from 'drizzle-orm';
 
 /**
@@ -56,13 +56,14 @@ export const getMembers = async (req: Request, res: Response) => {
             .map(a => a.volunteerId)
             .filter((v): v is number => v !== null);
 
-        const volunteerMap: Record<number, { name: string }> = {};
+        const volunteerMap: Record<number, { name: string, photoUrl: string | null }> = {};
         if (volunteerIds.length > 0) {
             const vols = await db
-                .select({ id: volunteers.id, name: volunteers.name })
+                .select({ id: volunteers.id, name: volunteers.name, photoUrl: volunteerProfiles.profilePhotoUrl })
                 .from(volunteers)
+                .leftJoin(volunteerProfiles, eq(volunteers.id, volunteerProfiles.volunteerId))
                 .where(eq(volunteers.academicYearId, currentAY.id));
-            vols.forEach(v => { volunteerMap[v.id] = { name: v.name }; });
+            vols.forEach(v => { volunteerMap[v.id] = { name: v.name, photoUrl: v.photoUrl }; });
         }
 
         const members = assignments.map(a => ({
@@ -71,7 +72,7 @@ export const getMembers = async (req: Request, res: Response) => {
                 ? (volunteerMap[a.volunteerId]?.name ?? a.displayName ?? 'Unknown')
                 : (a.displayName ?? 'Unknown'),
             role: a.roleName,
-            photoUrl: a.displayPhotoUrl ?? null,
+            photoUrl: a.displayPhotoUrl ?? (a.volunteerId ? volunteerMap[a.volunteerId]?.photoUrl : null) ?? null,
             year: currentAY.label,
             createdAt: a.createdAt,
         }));

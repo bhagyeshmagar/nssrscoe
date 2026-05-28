@@ -19,36 +19,43 @@
     {
       "idx": 2,
       "version": "7",
-      "when": 1748278200000,
+      "when": 1770183500000,
       "tag": "0002_academic_year_foundation",
       "breakpoints": true
     },
     {
       "idx": 3,
       "version": "7",
-      "when": 1748278260000,
+      "when": 1770183560000,
       "tag": "0003_volunteers_ay_link",
       "breakpoints": true
     },
     {
       "idx": 4,
       "version": "7",
-      "when": 1748278320000,
+      "when": 1770183620000,
       "tag": "0004_core_team",
       "breakpoints": true
     },
     {
       "idx": 5,
       "version": "7",
-      "when": 1748278380000,
+      "when": 1770183680000,
       "tag": "0005_special_camps",
       "breakpoints": true
     },
     {
       "idx": 6,
       "version": "7",
-      "when": 1748278440000,
+      "when": 1770183740000,
       "tag": "0006_events_ay_link",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1770183800000,
+      "tag": "0007_phase2_extensions",
       "breakpoints": true
     }
   ]

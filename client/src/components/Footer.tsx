@@ -8,7 +8,7 @@ const Footer = () => {
     useEffect(() => {
         const fetchSettings = async () => {
             try {
-                const res = await settingsAPI.getAll();
+                const res = await settingsAPI.get();
                 setSettings(res.data);
             } catch (err) {
                 console.error("Failed to fetch footer settings", err);

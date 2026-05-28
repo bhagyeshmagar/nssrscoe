@@ -18,23 +18,24 @@ import { relations } from 'drizzle-orm';
 export const eventTypeEnum = pgEnum('event_type', ['upcoming', 'past']);
 export const mediaTypeEnum = pgEnum('media_type', ['image', 'video']);
 
-/** Canonical department list for JSPM RSCOE. Enforces consistency across all records. */
 export const departmentEnum = pgEnum('department', [
     'Computer Engineering',
+    'Computer Science and Business Systems',
     'Information Technology',
-    'Electronics & Telecommunication Engineering',
+    'Electronics and Telecommunication',
+    'Electrical Engineering',
+    'Automation and Robotics',
     'Mechanical Engineering',
     'Civil Engineering',
-    'Electrical Engineering',
-    'Artificial Intelligence & Data Science',
+    'Bachelor of Computer Applications',
 ]);
 
-/**
- * Distinguishes between institution-level roles (Principal, NSS Program Officer)
- * which are manually entered, and student roles which must reference a volunteer
- * from the same academic year.
- */
 export const roleTypeEnum = pgEnum('role_type', ['institution', 'student']);
+
+/** regular = counts toward the 100-per-AY cap; backup = overflow list */
+export const volunteerStatusEnum = pgEnum('volunteer_status', ['regular', 'backup']);
+
+export const attendanceStatusEnum = pgEnum('attendance_status', ['present', 'absent', 'late']);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ADMINS
@@ -49,28 +50,19 @@ export const admins = pgTable('admins', {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ACADEMIC YEARS
-// Top-level aggregate. All volunteers, core team, and special camps belong to
-// exactly one academic year.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const academicYears = pgTable('academic_years', {
     id: serial('id').primaryKey(),
-    /** Human-readable label, e.g. "2024-25". Must be unique. */
-    label: varchar('label', { length: 20 }).notNull().unique(),
+    label: varchar('label', { length: 20 }).notNull().unique(),   // "2024-25"
     startDate: date('start_date').notNull(),
     endDate: date('end_date').notNull(),
-    /**
-     * Only one AY can be current at a time.
-     * Enforced by a partial unique index: UNIQUE (is_current) WHERE is_current = true.
-     * Switching the current AY requires setting the previous one to false first.
-     */
+    /** Enforced by partial unique index: UNIQUE (is_current) WHERE is_current = true */
     isCurrent: boolean('is_current').default(false).notNull(),
-    /**
-     * When locked, all write operations (volunteers, core team, special camps)
-     * scoped to this AY return 403. Read operations are always permitted.
-     */
+    /** Write-lock. All volunteer/core-team/camp mutations blocked when true. */
     isLocked: boolean('is_locked').default(false).notNull(),
-    /** Maximum number of regular volunteers allowed for this AY. Default 100. */
+    /** Archived AYs are fully read-only and hidden from active management views. */
+    isArchived: boolean('is_archived').default(false).notNull(),
     volunteerCap: integer('volunteer_cap').default(100).notNull(),
     lockedAt: timestamp('locked_at'),
     lockedById: integer('locked_by_id').references(() => admins.id),
@@ -78,34 +70,26 @@ export const academicYears = pgTable('academic_years', {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// VOLUNTEERS (auth credentials + basic identity)
+// VOLUNTEERS (auth + identity)
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const volunteers = pgTable('volunteers', {
     id: serial('id').primaryKey(),
-    /**
-     * Every volunteer belongs to exactly one academic year.
-     * The cap (volunteerCap) is enforced at the application layer before insert.
-     */
     academicYearId: integer('academic_year_id').references(() => academicYears.id).notNull(),
     name: varchar('name', { length: 255 }).notNull(),
     email: varchar('email', { length: 255 }).notNull().unique(),
     passwordHash: text('password_hash').notNull(),
     isActive: boolean('is_active').default(true),
-    /**
-     * Canonical department — required at account creation time.
-     * Uses the departmentEnum to prevent free-text drift.
-     */
     department: departmentEnum('department').notNull(),
+    /** regular = counts toward 100-per-AY cap; backup = overflow */
+    status: volunteerStatusEnum('status').default('regular').notNull(),
     createdById: integer('created_by_id').references(() => admins.id),
     createdAt: timestamp('created_at').defaultNow(),
     updatedAt: timestamp('updated_at').defaultNow(),
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// VOLUNTEER PROFILES (self-filled personal details)
-// Kept intentionally separate from the volunteers (auth) table so that
-// credential data and personal data have distinct access paths.
+// VOLUNTEER PROFILES (self-filled personal details — kept split from auth)
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const volunteerProfiles = pgTable('volunteer_profiles', {
@@ -116,13 +100,9 @@ export const volunteerProfiles = pgTable('volunteer_profiles', {
         .unique(),
     fullName: varchar('full_name', { length: 255 }),
     prnNo: varchar('prn_no', { length: 50 }),
-    /**
-     * The student's current college year at the time of NSS enrollment (FE/SE/TE/BE).
-     * This is intentionally separate from academic_year_id on the volunteers table,
-     * which represents the NSS program year (e.g. "2024-25"), not the college year.
-     */
+    /** FE / SE / TE / BE — the student's college year at NSS enrollment time. */
     collegeYearAtEnrollment: varchar('college_year_at_enrollment', { length: 20 }),
-    nssYear: integer('nss_year'),                   // 1 or 2 — which year of the NSS program
+    nssYear: integer('nss_year'),
     marksheetUrl: text('marksheet_url'),
     cgpa: varchar('cgpa', { length: 10 }),
     eligibilityNo: varchar('eligibility_no', { length: 50 }),
@@ -131,57 +111,41 @@ export const volunteerProfiles = pgTable('volunteer_profiles', {
     casteCategory: varchar('caste_category', { length: 50 }),
     phoneNo: varchar('phone_no', { length: 20 }),
     emailId: varchar('email_id', { length: 255 }),
+    department: varchar('department', { length: 100 }), // Added so Drizzle can map the existing DB column
     profilePhotoUrl: text('profile_photo_url'),
     experienceText: text('experience_text'),
     updatedAt: timestamp('updated_at').defaultNow(),
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CORE TEAM ROLES (master reference table)
-// Seeded once at setup. Contains both institution-level roles (Principal,
-// NSS Program Officer) and student roles (Secretary, etc.).
+// CORE TEAM ROLES (master reference — seeded once)
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const coreTeamRoles = pgTable('core_team_roles', {
     id: serial('id').primaryKey(),
-    /** Role name, e.g. "Secretary", "Principal". Must be globally unique. */
     name: varchar('name', { length: 100 }).notNull().unique(),
-    /** 'institution' roles bypass the volunteer cap and use display_name/photo directly. */
+    /** Stable code used for programmatic validation (e.g. 'department_coordinator'). */
+    code: varchar('code', { length: 50 }).notNull().unique(),
     roleType: roleTypeEnum('role_type').notNull(),
-    /**
-     * When true, only one volunteer (or institution person) can hold this role
-     * per academic year. E.g. Secretary is unique; a generic "Committee Member" might not be.
-     */
     isUniquePerAy: boolean('is_unique_per_ay').default(true).notNull(),
-    /** Controls display ordering on the public /members page. */
     displayOrder: integer('display_order').default(0).notNull(),
     createdAt: timestamp('created_at').defaultNow(),
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CORE TEAM ASSIGNMENTS (per-AY selection)
-// Links a role → a volunteer (student roles) or a named person (institution roles).
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const coreTeamAssignments = pgTable('core_team_assignments', {
     id: serial('id').primaryKey(),
-    academicYearId: integer('academic_year_id')
-        .notNull()
-        .references(() => academicYears.id),
-    coreTeamRoleId: integer('core_team_role_id')
-        .notNull()
-        .references(() => coreTeamRoles.id),
-    /**
-     * For student roles: must reference a volunteer from the SAME academicYearId.
-     * For institution roles: must be NULL (Principal/NSS PO are not in volunteers table).
-     * SET NULL on delete so the assignment record survives if the volunteer is removed.
-     */
+    academicYearId: integer('academic_year_id').notNull().references(() => academicYears.id),
+    coreTeamRoleId: integer('core_team_role_id').notNull().references(() => coreTeamRoles.id),
     volunteerId: integer('volunteer_id').references(() => volunteers.id, { onDelete: 'set null' }),
-    /** Used only when volunteerId IS NULL (institution roles). */
+    /** For institution roles (principal, nss_po). NULL for student roles. */
     displayName: varchar('display_name', { length: 255 }),
-    /** Used only when volunteerId IS NULL (institution roles). */
     displayPhotoUrl: text('display_photo_url'),
-    /** Overrides role-level display order within a specific AY if needed. */
+    /** For department_coordinator only — which dept this coordinator manages. */
+    department: varchar('department', { length: 100 }),
     displayOrder: integer('display_order').default(0),
     createdAt: timestamp('created_at').defaultNow(),
 });
@@ -192,19 +156,12 @@ export const coreTeamAssignments = pgTable('core_team_assignments', {
 
 export const specialCamps = pgTable('special_camps', {
     id: serial('id').primaryKey(),
-    academicYearId: integer('academic_year_id')
-        .notNull()
-        .references(() => academicYears.id),
+    academicYearId: integer('academic_year_id').notNull().references(() => academicYears.id),
     name: varchar('name', { length: 255 }).notNull(),
     location: varchar('location', { length: 255 }).notNull(),
     startDate: date('start_date').notNull(),
     endDate: date('end_date').notNull(),
     description: text('description'),
-    /**
-     * While false: participants can be freely added or removed.
-     * Once true: the participant list is sealed and snapshot columns are frozen.
-     * Cannot be reversed.
-     */
     isFinalized: boolean('is_finalized').default(false).notNull(),
     finalizedAt: timestamp('finalized_at'),
     finalizedById: integer('finalized_by_id').references(() => admins.id),
@@ -212,23 +169,14 @@ export const specialCamps = pgTable('special_camps', {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SPECIAL CAMP PARTICIPANTS (snapshot table)
-// snap_* columns are populated from the volunteer's live profile at the moment
-// the camp is finalized. After that, the live profile may change but these
-// snapshot columns remain unchanged — they are the official record.
+// SPECIAL CAMP PARTICIPANTS (snapshot)
+// snap_* columns are frozen at finalization time and never updated after.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const specialCampParticipants = pgTable('special_camp_participants', {
     id: serial('id').primaryKey(),
-    specialCampId: integer('special_camp_id')
-        .notNull()
-        .references(() => specialCamps.id, { onDelete: 'cascade' }),
-    /**
-     * The live volunteer FK. SET NULL if the volunteer record is deleted later,
-     * preserving the historical snapshot.
-     */
+    specialCampId: integer('special_camp_id').notNull().references(() => specialCamps.id, { onDelete: 'cascade' }),
     volunteerId: integer('volunteer_id').references(() => volunteers.id, { onDelete: 'set null' }),
-    // ── Snapshot columns (written at finalization time, never updated after) ──
     snapName: varchar('snap_name', { length: 255 }).notNull(),
     snapPrnNo: varchar('snap_prn_no', { length: 50 }),
     snapDepartment: varchar('snap_department', { length: 100 }),
@@ -236,9 +184,56 @@ export const specialCampParticipants = pgTable('special_camp_participants', {
     snapNssYear: integer('snap_nss_year'),
     snapCgpa: varchar('snap_cgpa', { length: 10 }),
     snapPhoneNo: varchar('snap_phone_no', { length: 20 }),
-    /** Timestamp at which snapshot data was captured (= camp finalization time). */
     snapFinalizedAt: timestamp('snap_finalized_at'),
     addedAt: timestamp('added_at').defaultNow(),
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ATTENDANCE SESSIONS
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const attendanceSessions = pgTable('attendance_sessions', {
+    id: serial('id').primaryKey(),
+    academicYearId: integer('academic_year_id').notNull().references(() => academicYears.id),
+    eventId: integer('event_id').references(() => events.id, { onDelete: 'set null' }),
+    title: varchar('title', { length: 255 }).notNull(),
+    date: date('date').notNull(),
+    description: text('description'),
+    createdById: integer('created_by_id').references(() => admins.id, { onDelete: 'set null' }),
+    createdAt: timestamp('created_at').defaultNow(),
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ATTENDANCE RECORDS
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const attendanceRecords = pgTable('attendance_records', {
+    id: serial('id').primaryKey(),
+    sessionId: integer('session_id').notNull().references(() => attendanceSessions.id, { onDelete: 'cascade' }),
+    volunteerId: integer('volunteer_id').notNull().references(() => volunteers.id, { onDelete: 'cascade' }),
+    status: attendanceStatusEnum('status').notNull(),
+    notes: text('notes'),
+    recordedById: integer('recorded_by_id').references(() => admins.id, { onDelete: 'set null' }),
+    createdAt: timestamp('created_at').defaultNow(),
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AUDIT LOGS
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const auditLogs = pgTable('audit_logs', {
+    id: serial('id').primaryKey(),
+    /** e.g. 'volunteer.create', 'academic_year.lock', 'special_camp.finalize' */
+    action: varchar('action', { length: 100 }).notNull(),
+    /** e.g. 'volunteer', 'academic_year', 'special_camp' */
+    entityType: varchar('entity_type', { length: 50 }).notNull(),
+    entityId: integer('entity_id'),
+    performedById: integer('performed_by_id'),
+    performedByRole: varchar('performed_by_role', { length: 20 }).default('admin').notNull(),
+    academicYearId: integer('academic_year_id'),
+    /** JSON string with relevant context (before/after values, params). */
+    details: text('details'),
+    createdAt: timestamp('created_at').defaultNow(),
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -255,7 +250,6 @@ export const events = pgTable('events', {
     type: eventTypeEnum('type').default('upcoming'),
     reportUrl: text('report_url'),
     volunteersCount: integer('volunteers_count').default(0),
-    /** Optional link to an academic year. Allows grouping past events by AY. */
     academicYearId: integer('academic_year_id').references(() => academicYears.id),
     createdAt: timestamp('created_at').defaultNow(),
 });
@@ -313,6 +307,7 @@ export const adminsRelations = relations(admins, ({ many }) => ({
     createdVolunteers: many(volunteers),
     lockedYears: many(academicYears),
     finalizedCamps: many(specialCamps),
+    attendanceSessions: many(attendanceSessions),
 }));
 
 export const academicYearsRelations = relations(academicYears, ({ many, one }) => ({
@@ -320,34 +315,21 @@ export const academicYearsRelations = relations(academicYears, ({ many, one }) =
     coreTeamAssignments: many(coreTeamAssignments),
     specialCamps: many(specialCamps),
     events: many(events),
-    lockedBy: one(admins, {
-        fields: [academicYears.lockedById],
-        references: [admins.id],
-    }),
+    attendanceSessions: many(attendanceSessions),
+    lockedBy: one(admins, { fields: [academicYears.lockedById], references: [admins.id] }),
 }));
 
 export const volunteersRelations = relations(volunteers, ({ one, many }) => ({
-    academicYear: one(academicYears, {
-        fields: [volunteers.academicYearId],
-        references: [academicYears.id],
-    }),
-    profile: one(volunteerProfiles, {
-        fields: [volunteers.id],
-        references: [volunteerProfiles.volunteerId],
-    }),
-    createdBy: one(admins, {
-        fields: [volunteers.createdById],
-        references: [admins.id],
-    }),
+    academicYear: one(academicYears, { fields: [volunteers.academicYearId], references: [academicYears.id] }),
+    profile: one(volunteerProfiles, { fields: [volunteers.id], references: [volunteerProfiles.volunteerId] }),
+    createdBy: one(admins, { fields: [volunteers.createdById], references: [admins.id] }),
     coreTeamAssignments: many(coreTeamAssignments),
     specialCampParticipations: many(specialCampParticipants),
+    attendanceRecords: many(attendanceRecords),
 }));
 
 export const volunteerProfilesRelations = relations(volunteerProfiles, ({ one }) => ({
-    volunteer: one(volunteers, {
-        fields: [volunteerProfiles.volunteerId],
-        references: [volunteers.id],
-    }),
+    volunteer: one(volunteers, { fields: [volunteerProfiles.volunteerId], references: [volunteers.id] }),
 }));
 
 export const coreTeamRolesRelations = relations(coreTeamRoles, ({ many }) => ({
@@ -355,70 +337,51 @@ export const coreTeamRolesRelations = relations(coreTeamRoles, ({ many }) => ({
 }));
 
 export const coreTeamAssignmentsRelations = relations(coreTeamAssignments, ({ one }) => ({
-    academicYear: one(academicYears, {
-        fields: [coreTeamAssignments.academicYearId],
-        references: [academicYears.id],
-    }),
-    role: one(coreTeamRoles, {
-        fields: [coreTeamAssignments.coreTeamRoleId],
-        references: [coreTeamRoles.id],
-    }),
-    volunteer: one(volunteers, {
-        fields: [coreTeamAssignments.volunteerId],
-        references: [volunteers.id],
-    }),
+    academicYear: one(academicYears, { fields: [coreTeamAssignments.academicYearId], references: [academicYears.id] }),
+    role: one(coreTeamRoles, { fields: [coreTeamAssignments.coreTeamRoleId], references: [coreTeamRoles.id] }),
+    volunteer: one(volunteers, { fields: [coreTeamAssignments.volunteerId], references: [volunteers.id] }),
 }));
 
 export const specialCampsRelations = relations(specialCamps, ({ one, many }) => ({
-    academicYear: one(academicYears, {
-        fields: [specialCamps.academicYearId],
-        references: [academicYears.id],
-    }),
-    finalizedBy: one(admins, {
-        fields: [specialCamps.finalizedById],
-        references: [admins.id],
-    }),
+    academicYear: one(academicYears, { fields: [specialCamps.academicYearId], references: [academicYears.id] }),
+    finalizedBy: one(admins, { fields: [specialCamps.finalizedById], references: [admins.id] }),
     participants: many(specialCampParticipants),
 }));
 
 export const specialCampParticipantsRelations = relations(specialCampParticipants, ({ one }) => ({
-    specialCamp: one(specialCamps, {
-        fields: [specialCampParticipants.specialCampId],
-        references: [specialCamps.id],
-    }),
-    volunteer: one(volunteers, {
-        fields: [specialCampParticipants.volunteerId],
-        references: [volunteers.id],
-    }),
+    specialCamp: one(specialCamps, { fields: [specialCampParticipants.specialCampId], references: [specialCamps.id] }),
+    volunteer: one(volunteers, { fields: [specialCampParticipants.volunteerId], references: [volunteers.id] }),
+}));
+
+export const attendanceSessionsRelations = relations(attendanceSessions, ({ one, many }) => ({
+    academicYear: one(academicYears, { fields: [attendanceSessions.academicYearId], references: [academicYears.id] }),
+    event: one(events, { fields: [attendanceSessions.eventId], references: [events.id] }),
+    createdBy: one(admins, { fields: [attendanceSessions.createdById], references: [admins.id] }),
+    records: many(attendanceRecords),
+}));
+
+export const attendanceRecordsRelations = relations(attendanceRecords, ({ one }) => ({
+    session: one(attendanceSessions, { fields: [attendanceRecords.sessionId], references: [attendanceSessions.id] }),
+    volunteer: one(volunteers, { fields: [attendanceRecords.volunteerId], references: [volunteers.id] }),
+    recordedBy: one(admins, { fields: [attendanceRecords.recordedById], references: [admins.id] }),
 }));
 
 export const eventsRelations = relations(events, ({ many, one }) => ({
     registrations: many(eventRegistrations),
     gallery: many(gallery),
     images: many(eventImages),
-    academicYear: one(academicYears, {
-        fields: [events.academicYearId],
-        references: [academicYears.id],
-    }),
+    academicYear: one(academicYears, { fields: [events.academicYearId], references: [academicYears.id] }),
+    attendanceSessions: many(attendanceSessions),
 }));
 
 export const eventImagesRelations = relations(eventImages, ({ one }) => ({
-    event: one(events, {
-        fields: [eventImages.eventId],
-        references: [events.id],
-    }),
+    event: one(events, { fields: [eventImages.eventId], references: [events.id] }),
 }));
 
 export const registrationRelations = relations(eventRegistrations, ({ one }) => ({
-    event: one(events, {
-        fields: [eventRegistrations.eventId],
-        references: [events.id],
-    }),
+    event: one(events, { fields: [eventRegistrations.eventId], references: [events.id] }),
 }));
 
 export const galleryRelations = relations(gallery, ({ one }) => ({
-    event: one(events, {
-        fields: [gallery.eventId],
-        references: [events.id],
-    }),
+    event: one(events, { fields: [gallery.eventId], references: [events.id] }),
 }));
