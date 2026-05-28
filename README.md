@@ -47,7 +47,24 @@ Client runs on http://localhost:5173
 - Password: `admin123`
 
 ## Features
-- **Admin**: Login, CRUD for Events, Gallery, Members.
-- **Visitor**: View Events, Gallery, Members, About Us. Register for events.
-- **3D**: Rotating logo in Hero section.
 
+### Academic-Year Scoped Architecture
+The entire platform is designed around dynamic **Academic Years (AY)** (e.g., *2025-26*). 
+All major entities are strictly scoped to an Academic Year:
+- **Volunteers**: Tracked per AY with active/backup statuses and individual profiles.
+- **Core Team**: Hierarchical roles (Institution level, Department level, Student Coordinators) are assigned per AY.
+- **Attendance**: Managed individually for events within a specific AY.
+- **Special Camps**: Camp assignments, participants, and details are isolated per AY.
+
+### Admin Dashboard
+- **Academic Years Management**: Create, lock, archive, and set active Academic Years.
+- **Volunteer Management**: Add, approve, edit profiles, and track volunteer statuses.
+- **Core Team Management**: Assign specific roles (e.g., PO, APO, Dept Coordinator, NSS Lead) to volunteers.
+- **Event & Attendance**: Track events and log attendance easily via bulk-selection interfaces.
+- **Site Management**: Edit public-facing settings (hero text, stats, mission).
+
+### Public Interface
+- **Dynamic Volunteering**: Volunteers can view their own profile, submit their details, and view open events.
+- **Event Registration**: Visitor pass generation and lookup for events.
+- **Gallery & Members**: View past highlights and active core members dynamically loaded based on the Active AY.
+- **3D Hero**: Interactive 3D rotating logo built with React Three Fiber.
