@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { volunteersAPI, academicYearsAPI, uploadAPI } from '../../services/api';
-import type { AcademicYear, AYStats, VolunteerWithProfile, CreateVolunteerData, Department } from '../../services/api';
+import { volunteersAPI, academicYearsAPI, uploadAPI, attendanceAPI } from '../../services/api';
+import type { AcademicYear, AYStats, VolunteerWithProfile, CreateVolunteerData, Department, VolunteerAttendanceRecord } from '../../services/api';
 import { CapBar } from './Shared';
 import { DEPT_LIST } from './Shared';
 
@@ -13,6 +13,8 @@ export const AYVolunteersTab = ({ years, currentAY }: { years: AcademicYear[]; c
     const [viewProfileId, setViewProfileId] = useState<number | null>(null);
     const [form, setForm] = useState<CreateVolunteerData>({ name: '', email: '', password: '', department: 'Computer Engineering' as Department });
     const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
+    const [attendance, setAttendance] = useState<VolunteerAttendanceRecord[]>([]);
+    const [loadingAttendance, setLoadingAttendance] = useState(false);
     const flash = (type: 'ok' | 'err', text: string) => { setMsg({ type, text }); setTimeout(() => setMsg(null), 4000); };
 
     const load = useCallback(async () => {
@@ -27,6 +29,25 @@ export const AYVolunteersTab = ({ years, currentAY }: { years: AcademicYear[]; c
     }, [selectedAyId, filter]);
 
     useEffect(() => { load(); }, [load]);
+    
+    useEffect(() => {
+        if (viewProfileId && selectedAyId) {
+            setLoadingAttendance(true);
+            attendanceAPI.getVolunteer(selectedAyId, viewProfileId)
+                .then(res => {
+                    const data = (res.data as any)?.data ?? res.data;
+                    setAttendance(data || []);
+                })
+                .catch(() => {
+                    setAttendance([]);
+                })
+                .finally(() => {
+                    setLoadingAttendance(false);
+                });
+        } else {
+            setAttendance([]);
+        }
+    }, [viewProfileId, selectedAyId]);
     
     useEffect(() => {
         if (!selectedAyId && years.length > 0) {
@@ -132,16 +153,21 @@ export const AYVolunteersTab = ({ years, currentAY }: { years: AcademicYear[]; c
             <div className="bg-white rounded-xl shadow overflow-hidden">
                 <table className="w-full text-sm">
                     <thead className="bg-gray-50 border-b">
-                        <tr>{['Name', 'Email', 'Department', 'Status', 'Active', 'Actions'].map(h => <th key={h} className="text-left px-4 py-3 text-gray-600 font-medium">{h}</th>)}</tr>
+                        <tr>
+                            {['Name', 'Email', 'Department', 'Status', 'Attended', 'Active', 'Actions'].map(h => (
+                                <th key={h} className={`px-4 py-3 text-gray-600 font-medium ${h === 'Attended' ? 'text-center' : 'text-left'}`}>{h}</th>
+                            ))}
+                        </tr>
                     </thead>
                     <tbody className="divide-y">
-                        {vols.length === 0 && <tr><td colSpan={6} className="text-center py-8 text-gray-400">No volunteers found.</td></tr>}
+                        {vols.length === 0 && <tr><td colSpan={7} className="text-center py-8 text-gray-400">No volunteers found.</td></tr>}
                         {vols.map(v => (
                             <tr key={v.id} className="hover:bg-gray-50">
                                 <td className="px-4 py-3 font-medium text-gray-800">{v.name}</td>
                                 <td className="px-4 py-3 text-gray-600">{v.email}</td>
                                 <td className="px-4 py-3 text-gray-600 text-xs">{v.department}</td>
                                 <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${v.status === 'regular' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}`}>{v.status}</span></td>
+                                <td className="px-4 py-3 text-center font-semibold text-gray-700">{v.eventsAttendedCount ?? 0}</td>
                                 <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded-full text-xs ${v.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>{v.isActive ? 'Active' : 'Inactive'}</span></td>
                                 <td className="px-4 py-3">
                                     <div className="flex gap-1 flex-wrap">
@@ -217,6 +243,32 @@ export const AYVolunteersTab = ({ years, currentAY }: { years: AcademicYear[]; c
                                                 </a>
                                             </div>
                                         )}
+
+                                        {/* Attended Events Section */}
+                                        <div className="col-span-full mt-6 border-t pt-4">
+                                            <h5 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                                                <span>📅</span> Attended Events ({attendance.filter(a => a.status === 'present').length})
+                                            </h5>
+                                            {loadingAttendance ? (
+                                                <div className="text-sm text-gray-500 py-2">Loading attendance records...</div>
+                                            ) : attendance.filter(a => a.status === 'present').length > 0 ? (
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                                    {attendance.filter(a => a.status === 'present').map((att, idx) => (
+                                                        <div key={idx} className="bg-green-50/50 border border-green-100 rounded-lg p-3 flex justify-between items-center">
+                                                            <div>
+                                                                <div className="text-sm font-semibold text-gray-800">{att.sessionTitle}</div>
+                                                                <div className="text-xs text-gray-500 mt-0.5">{new Date(att.date).toLocaleDateString()}</div>
+                                                            </div>
+                                                            <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded text-xs font-semibold uppercase">Present</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <div className="text-sm text-gray-500 py-4 bg-gray-50 rounded-lg text-center border border-dashed">
+                                                    No events attended yet for this academic year.
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 );
                             })()}

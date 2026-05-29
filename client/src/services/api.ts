@@ -125,7 +125,7 @@ export const attendanceAPI = {
     getSummary:      (ayId: number) =>
         api.get<AttendanceSummary>(`/academic-years/${ayId}/attendance/summary`),
     getVolunteer:    (ayId: number, volunteerId: number) =>
-        api.get(`/academic-years/${ayId}/attendance/volunteer/${volunteerId}`),
+        api.get<VolunteerAttendanceRecord[]>(`/academic-years/${ayId}/attendance/volunteer/${volunteerId}`),
     getEventAttendance: (ayId: number, eventId: number) =>
         api.get<AttendanceSessionWithRecords>(`/academic-years/${ayId}/attendance/events/${eventId}/attendance`),
     saveEventAttendance: (ayId: number, eventId: number, records: AttendanceRecordInput[]) =>
@@ -298,6 +298,7 @@ export interface VolunteerData {
     isActive: boolean;
     academicYearId: number;
     createdAt: string;
+    eventsAttendedCount?: number;
 }
 
 export interface CreateVolunteerData {
@@ -421,6 +422,14 @@ export interface AttendanceSummary {
     }>;
 }
 
+export interface VolunteerAttendanceRecord {
+    sessionId: number;
+    sessionTitle: string;
+    date: string;
+    status: 'present' | 'absent' | 'late' | null;
+    notes?: string | null;
+}
+
 export interface CreateSessionData {
     title: string;
     date: string;
@@ -495,7 +504,7 @@ export interface SiteSettings {
     statImpactCount?: string; statImpactLabel?: string;
     aboutMission?: string; aboutHistory?: string; aboutText?: string;
     contactEmail?: string; contactPhone?: string; contactAddress?: string;
-    socialInstagram?: string; socialFacebook?: string; socialTwitter?: string;
+    socialInstagram?: string; socialFacebook?: string; socialTwitter?: string; socialYoutube?: string;
     homeSliderImages?: string;
 }
 export interface EventRegistration {

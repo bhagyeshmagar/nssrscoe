@@ -50,7 +50,10 @@ const Footer = () => {
                             {settings.socialTwitter && (
                                 <a href={settings.socialTwitter} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white transition">Twitter</a>
                             )}
-                            {!settings.socialInstagram && !settings.socialFacebook && !settings.socialTwitter && (
+                            {settings.socialYoutube && (
+                                <a href={settings.socialYoutube} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white transition">YouTube</a>
+                            )}
+                            {!settings.socialInstagram && !settings.socialFacebook && !settings.socialTwitter && !settings.socialYoutube && (
                                 <p className="text-gray-500 text-sm">No social links configured yet.</p>
                             )}
                         </div>

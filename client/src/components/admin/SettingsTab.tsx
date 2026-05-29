@@ -19,6 +19,7 @@ export const SettingsTab = ({ settings, onRefresh }: { settings: SiteSettings | 
         socialInstagram: '',
         socialFacebook: '',
         socialTwitter: '',
+        socialYoutube: '',
     });
     const [saving, setSaving] = useState(false);
 
@@ -136,6 +137,10 @@ export const SettingsTab = ({ settings, onRefresh }: { settings: SiteSettings | 
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">Twitter URL</label>
                             <input type="url" value={formData.socialTwitter || ''} onChange={e => setFormData({ ...formData, socialTwitter: e.target.value })} className="w-full border rounded px-3 py-2" placeholder="https://twitter.com/nss_jspm_rscoe" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">YouTube URL</label>
+                            <input type="url" value={formData.socialYoutube || ''} onChange={e => setFormData({ ...formData, socialYoutube: e.target.value })} className="w-full border rounded px-3 py-2" placeholder="https://youtube.com/@NSSRSCOE" />
                         </div>
                     </div>
                 </div>

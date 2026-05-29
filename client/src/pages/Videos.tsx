@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Play } from 'lucide-react';
-import { galleryAPI, uploadAPI } from '../services/api';
+import { galleryAPI, uploadAPI, settingsAPI } from '../services/api';
 
 interface VideoItem {
     id: number;
@@ -36,10 +36,23 @@ const Videos = () => {
     const [videos, setVideos] = useState<VideoItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedVideo, setSelectedVideo] = useState<VideoItem | null>(null);
+    const [youtubeUrl, setYoutubeUrl] = useState<string>('https://www.youtube.com/@NSSRSCOE'); // Fallback
 
     useEffect(() => {
         fetchVideos();
+        fetchSettings();
     }, []);
+
+    const fetchSettings = async () => {
+        try {
+            const res = await settingsAPI.get();
+            if (res.data.socialYoutube) {
+                setYoutubeUrl(res.data.socialYoutube);
+            }
+        } catch (error) {
+            console.error('Error fetching settings:', error);
+        }
+    };
 
     const fetchVideos = async () => {
         try {
@@ -156,7 +169,7 @@ const Videos = () => {
                     <h2 className="text-white text-2xl font-bold mb-3">Want More Videos?</h2>
                     <p className="text-red-100 mb-6">Subscribe to our YouTube channel for more NSS activities and events</p>
                     <a
-                        href="https://www.youtube.com"
+                        href={youtubeUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex items-center gap-2 bg-white text-red-600 px-8 py-3 rounded-full font-bold hover:bg-gray-100 transition"

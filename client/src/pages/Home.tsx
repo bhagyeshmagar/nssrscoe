@@ -96,7 +96,7 @@ const Home = () => {
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.8 }}
-                        className="text-5xl md:text-7xl font-bold mb-6"
+                        className="text-4xl md:text-5xl font-bold mb-6"
                     >
                         {settings?.heroTitle || 'NOT ME, BUT YOU'}
                     </motion.h1>
@@ -119,19 +119,6 @@ const Home = () => {
                     >
                         {sliderImages.length > 0 ? sliderImages[currentSlideIndex].description : ''}
                     </motion.p>
-
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ duration: 0.5, delay: 0.4 }}
-                    >
-                        <Link
-                            to="/register"
-                            className="bg-white text-nss-blue font-bold py-3 px-8 rounded-full hover:bg-gray-100 transition duration-300"
-                        >
-                            {settings?.heroCta || 'Join Us / Register'}
-                        </Link>
-                    </motion.div>
                 </div>
 
                 {/* Slider Controls */}
@@ -192,6 +179,16 @@ const Home = () => {
                         </h3>
                         <p className="text-gray-600">{settings?.statImpactLabel || 'Lives Impacted'}</p>
                     </motion.div>
+                </div>
+                
+                {/* Moved CTA Button */}
+                <div className="mt-12 text-center">
+                    <Link
+                        to="/register"
+                        className="bg-nss-blue text-white font-bold py-3 px-8 rounded-full hover:bg-blue-900 transition duration-300 inline-block shadow-lg"
+                    >
+                        {settings?.heroCta || 'Join Us / Register'}
+                    </Link>
                 </div>
             </section>
         </div>

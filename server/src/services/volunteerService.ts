@@ -5,6 +5,7 @@ import {
     volunteers,
     volunteerProfiles,
     academicYears,
+    attendanceRecords,
 } from '../db/schema';
 import {
     NotFoundError,
@@ -110,6 +111,12 @@ export const listVolunteersForAY = async (ayId: number, filters: ListVolunteerFi
             createdAt: volunteers.createdAt,
             // Full profile needed by admin dashboard modal
             profile: volunteerProfiles,
+            eventsAttendedCount: sql<number>`(
+                SELECT count(*)::int
+                FROM ${attendanceRecords}
+                WHERE ${attendanceRecords.volunteerId} = ${volunteers.id}
+                  AND ${attendanceRecords.status} = 'present'
+            )`.as('events_attended_count'),
         })
         .from(volunteers)
         .leftJoin(volunteerProfiles, eq(volunteers.id, volunteerProfiles.volunteerId))
@@ -132,13 +139,22 @@ export const listVolunteersForAY = async (ayId: number, filters: ListVolunteerFi
 
 export const getVolunteerById = async (id: number) => {
     const [row] = await db
-        .select()
+        .select({
+            volunteers: volunteers,
+            profile: volunteerProfiles,
+            eventsAttendedCount: sql<number>`(
+                SELECT count(*)::int
+                FROM ${attendanceRecords}
+                WHERE ${attendanceRecords.volunteerId} = ${volunteers.id}
+                  AND ${attendanceRecords.status} = 'present'
+            )`.as('events_attended_count'),
+        })
         .from(volunteers)
         .leftJoin(volunteerProfiles, eq(volunteers.id, volunteerProfiles.volunteerId))
         .where(eq(volunteers.id, id))
         .limit(1);
     if (!row) throw new NotFoundError(`Volunteer ${id} not found.`);
-    return { ...row.volunteers, profile: row.volunteer_profiles };
+    return { ...row.volunteers, profile: row.profile, eventsAttendedCount: row.eventsAttendedCount };
 };
 
 // ── Create ────────────────────────────────────────────────────────────────────
