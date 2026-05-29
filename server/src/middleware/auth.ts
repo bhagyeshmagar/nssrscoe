@@ -6,7 +6,8 @@ export interface AuthRequest extends Request {
         id: number;
         username?: string;
         email?: string;
-        role: 'admin' | 'volunteer';
+        role: 'admin' | 'volunteer' | 'superadmin';
+        isSuperadmin?: boolean;
     };
 }
 
@@ -26,8 +27,17 @@ export const authenticateToken = (req: Request, res: Response, next: NextFunctio
 // Middleware to check if user is admin
 export const requireAdmin = (req: Request, res: Response, next: NextFunction) => {
     const authReq = req as AuthRequest;
-    if (!authReq.user || authReq.user.role !== 'admin') {
+    if (!authReq.user || (authReq.user.role !== 'admin' && authReq.user.role !== 'superadmin')) {
         return res.status(403).json({ message: 'Admin access required' });
+    }
+    next();
+};
+
+// Middleware to check if user is a superadmin
+export const requireSuperAdmin = (req: Request, res: Response, next: NextFunction) => {
+    const authReq = req as AuthRequest;
+    if (!authReq.user || !authReq.user.isSuperadmin) {
+        return res.status(403).json({ message: 'Superadmin access required' });
     }
     next();
 };

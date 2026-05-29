@@ -58,7 +58,7 @@ const PastEvents = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                         {events.map((event) => (
                             <Link to={`/events/${event.id}`} key={event.id} className="group block bg-white rounded-xl overflow-hidden shadow-lg hover:shadow-xl transition-all hover:-translate-y-1">
-                                <div className="h-56 overflow-hidden relative grayscale group-hover:grayscale-0 transition duration-500">
+                                <div className="h-56 overflow-hidden relative transition duration-500">
                                     {event.imageUrl ? (
                                         <img src={uploadAPI.getFullUrl(event.imageUrl)} alt={event.title} className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
                                     ) : (

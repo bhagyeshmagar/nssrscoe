@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { settingsAPI } from '../services/api';
 import type { SiteSettings } from '../services/api';
 
@@ -32,7 +32,7 @@ const Footer = () => {
                         <h3 className="text-lg font-semibold mb-4">Contact</h3>
                         <p className="text-gray-400 text-sm mb-1">
                             <a href="https://jspmrscoe.edu.in" target="_blank" rel="noopener noreferrer" className="hover:text-white transition">
-                                JSPM Rajarshi Shahu College Of Engineering
+                                JSPM's Rajarshi Shahu College of Engineering
                             </a>
                         </p>
                         <p className="text-gray-400 text-sm">Tathawade, Pune</p>
@@ -59,7 +59,7 @@ const Footer = () => {
                 <div className="border-t border-gray-800 mt-8 pt-8 flex flex-col md:flex-row justify-between items-center text-sm text-gray-500">
                     <div>&copy; {new Date().getFullYear()} NSS JSPM RSCOE. All rights reserved.</div>
                     <div className="mt-2 md:mt-0">
-                        Made with ❤️ by NSS Volunteers
+                        Made for NSS With ❤️ by Bhagyesh Magar
                     </div>
                 </div>
             </div>

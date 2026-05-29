@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
-// import RotatingLogo from '../components/RotatingLogo';  // Temporarily disabled
+
 import { settingsAPI, uploadAPI } from '../services/api';
 import type { SiteSettings } from '../services/api';
 
@@ -73,7 +73,7 @@ const Home = () => {
         <div className="bg-white">
             {/* Hero Section */}
             <section className="relative h-[80vh] flex items-center justify-center bg-gradient-to-r from-nss-blue to-nss-red overflow-hidden">
-                {/* <RotatingLogo /> - Temporarily disabled for debugging */}
+
                 {sliderImages.length > 0 ? (
                     <AnimatePresence mode="popLayout">
                         <motion.img

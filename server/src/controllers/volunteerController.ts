@@ -18,7 +18,6 @@ export const listVolunteersByAY = async (req: Request, res: Response) => {
             search: search as string | undefined,
             isActive: isActive !== undefined ? isActive === 'true' : undefined,
         });
-        console.log('DEBUG API OUTPUT:', JSON.stringify(data[0], null, 2));
         ok(res, data);
     } catch (err) { handleError(res, err); }
 };

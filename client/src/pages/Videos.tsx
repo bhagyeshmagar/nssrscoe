@@ -5,10 +5,32 @@ import { galleryAPI, uploadAPI } from '../services/api';
 interface VideoItem {
     id: number;
     title: string | null;
+    description?: string;
     url: string;
     type: string;
     createdAt: string;
 }
+
+const DescriptionText = ({ text }: { text: string }) => {
+    const [expanded, setExpanded] = useState(false);
+    if (!text) return null;
+    
+    if (text.length <= 100) {
+        return <p className="mt-2 text-sm text-gray-400">{text}</p>;
+    }
+    
+    return (
+        <div className="mt-2 text-sm text-gray-400">
+            {expanded ? text : `${text.substring(0, 100)}... `}
+            <button 
+                onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }} 
+                className="text-blue-400 hover:text-blue-300 font-medium"
+            >
+                {expanded ? 'Show less' : 'more'}
+            </button>
+        </div>
+    );
+};
 
 const Videos = () => {
     const [videos, setVideos] = useState<VideoItem[]>([]);
@@ -59,7 +81,7 @@ const Videos = () => {
                     {videos.map((video) => (
                         <div
                             key={video.id}
-                            className="bg-gray-900 rounded-xl overflow-hidden shadow-lg hover:shadow-2xl transition-shadow cursor-pointer group"
+                            className="bg-gray-900 rounded-xl overflow-hidden shadow-lg hover:shadow-2xl transition-shadow cursor-pointer group flex flex-col"
                             onClick={() => setSelectedVideo(video)}
                         >
                             <div className="relative aspect-video">
@@ -77,11 +99,12 @@ const Videos = () => {
                                     </div>
                                 </div>
                             </div>
-                            <div className="p-4">
+                            <div className="p-4 flex-1">
                                 <h3 className="text-white font-bold text-lg truncate">
                                     {video.title || 'NSS Activity Video'}
                                 </h3>
-                                <p className="text-gray-400 text-sm">
+                                <DescriptionText text={video.description || ''} />
+                                <p className="text-gray-500 text-xs mt-2">
                                     {video.createdAt ? new Date(video.createdAt).toLocaleDateString('en-IN', {
                                         year: 'numeric',
                                         month: 'long',
@@ -97,27 +120,29 @@ const Videos = () => {
             {/* Video Modal */}
             {selectedVideo && (
                 <div
-                    className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4"
+                    className="fixed inset-0 bg-black/90 z-50 flex flex-col items-center justify-center p-4"
                     onClick={() => setSelectedVideo(null)}
                 >
+                    <button
+                        onClick={() => setSelectedVideo(null)}
+                        className="absolute top-4 right-4 text-white text-4xl hover:text-gray-300 transition z-50"
+                    >
+                        &times;
+                    </button>
                     <div
-                        className="max-w-5xl w-full"
+                        className="max-w-[90vw] max-h-[90vh] flex flex-col bg-black rounded-lg overflow-hidden"
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <div className="flex justify-between items-center mb-4">
-                            <h2 className="text-white text-xl font-bold">
-                                {selectedVideo.title || 'NSS Activity Video'}
-                            </h2>
-                            <button
-                                onClick={() => setSelectedVideo(null)}
-                                className="text-white text-3xl hover:text-gray-300 transition"
-                            >
-                                &times;
-                            </button>
-                        </div>
+                        {selectedVideo.title && (
+                            <div className="p-4 bg-gray-900 border-b border-gray-800">
+                                <h2 className="text-white text-xl font-bold">
+                                    {selectedVideo.title}
+                                </h2>
+                            </div>
+                        )}
                         <video
                             src={uploadAPI.getFullUrl(selectedVideo.url)}
-                            className="w-full rounded-lg"
+                            className="max-h-[80vh] w-auto mx-auto object-contain"
                             controls
                             autoPlay
                         />

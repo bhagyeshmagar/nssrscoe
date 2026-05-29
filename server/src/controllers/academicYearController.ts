@@ -57,6 +57,18 @@ export const lockAcademicYear = async (req: Request, res: Response) => {
     } catch (err) { handleError(res, err); }
 };
 
+export const unlockAcademicYear = async (req: Request, res: Response) => {
+    try {
+        const adminId = (req as AuthRequest).user!.id;
+        const { password } = req.body;
+        if (!password) {
+            return res.status(400).json({ success: false, message: 'Password is required to unlock.' });
+        }
+        const ay = await ayService.unlockAcademicYear(Number(req.params.id), password, adminId);
+        ok(res, ay, `Academic year "${ay.label}" has been unlocked.`);
+    } catch (err) { handleError(res, err); }
+};
+
 export const archiveAcademicYear = async (req: Request, res: Response) => {
     try {
         const adminId = (req as AuthRequest).user!.id;

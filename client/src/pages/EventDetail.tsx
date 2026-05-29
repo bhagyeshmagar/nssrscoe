@@ -1,9 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { eventsAPI, eventImagesAPI, uploadAPI } from '../services/api'; // Added eventImagesAPI, uploadAPI
-import { Calendar, MapPin, Download, X, CheckCircle, Share2, Clock, Users, ChevronLeft, ArrowRight, ZoomIn } from 'lucide-react'; // Added ZoomIn
+import { eventsAPI, eventImagesAPI, uploadAPI } from '../services/api';
+import { Calendar, MapPin, Download, Clock, Users, ChevronLeft, ArrowRight, ZoomIn, Share2 } from 'lucide-react';
 import { format } from 'date-fns';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
+
+import { EventRegistrationModal } from '../components/events/EventRegistrationModal';
+import { ImageLightbox } from '../components/events/ImageLightbox';
 
 interface Event {
     id: number;
@@ -11,7 +14,7 @@ interface Event {
     description: string;
     date: string;
     location: string;
-    imageUrl?: string; // Kept for backward compatibility or as fallback
+    imageUrl?: string;
     type: 'upcoming' | 'past';
     reportUrl?: string;
     volunteersCount?: number;
@@ -28,8 +31,10 @@ const EventDetail = () => {
     const { id } = useParams();
     const navigate = useNavigate();
     const [event, setEvent] = useState<Event | null>(null);
-    const [eventImages, setEventImages] = useState<EventImage[]>([]); // State for multiple images
+    const [eventImages, setEventImages] = useState<EventImage[]>([]);
     const [loading, setLoading] = useState(true);
+    
+    // Modal state
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isRegistered, setIsRegistered] = useState(false);
 
@@ -41,12 +46,10 @@ const EventDetail = () => {
         window.scrollTo(0, 0);
         const fetchData = async () => {
             try {
-                // Fetch event details
                 const eventsResponse = await eventsAPI.getAll();
                 const foundEvent = eventsResponse.data.find((e: Event) => e.id === Number(id));
                 setEvent(foundEvent || null);
 
-                // Fetch event images
                 if (foundEvent) {
                     const imagesResponse = await eventImagesAPI.getByEvent(Number(id));
                     setEventImages(imagesResponse.data);
@@ -85,21 +88,7 @@ const EventDetail = () => {
         }, 1500);
     };
 
-    // Determine banner image: specific master image -> event.imageUrl -> first image -> fallback
     const bannerImage = eventImages.find(img => img.isMaster)?.url || event?.imageUrl || eventImages[0]?.url;
-
-    const openLightbox = (index: number) => {
-        setCurrentImageIndex(index);
-        setLightboxOpen(true);
-    };
-
-    const nextImage = () => {
-        setCurrentImageIndex((prev) => (prev + 1) % eventImages.length);
-    };
-
-    const prevImage = () => {
-        setCurrentImageIndex((prev) => (prev - 1 + eventImages.length) % eventImages.length);
-    };
 
     return (
         <div className="bg-white min-h-screen font-sans">
@@ -149,7 +138,6 @@ const EventDetail = () => {
                                 <MapPin className="w-5 h-5 text-red-400" />
                                 <span className="text-lg font-medium">{event.location}</span>
                             </div>
-                            {/* Changed condition to show volunteers count if available, regardless of event type */}
                             {event.volunteersCount && event.volunteersCount > 0 && (
                                 <div className="flex items-center gap-2">
                                     <Users className="w-5 h-5 text-yellow-400" />
@@ -166,7 +154,6 @@ const EventDetail = () => {
 
                     {/* Main Content */}
                     <div className="lg:col-span-8 space-y-12">
-
                         {/* About Section */}
                         <motion.section
                             initial={{ opacity: 0, y: 20 }}
@@ -196,7 +183,10 @@ const EventDetail = () => {
                                         <div
                                             key={img.id}
                                             className="relative group aspect-square overflow-hidden rounded-xl cursor-pointer shadow-md hover:shadow-xl transition-all"
-                                            onClick={() => openLightbox(index)}
+                                            onClick={() => {
+                                                setCurrentImageIndex(index);
+                                                setLightboxOpen(true);
+                                            }}
                                         >
                                             <img
                                                 src={uploadAPI.getFullUrl(img.url)}
@@ -314,130 +304,24 @@ const EventDetail = () => {
             </div>
 
             {/* Registration Modal */}
-            <AnimatePresence>
-                {isModalOpen && (
-                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.95 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.95 }}
-                            className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden"
-                        >
-                            {!isRegistered ? (
-                                <>
-                                    <div className="bg-gray-50 px-6 py-4 border-b flex justify-between items-center">
-                                        <h3 className="text-xl font-bold text-gray-800">Event Registration</h3>
-                                        <button onClick={() => setIsModalOpen(false)} className="text-gray-500 hover:text-gray-700">
-                                            <X className="w-6 h-6" />
-                                        </button>
-                                    </div>
-                                    <form onSubmit={handleRegisterSubmit} className="p-6 space-y-4">
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
-                                            <input type="text" required className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-nss-blue focus:border-nss-blue outline-none transition" placeholder="John Doe" />
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
-                                            <input type="email" required className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-nss-blue focus:border-nss-blue outline-none transition" placeholder="john@example.com" />
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-1">Department</label>
-                                                <select className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-nss-blue focus:border-nss-blue outline-none transition">
-                                                    <option>Select...</option>
-                                                    <option>Computer</option>
-                                                    <option>IT</option>
-                                                    <option>Mechanical</option>
-                                                    <option>Civil</option>
-                                                    <option>ENTC</option>
-                                                </select>
-                                            </div>
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-1">Year</label>
-                                                <select className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-nss-blue focus:border-nss-blue outline-none transition">
-                                                    <option>Select...</option>
-                                                    <option>FE</option>
-                                                    <option>SE</option>
-                                                    <option>TE</option>
-                                                    <option>BE</option>
-                                                </select>
-                                            </div>
-                                        </div>
-                                        <button type="submit" className="w-full bg-nss-blue hover:bg-blue-900 text-white font-bold py-3 rounded-xl shadow-md transition mt-2">
-                                            Confirm Registration
-                                        </button>
-                                    </form>
-                                </>
-                            ) : (
-                                <div className="p-12 text-center">
-                                    <div className="w-20 h-20 bg-green-100 text-green-500 rounded-full flex items-center justify-center mx-auto mb-6">
-                                        <CheckCircle className="w-10 h-10" />
-                                    </div>
-                                    <h3 className="text-2xl font-bold text-gray-800 mb-2">Registration Successful!</h3>
-                                    <p className="text-gray-600 mb-8">You have successfully registered for "{event.title}". Check your email for details.</p>
-                                    <button
-                                        onClick={() => { setIsModalOpen(false); setIsRegistered(false); }}
-                                        className="bg-gray-800 text-white px-6 py-3 rounded-lg hover:bg-gray-900 transition"
-                                    >
-                                        Close
-                                    </button>
-                                </div>
-                            )}
-                        </motion.div>
-                    </div>
-                )}
-            </AnimatePresence>
+            <EventRegistrationModal
+                isOpen={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
+                eventTitle={event.title}
+                isRegistered={isRegistered}
+                onSubmit={handleRegisterSubmit}
+                onReset={() => setIsRegistered(false)}
+            />
 
             {/* Lightbox Modal */}
-            <AnimatePresence>
-                {lightboxOpen && (
-                    <div className="fixed inset-0 z-[60] bg-black/95 flex items-center justify-center backdrop-blur-sm">
-                        <button
-                            onClick={() => setLightboxOpen(false)}
-                            className="absolute top-4 right-4 text-white/70 hover:text-white transition p-2 bg-white/10 rounded-full"
-                        >
-                            <X className="w-8 h-8" />
-                        </button>
-
-                        <button
-                            onClick={prevImage}
-                            className="absolute left-4 top-1/2 -translate-y-1/2 text-white/70 hover:text-white transition p-3 bg-white/10 hover:bg-white/20 rounded-full"
-                        >
-                            <ChevronLeft className="w-8 h-8" />
-                        </button>
-
-                        <div className="w-full h-full p-12 flex items-center justify-center relative">
-                            <motion.img
-                                key={currentImageIndex}
-                                initial={{ opacity: 0, scale: 0.9 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                exit={{ opacity: 0, scale: 0.9 }}
-                                transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                                src={uploadAPI.getFullUrl(eventImages[currentImageIndex]?.url)}
-                                alt="Gallery View"
-                                className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl"
-                            />
-                            {eventImages[currentImageIndex]?.isMaster && (
-                                <div className="absolute top-16 left-1/2 -translate-x-1/2 bg-yellow-500/90 text-white px-3 py-1 rounded-full text-sm font-medium backdrop-blur-sm">
-                                    Featured Image
-                                </div>
-                            )}
-                        </div>
-
-                        <button
-                            onClick={nextImage}
-                            className="absolute right-4 top-1/2 -translate-y-1/2 text-white/70 hover:text-white transition p-3 bg-white/10 hover:bg-white/20 rounded-full"
-                        >
-                            <ArrowRight className="w-8 h-8" />
-                        </button>
-
-                        {/* Image Counter */}
-                        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 text-white/80 bg-black/40 px-4 py-2 rounded-full backdrop-blur-md">
-                            {currentImageIndex + 1} / {eventImages.length}
-                        </div>
-                    </div>
-                )}
-            </AnimatePresence>
+            <ImageLightbox
+                isOpen={lightboxOpen}
+                onClose={() => setLightboxOpen(false)}
+                images={eventImages}
+                currentIndex={currentImageIndex}
+                onNext={() => setCurrentImageIndex((prev) => (prev + 1) % eventImages.length)}
+                onPrev={() => setCurrentImageIndex((prev) => (prev - 1 + eventImages.length) % eventImages.length)}
+            />
         </div>
     );
 };

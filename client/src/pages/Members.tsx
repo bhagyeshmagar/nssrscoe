@@ -7,6 +7,7 @@ interface Member {
     role: string;
     photoUrl?: string;
     year?: string;
+    order?: number;
     createdAt: string;
 }
 
@@ -27,18 +28,25 @@ const Members = () => {
         fetchMembers();
     }, []);
 
-    // Group members by role
+    // Group members by base role
     const groupedMembers = members.reduce((acc, member) => {
-        const role = member.role;
-        if (!acc[role]) {
-            acc[role] = [];
+        let baseRole = member.role;
+        let subRole = '';
+        
+        if (member.role.startsWith('Department Coordinator')) {
+            baseRole = 'Department Coordinators';
+            subRole = member.role.replace('Department Coordinator - ', '').trim();
+        } else if (member.role.startsWith('Portfolio Lead')) {
+            baseRole = 'Portfolio Leads';
+            subRole = member.role.replace('Portfolio Lead - ', '').trim();
         }
-        acc[role].push(member);
+        
+        if (!acc[baseRole]) {
+            acc[baseRole] = { order: member.order || 99, members: [] };
+        }
+        acc[baseRole].members.push({ ...member, subRole });
         return acc;
-    }, {} as Record<string, Member[]>);
-
-    // Define role priority for ordering
-    const rolePriority = ['Program Officer', 'Secretary', 'Joint Secretary', 'Treasurer'];
+    }, {} as Record<string, { order: number, members: (Member & { subRole?: string })[] }>);
 
     if (loading) {
         return (
@@ -62,23 +70,16 @@ const Members = () => {
                 </div>
             ) : (
                 <div className="space-y-12">
-                    {/* Show role groups in priority order, then alphabetically */}
+                    {/* Show role groups in assigned order */}
                     {Object.keys(groupedMembers)
-                        .sort((a, b) => {
-                            const aIndex = rolePriority.indexOf(a);
-                            const bIndex = rolePriority.indexOf(b);
-                            if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex;
-                            if (aIndex !== -1) return -1;
-                            if (bIndex !== -1) return 1;
-                            return a.localeCompare(b);
-                        })
+                        .sort((a, b) => groupedMembers[a].order - groupedMembers[b].order)
                         .map((role) => (
                             <div key={role}>
                                 <h2 className="text-2xl font-bold text-gray-800 mb-6 text-center border-b pb-2">
                                     {role}
                                 </h2>
                                 <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-8 justify-center">
-                                    {groupedMembers[role].map((member) => (
+                                    {groupedMembers[role].members.map((member) => (
                                         <MemberCard key={member.id} member={member} />
                                     ))}
                                 </div>
@@ -90,7 +91,7 @@ const Members = () => {
     );
 };
 
-const MemberCard = ({ member }: { member: Member }) => (
+const MemberCard = ({ member }: { member: Member & { subRole?: string } }) => (
     <div className="bg-white p-6 rounded-lg shadow-md text-center border-t-4 border-nss-blue hover:shadow-lg transition">
         <div className="w-24 h-24 bg-gray-200 rounded-full mx-auto mb-4 overflow-hidden">
             {member.photoUrl ? (
@@ -100,13 +101,13 @@ const MemberCard = ({ member }: { member: Member }) => (
                     className="w-full h-full object-cover"
                 />
             ) : (
-                <div className="w-full h-full flex items-center justify-center text-4xl text-gray-400">
+                <div className="w-full h-full flex items-center justify-center text-4xl text-gray-400 bg-gray-100">
                     👤
                 </div>
             )}
         </div>
         <h3 className="text-xl font-bold text-gray-800">{member.name}</h3>
-        <p className="text-nss-blue font-medium">{member.role}</p>
+        <p className="text-nss-blue font-medium">{member.subRole || member.role}</p>
         {member.year && (
             <p className="text-gray-500 text-sm mt-1">{member.year}</p>
         )}

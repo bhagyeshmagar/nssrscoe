@@ -1,17 +1,19 @@
 import { useState, useEffect } from 'react';
 import { Quote } from 'lucide-react';
 import { volunteersAPI, uploadAPI } from '../services/api';
+import type { ExperienceData } from '../services/api';
 
 const Volunteering = () => {
-    const [experiences, setExperiences] = useState<any[]>([]);
+    const [experiences, setExperiences] = useState<ExperienceData[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const fetchExps = async () => {
             try {
                 const res = await volunteersAPI.getExperiences();
-                const data = (res.data as any).data || res.data;
-                if (data && data.length > 0) {
+                const rawData = res.data as unknown as { data?: ExperienceData[] } | ExperienceData[];
+                const data = ('data' in rawData && rawData.data) ? rawData.data : rawData as ExperienceData[];
+                if (Array.isArray(data) && data.length > 0) {
                     setExperiences(data);
                 } else {
                     setExperiences([]);

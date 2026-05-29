@@ -74,6 +74,7 @@ export const getMembers = async (req: Request, res: Response) => {
             role: a.roleName,
             photoUrl: a.displayPhotoUrl ?? (a.volunteerId ? volunteerMap[a.volunteerId]?.photoUrl : null) ?? null,
             year: currentAY.label,
+            order: a.roleDisplayOrder,
             createdAt: a.createdAt,
         }));
 
@@ -90,7 +91,7 @@ export const getMembers = async (req: Request, res: Response) => {
  */
 export const createMember = async (req: Request, res: Response) => {
     try {
-        const { coreTeamRoleId, volunteerId, displayName, displayPhotoUrl } = req.body;
+        const { coreTeamRoleId, volunteerId, displayName, displayPhotoUrl, name, role, photoUrl } = req.body;
 
         const [currentAY] = await db
             .select({ id: academicYears.id })
@@ -102,12 +103,31 @@ export const createMember = async (req: Request, res: Response) => {
             return res.status(400).json({ message: 'No active academic year is set. Create and activate an academic year first.' });
         }
 
+        let roleId = coreTeamRoleId ? parseInt(coreTeamRoleId) : null;
+        
+        // Legacy support: if 'role' is provided as string
+        if (!roleId && role) {
+            let coreRole = await db.select().from(coreTeamRoles).where(eq(coreTeamRoles.name, role)).limit(1).then(res => res[0]);
+            if (!coreRole) {
+                const code = role.toLowerCase().replace(/[^a-z0-9]+/g, '_').substring(0, 50);
+                const [newRole] = await db.insert(coreTeamRoles).values({
+                    name: role,
+                    code: code,
+                    roleType: role.toLowerCase().includes('coordinator') || role.toLowerCase().includes('lead') || role.toLowerCase().includes('representative') ? 'student' : 'institution',
+                }).returning();
+                coreRole = newRole;
+            }
+            roleId = coreRole.id;
+        }
+
+        if (!roleId) return res.status(400).json({ message: 'Role is required' });
+
         const [newAssignment] = await db.insert(coreTeamAssignments).values({
             academicYearId: currentAY.id,
-            coreTeamRoleId: parseInt(coreTeamRoleId),
+            coreTeamRoleId: roleId,
             volunteerId: volunteerId ? parseInt(volunteerId) : null,
-            displayName: displayName ?? null,
-            displayPhotoUrl: displayPhotoUrl ?? null,
+            displayName: displayName ?? name ?? null,
+            displayPhotoUrl: displayPhotoUrl ?? photoUrl ?? null,
         }).returning();
 
         res.json(newAssignment);
@@ -123,15 +143,32 @@ export const createMember = async (req: Request, res: Response) => {
 export const updateMember = async (req: Request, res: Response) => {
     const { id } = req.params;
     try {
-        const { volunteerId, displayName, displayPhotoUrl, displayOrder } = req.body;
+        const { volunteerId, displayName, displayPhotoUrl, displayOrder, name, photoUrl, role } = req.body;
+        
+        let updateData: any = {
+            volunteerId: volunteerId !== undefined ? parseInt(volunteerId) : undefined,
+            displayName: displayName ?? name ?? undefined,
+            displayPhotoUrl: displayPhotoUrl ?? photoUrl ?? undefined,
+            displayOrder: displayOrder !== undefined ? parseInt(displayOrder) : undefined,
+        };
+
+        if (role) {
+            let coreRole = await db.select().from(coreTeamRoles).where(eq(coreTeamRoles.name, role)).limit(1).then(res => res[0]);
+            if (!coreRole) {
+                const code = role.toLowerCase().replace(/[^a-z0-9]+/g, '_').substring(0, 50);
+                const [newRole] = await db.insert(coreTeamRoles).values({
+                    name: role,
+                    code: code,
+                    roleType: role.toLowerCase().includes('coordinator') || role.toLowerCase().includes('lead') || role.toLowerCase().includes('representative') ? 'student' : 'institution',
+                }).returning();
+                coreRole = newRole;
+            }
+            updateData.coreTeamRoleId = coreRole.id;
+        }
+
         const [updated] = await db
             .update(coreTeamAssignments)
-            .set({
-                volunteerId: volunteerId !== undefined ? parseInt(volunteerId) : undefined,
-                displayName: displayName ?? undefined,
-                displayPhotoUrl: displayPhotoUrl ?? undefined,
-                displayOrder: displayOrder !== undefined ? parseInt(displayOrder) : undefined,
-            })
+            .set(updateData)
             .where(eq(coreTeamAssignments.id, Number(id)))
             .returning();
         res.json(updated);

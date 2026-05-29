@@ -1,5 +1,4 @@
-import React from 'react';
-import { Target, Heart, Award, Shield, Users, Globe, BookOpen, UserCheck, Flag, Zap, Compass, Mountain } from 'lucide-react';
+import { Target, Award, Shield, Users, Globe, UserCheck, Zap, Mountain } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 const Mission = () => {

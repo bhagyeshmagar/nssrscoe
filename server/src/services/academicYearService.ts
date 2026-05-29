@@ -6,6 +6,7 @@ import {
     coreTeamAssignments,
     specialCamps,
     events,
+    admins,
 } from '../db/schema';
 import {
     NotFoundError,
@@ -30,6 +31,8 @@ export interface UpdateAYInput {
     startDate?: string;
     endDate?: string;
     volunteerCap?: number;
+    regularActivityReportUrl?: string;
+    specialCampReportUrl?: string;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -127,6 +130,8 @@ export const updateAcademicYear = async (id: number, input: UpdateAYInput, admin
             ...(input.startDate && { startDate: input.startDate }),
             ...(input.endDate && { endDate: input.endDate }),
             ...(input.volunteerCap !== undefined && { volunteerCap: input.volunteerCap }),
+            ...(input.regularActivityReportUrl !== undefined && { regularActivityReportUrl: input.regularActivityReportUrl }),
+            ...(input.specialCampReportUrl !== undefined && { specialCampReportUrl: input.specialCampReportUrl }),
         })
         .where(eq(academicYears.id, id))
         .returning();
@@ -203,6 +208,39 @@ export const lockAcademicYear = async (id: number, adminId: number) => {
         .where(eq(academicYears.id, id));
 
     await auditAYLock(id, adminId, ay.label);
+
+    return findAY(id);
+};
+
+export const unlockAcademicYear = async (id: number, passwordStr: string, adminId: number) => {
+    const ay = await findAY(id);
+
+    if (!ay.isLocked) throw new ConflictError(`Academic year "${ay.label}" is not locked.`);
+    if (ay.isArchived) throw new ForbiddenError(`Academic year "${ay.label}" is archived and cannot be unlocked.`, 'AY_ARCHIVED');
+
+    const [admin] = await db.select().from(admins).where(eq(admins.id, adminId)).limit(1);
+    if (!admin) throw new NotFoundError('Admin not found.');
+
+    const isValid = await require('bcryptjs').compare(passwordStr, admin.passwordHash);
+    if (!isValid) throw new ForbiddenError('Invalid admin password.');
+
+    await db
+        .update(academicYears)
+        .set({
+            isLocked: false,
+            lockedAt: null,
+            lockedById: null,
+        })
+        .where(eq(academicYears.id, id));
+
+    await logAudit({
+        action: 'academic_year.unlock',
+        entityType: 'academic_year',
+        entityId: id,
+        performedById: adminId,
+        academicYearId: id,
+        details: { label: ay.label },
+    });
 
     return findAY(id);
 };

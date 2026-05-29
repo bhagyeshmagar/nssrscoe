@@ -18,9 +18,15 @@ import volunteerRoutes, { ayVolunteerRouter } from './routes/volunteerRoutes';
 import coreTeamRoutes, { ayCoreTeamRouter } from './routes/coreTeamRoutes';
 import attendanceRoutes, { ayAttendanceRouter } from './routes/attendanceRoutes';
 import specialCampRoutes, { ayCampsRouter } from './routes/specialCampRoutes';
-// import { apiRateLimiter } from './middleware/rateLimiter';
+import adminRoutes from './routes/adminRoutes';
+import activityCalendarRoutes from './routes/activityCalendarRoutes';
+import { apiRateLimiter } from './middleware/rateLimiter';
 
 dotenv.config();
+
+if (!process.env.JWT_SECRET) {
+    throw new Error('JWT_SECRET environment variable is required');
+}
 
 const app: Express = express();
 const port = process.env.PORT || 5000;
@@ -37,10 +43,10 @@ app.use(cors({
     credentials: true,
 }));
 
-app.use(express.json());
+app.use(express.json({ limit: '1mb' }));
 
 // Apply general rate limiting to all API routes
-// app.use('/api', apiRateLimiter);
+app.use('/api', apiRateLimiter);
 
 // Serve uploaded files statically
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
@@ -61,13 +67,16 @@ app.use('/api/academic-years/:ayId/special-camps', ayCampsRouter);
 
 // ── Flat / self-service routes ────────────────────────────────────────────────
 app.use('/api/auth',          authRoutes);
+app.use('/api/admins',        adminRoutes);
 app.use('/api/events',        eventRoutes);
 app.use('/api/gallery',       galleryRoutes);
 app.use('/api/members',       membersRoutes);
 app.use('/api/settings',      settingsRoutes);
 app.use('/api/upload',        uploadRoutes);
 app.use('/api/event-images',  eventImagesRoutes);
+
 app.use('/api/registrations', registrationRoutes);
+app.use('/api/activity-calendar', activityCalendarRoutes);
 
 app.use('/api/volunteers',    volunteerRoutes);     // /me, /me/profile, /me/password, /public, /experiences
 app.use('/api/core-team',     coreTeamRoutes);      // /roles

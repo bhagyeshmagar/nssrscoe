@@ -22,12 +22,13 @@ export const login = async (req: Request, res: Response) => {
         if (admin.length > 0) {
             const validPassword = await bcrypt.compare(password, admin[0].passwordHash);
             if (validPassword) {
+                const role = admin[0].isSuperadmin ? 'superadmin' : 'admin';
                 const token = jwt.sign(
-                    { id: admin[0].id, username: admin[0].username, role: 'admin' },
+                    { id: admin[0].id, username: admin[0].username, role, isSuperadmin: admin[0].isSuperadmin },
                     process.env.JWT_SECRET as string,
                     { expiresIn: '1d' }
                 );
-                return res.json({ token, role: 'admin', user: { id: admin[0].id, username: admin[0].username } });
+                return res.json({ token, role, isSuperadmin: admin[0].isSuperadmin, user: { id: admin[0].id, username: admin[0].username, isSuperadmin: admin[0].isSuperadmin } });
             }
         }
 
@@ -80,10 +81,12 @@ export const verifyToken = async (req: Request, res: Response) => {
         return res.json({
             valid: true,
             role: decoded.role,
+            isSuperadmin: decoded.isSuperadmin,
             user: {
                 id: decoded.id,
                 username: decoded.username,
                 email: decoded.email,
+                isSuperadmin: decoded.isSuperadmin,
             }
         });
     } catch (error) {

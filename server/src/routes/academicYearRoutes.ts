@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { authenticateToken, requireAdmin } from '../middleware/auth';
+import { authenticateToken, requireAdmin, requireSuperAdmin } from '../middleware/auth';
 import * as ayCtrl from '../controllers/academicYearController';
 
 const router = Router();
@@ -15,6 +15,7 @@ router.post('/',               authenticateToken, requireAdmin, ayCtrl.createAca
 router.put('/:id',             authenticateToken, requireAdmin, ayCtrl.updateAcademicYear);
 router.post('/:id/activate',   authenticateToken, requireAdmin, ayCtrl.activateAcademicYear);
 router.post('/:id/lock',       authenticateToken, requireAdmin, ayCtrl.lockAcademicYear);
+router.post('/:id/unlock',     authenticateToken, requireSuperAdmin, ayCtrl.unlockAcademicYear);
 router.post('/:id/archive',    authenticateToken, requireAdmin, ayCtrl.archiveAcademicYear);
 
 export default router;

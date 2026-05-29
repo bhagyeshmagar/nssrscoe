@@ -1,26 +1,52 @@
 import { Request, Response } from 'express';
 import { db } from '../db';
-import { events } from '../db/schema';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, sql } from 'drizzle-orm';
+import { events, academicYears } from '../db/schema';
 
 export const getEvents = async (req: Request, res: Response) => {
     try {
-        const allEvents = await db.select().from(events).orderBy(desc(events.date));
+        const allEvents = await db.select({
+            id: events.id,
+            title: events.title,
+            description: events.description,
+            date: events.date,
+            location: events.location,
+            type: events.type,
+            reportUrl: events.reportUrl,
+            academicYearId: events.academicYearId,
+            createdAt: events.createdAt,
+            imageUrl: sql<string>`COALESCE(NULLIF(events.image_url, ''), (SELECT url FROM event_images WHERE event_id = events.id AND is_master = true LIMIT 1), (SELECT url FROM event_images WHERE event_id = events.id LIMIT 1))`,
+            volunteersCount: sql<number>`(SELECT COUNT(ar.id)::int FROM attendance_records ar JOIN attendance_sessions s ON ar.session_id = s.id WHERE s.event_id = events.id AND ar.status = 'present')`
+        }).from(events).orderBy(desc(events.date));
+
         res.json(allEvents);
     } catch (error) {
+        console.error("Error in getEvents:", error);
         res.status(500).json({ message: 'Error fetching events', error });
     }
 };
 
 export const createEvent = async (req: Request, res: Response) => {
     try {
-        // Basic validation could go here or use Zod
+        const [currentAY] = await db
+            .select({ id: academicYears.id })
+            .from(academicYears)
+            .where(eq(academicYears.isCurrent, true))
+            .limit(1);
+
+        const { title, description, location, type, reportUrl } = req.body;
         const newEvent = await db.insert(events).values({
-            ...req.body,
+            title,
+            description,
+            location,
+            type: type || 'upcoming',
+            reportUrl,
+            academicYearId: currentAY?.id || null,
             date: new Date(req.body.date) // Ensure date is Date object
         }).returning();
         res.json(newEvent[0]);
     } catch (error) {
+        console.error("Error in createEvent:", error);
         res.status(500).json({ message: 'Error creating event', error });
     }
 };
@@ -28,13 +54,19 @@ export const createEvent = async (req: Request, res: Response) => {
 export const updateEvent = async (req: Request, res: Response) => {
     const { id } = req.params;
     try {
-        const updateData = { ...req.body };
-        if (updateData.date) {
-            updateData.date = new Date(updateData.date);
-        }
+        const { title, description, location, type, reportUrl, date } = req.body;
+        const updateData: any = {};
+        if (title !== undefined) updateData.title = title;
+        if (description !== undefined) updateData.description = description;
+        if (location !== undefined) updateData.location = location;
+        if (type !== undefined) updateData.type = type;
+        if (reportUrl !== undefined) updateData.reportUrl = reportUrl;
+        if (date !== undefined) updateData.date = new Date(date);
+
         const updated = await db.update(events).set(updateData).where(eq(events.id, Number(id))).returning();
         res.json(updated[0]);
     } catch (error) {
+        console.error("Error in updateEvent:", error);
         res.status(500).json({ message: 'Error updating event', error });
     }
 }
@@ -45,6 +77,7 @@ export const deleteEvent = async (req: Request, res: Response) => {
         await db.delete(events).where(eq(events.id, Number(id)));
         res.json({ message: 'Event deleted' });
     } catch (error) {
+        console.error("Error in deleteEvent:", error);
         res.status(500).json({ message: 'Error deleting event', error });
     }
 }

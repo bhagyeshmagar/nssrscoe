@@ -26,7 +26,7 @@ api.interceptors.response.use(
     }
 );
 
-export const decodeToken = (token: string): { id: number; role: 'admin' | 'volunteer'; username?: string; email?: string } | null => {
+export const decodeToken = (token: string): { id: number; role: 'admin' | 'superadmin' | 'volunteer'; isSuperadmin?: boolean; username?: string; email?: string } | null => {
     try {
         const base64Url = token.split('.')[1];
         const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
@@ -54,7 +54,16 @@ export const academicYearsAPI = {
     update:    (id: number, data: Partial<CreateAYData>) => api.put<AcademicYear>(`/academic-years/${id}`, data),
     activate:  (id: number)=> api.post<AcademicYear>(`/academic-years/${id}/activate`),
     lock:      (id: number)=> api.post<AcademicYear>(`/academic-years/${id}/lock`),
+    unlock:    (id: number, password: string) => api.post<AcademicYear>(`/academic-years/${id}/unlock`, { password }),
     archive:   (id: number)=> api.post<AcademicYear>(`/academic-years/${id}/archive`),
+};
+
+// ── Activity Calendar ────────────────────────────────────────────────────────
+export const activityCalendarAPI = {
+    getByAcademicYear: (ayId: number) => api.get<ActivityCalendarItem[]>(`/activity-calendar/${ayId}`),
+    create: (ayId: number, data: Omit<ActivityCalendarItem, 'id' | 'academicYearId' | 'createdAt'>) => api.post<ActivityCalendarItem>(`/activity-calendar/${ayId}`, data),
+    update: (id: number, data: Omit<ActivityCalendarItem, 'id' | 'academicYearId' | 'createdAt'>) => api.put<ActivityCalendarItem>(`/activity-calendar/${id}`, data),
+    delete: (id: number) => api.delete(`/activity-calendar/${id}`),
 };
 
 // ── Volunteers (AY-scoped admin) ──────────────────────────────────────────────
@@ -143,6 +152,15 @@ export const specialCampsAPI = {
 };
 
 // ── Existing APIs (unchanged) ─────────────────────────────────────────────────
+export const adminsAPI = {
+    getMe:   () => api.get('/admins/me'),
+    updateMe: (data: Record<string, unknown>) => api.put('/admins/me', data),
+    getAll:  () => api.get('/admins'),
+    create:  (data: Record<string, unknown>) => api.post('/admins', data),
+    update:  (id: number, data: Record<string, unknown>) => api.put(`/admins/${id}`, data),
+    delete:  (id: number) => api.delete(`/admins/${id}`),
+};
+
 export const eventsAPI = {
     getAll:  ()                              => api.get('/events'),
     create:  (data: EventData)               => api.post('/events', data),
@@ -217,6 +235,8 @@ export interface AcademicYear {
     volunteerCap: number;
     lockedAt?: string;
     createdAt: string;
+    regularActivityReportUrl?: string;
+    specialCampReportUrl?: string;
 }
 
 export interface AYStats {
@@ -232,6 +252,18 @@ export interface CreateAYData {
     startDate: string;
     endDate: string;
     volunteerCap?: number;
+    regularActivityReportUrl?: string;
+    specialCampReportUrl?: string;
+}
+
+export interface ActivityCalendarItem {
+    id: number;
+    academicYearId: number;
+    month: string;
+    tentativeDate: string;
+    activity: string;
+    type: string;
+    createdAt: string;
 }
 
 export type Department =
@@ -305,6 +337,7 @@ export interface VolunteerProfileData {
     emailId?: string;
     profilePhotoUrl?: string;
     experienceText?: string;
+    portfolioChoices?: string;
 }
 
 export interface VolunteerWithProfile extends VolunteerData {
@@ -456,7 +489,7 @@ export interface EventImage extends EventImageData { id: number; eventId: number
 export interface GalleryData { title?: string; url: string; type?: 'image' | 'video'; eventId?: number | null; }
 export interface MemberData { id?: number; name: string; role: string; photoUrl?: string; year?: string; }
 export interface SiteSettings {
-    heroTitle?: string; heroSubtitle?: string; heroCta?: string; heroCTA?: string;
+    heroTitle?: string; heroSubtitle?: string; heroCta?: string;
     statEventsCount?: string; statEventsLabel?: string;
     statVolunteersCount?: string; statVolunteersLabel?: string;
     statImpactCount?: string; statImpactLabel?: string;

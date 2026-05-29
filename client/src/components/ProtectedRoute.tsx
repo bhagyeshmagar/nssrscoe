@@ -1,4 +1,3 @@
-import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { decodeToken } from '../services/api';
 
@@ -29,7 +28,7 @@ const ProtectedRoute = ({ children, adminOnly = false, volunteerOnly = false }: 
     const userRole = decoded.role;
 
     // Role-based access control with loop prevention
-    if (adminOnly && userRole !== 'admin') {
+    if (adminOnly && userRole !== 'admin' && userRole !== 'superadmin') {
         // Volunteer trying to access admin page - redirect to volunteer dashboard
         // But only if not already on volunteer route (prevents loop)
         if (!location.pathname.startsWith('/volunteer')) {

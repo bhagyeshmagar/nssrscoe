@@ -45,6 +45,7 @@ export const admins = pgTable('admins', {
     id: serial('id').primaryKey(),
     username: varchar('username', { length: 255 }).notNull().unique(),
     passwordHash: text('password_hash').notNull(),
+    isSuperadmin: boolean('is_superadmin').default(false).notNull(),
     createdAt: timestamp('created_at').defaultNow(),
 });
 
@@ -66,6 +67,22 @@ export const academicYears = pgTable('academic_years', {
     volunteerCap: integer('volunteer_cap').default(100).notNull(),
     lockedAt: timestamp('locked_at'),
     lockedById: integer('locked_by_id').references(() => admins.id),
+    regularActivityReportUrl: varchar('regular_activity_report_url', { length: 1024 }),
+    specialCampReportUrl: varchar('special_camp_report_url', { length: 1024 }),
+    createdAt: timestamp('created_at').defaultNow(),
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ACTIVITY CALENDAR
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const activityCalendar = pgTable('activity_calendar', {
+    id: serial('id').primaryKey(),
+    academicYearId: integer('academic_year_id').references(() => academicYears.id, { onDelete: 'cascade' }).notNull(),
+    month: varchar('month', { length: 50 }).notNull(),
+    tentativeDate: varchar('tentative_date', { length: 255 }).notNull(),
+    activity: varchar('activity', { length: 500 }).notNull(),
+    type: varchar('type', { length: 50 }).notNull(), // 'Field Work', 'Health', 'Campus', 'National'
     createdAt: timestamp('created_at').defaultNow(),
 });
 
@@ -114,6 +131,7 @@ export const volunteerProfiles = pgTable('volunteer_profiles', {
     department: varchar('department', { length: 100 }), // Added so Drizzle can map the existing DB column
     profilePhotoUrl: text('profile_photo_url'),
     experienceText: text('experience_text'),
+    portfolioChoices: text('portfolio_choices'), // Added for preferred portfolios
     updatedAt: timestamp('updated_at').defaultNow(),
 });
 
@@ -282,6 +300,7 @@ export const eventRegistrations = pgTable('event_registrations', {
 export const gallery = pgTable('gallery', {
     id: serial('id').primaryKey(),
     title: varchar('title', { length: 255 }),
+    description: text('description').notNull().default(''),
     url: text('url').notNull(),
     type: mediaTypeEnum('type').default('image'),
     eventId: integer('event_id').references(() => events.id),

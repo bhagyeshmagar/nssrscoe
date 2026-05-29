@@ -1,9 +1,9 @@
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import html2canvas from 'html2canvas';
-import { Download, CheckCircle, User, Calendar, MapPin, Hash, Search } from 'lucide-react';
-import { format } from 'date-fns';
+import { Download, CheckCircle, Hash, Search } from 'lucide-react';
 import { eventsAPI, registrationsAPI } from '../services/api';
 import type { EventData, EventRegistration } from '../services/api';
+import { VisitorPassCard } from '../components/events/VisitorPassCard';
 
 const Register = () => {
     const [viewMode, setViewMode] = useState<'register' | 'lookup'>('register');
@@ -88,9 +88,10 @@ const Register = () => {
                 eventId: res.data.event.id.toString(),
             });
             setStep(2); // Go to pass view
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error("Lookup failed", err);
-            setLookupError(err.response?.data?.message || "Visitor ID not found.");
+            const axiosError = err as { response?: { data?: { message?: string } } };
+            setLookupError(axiosError.response?.data?.message || "Visitor ID not found.");
         }
         setLoading(false);
     };
@@ -223,64 +224,12 @@ const Register = () => {
                         <p>Your Visitor ID has been generated. Please save this pass.</p>
                     </div>
 
-                    {/* Visitor Pass Card */}
-                    <div ref={passRef} className="bg-white w-full max-w-sm rounded-xl shadow-2xl overflow-hidden border-2 border-nss-blue relative">
-                        {/* Header */}
-                        <div className="bg-nss-blue text-white p-4 text-center">
-                            <div className="flex justify-center items-center gap-2 mb-2">
-                                <img src="/assets/nss_logo.jpg" alt="NSS" className="w-10 h-10 rounded-full bg-white p-0.5" />
-                                <img src="/assets/rscoe_logo.png" alt="RSCOE" className="w-10 h-10 rounded-full bg-white p-0.5" />
-                            </div>
-                            <h3 className="font-bold text-lg tracking-wide uppercase">Visitor Pass</h3>
-                            <p className="text-xs opacity-90">NSS - JSPM RSCOE</p>
-                        </div>
-
-                        {/* Content */}
-                        <div className="p-6 space-y-4 relative">
-                            {/* Watermark */}
-                            <div className="absolute inset-0 flex items-center justify-center opacity-5 pointer-events-none">
-                                <img src="/assets/nss_logo.jpg" className="w-48 h-48 grayscale" />
-                            </div>
-
-                            <div className="flex items-center gap-3">
-                                <div className="bg-gray-100 p-2 rounded-full">
-                                    <User className="w-6 h-6 text-nss-red" />
-                                </div>
-                                <div>
-                                    <p className="text-xs text-gray-500 uppercase">Visitor Name</p>
-                                    <p className="font-bold text-lg text-gray-800">{formData.name}</p>
-                                </div>
-                            </div>
-
-                            <div className="flex items-center gap-3">
-                                <div className="bg-gray-100 p-2 rounded-full">
-                                    <Hash className="w-6 h-6 text-nss-red" />
-                                </div>
-                                <div>
-                                    <p className="text-xs text-gray-500 uppercase">Visitor ID</p>
-                                    <p className="font-mono font-bold text-xl text-nss-blue tracking-wider">{visitorPassId}</p>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4 pt-2">
-                                <div>
-                                    <p className="text-xs text-gray-500 uppercase flex items-center gap-1"><Calendar className="w-3 h-3" /> Date</p>
-                                    <p className="font-medium text-sm">{format(new Date(), 'dd MMM yyyy')}</p>
-                                </div>
-                                <div>
-                                    <p className="text-xs text-gray-500 uppercase flex items-center gap-1"><MapPin className="w-3 h-3" /> Event</p>
-                                    <p className="font-medium text-sm truncate">
-                                        {lookupResult?.event.title || events.find(e => e.id.toString() === formData.eventId)?.title || "NSS Event"}
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Footer */}
-                        <div className="bg-gray-50 border-t border-gray-200 p-3 text-center">
-                            <p className="text-[10px] text-gray-400">Please present this digital pass at the venue.</p>
-                        </div>
-                    </div>
+                    <VisitorPassCard 
+                        ref={passRef}
+                        visitorPassId={visitorPassId}
+                        name={formData.name}
+                        eventTitle={lookupResult?.event.title || events.find(e => e.id.toString() === formData.eventId)?.title || "NSS Event"}
+                    />
 
                     <button
                         onClick={downloadPass}

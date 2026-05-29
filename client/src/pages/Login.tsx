@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authAPI } from '../services/api';
 
@@ -25,9 +25,10 @@ const Login = () => {
             } else {
                 navigate('/volunteer');
             }
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error('Login failed', err);
-            setError(err.response?.data?.message || 'Invalid credentials. Please try again.');
+            const axiosError = err as { response?: { data?: { message?: string } } };
+            setError(axiosError.response?.data?.message || 'Invalid credentials. Please try again.');
         }
         setLoading(false);
     };
