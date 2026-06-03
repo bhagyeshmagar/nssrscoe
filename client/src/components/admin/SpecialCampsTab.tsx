@@ -125,18 +125,57 @@ export const SpecialCampsTab = ({ years, currentAY }: { years: AcademicYear[]; c
     const [expandedCampId, setExpandedCampId] = useState<number | null>(null);
     const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
 
+    const departmentPriority = [
+        'Computer Engineering',
+        'Computer Science and Business Systems',
+        'Information Technology',
+        'Electronics and Telecommunication',
+        'Electrical Engineering',
+        'Automation and Robotics',
+        'Mechanical Engineering',
+        'Civil Engineering',
+        'Bachelor of Computer Applications'
+    ];
+
     const sortParticipants = (participants: any[]) => {
-        if (!sortConfig) return participants;
-        return [...participants].sort((a, b) => {
+        const sorted = [...participants];
+        if (!sortConfig) {
+            // Default sort: Department priority -> Name
+            return sorted.sort((a, b) => {
+                const aDept = a.snapDepartment || a.currentDept || a.department || '';
+                const bDept = b.snapDepartment || b.currentDept || b.department || '';
+                const aIdx = departmentPriority.indexOf(aDept);
+                const bIdx = departmentPriority.indexOf(bDept);
+                const aRank = aIdx === -1 ? 999 : aIdx;
+                const bRank = bIdx === -1 ? 999 : bIdx;
+                if (aRank !== bRank) return aRank - bRank;
+                
+                const aName = a.snapName || a.currentName || a.name || '';
+                const bName = b.snapName || b.currentName || b.name || '';
+                return aName.localeCompare(bName);
+            });
+        }
+        return sorted.sort((a, b) => {
             const getVal = (p: any, key: string) => {
-                if (key === 'snapName') return p.snapName || p.currentName || '';
-                if (key === 'snapDepartment') return p.snapDepartment || p.currentDept || '';
+                if (key === 'snapName') return p.snapName || p.currentName || p.name || '';
+                if (key === 'snapDepartment') return p.snapDepartment || p.currentDept || p.department || '';
                 if (key === 'snapCollegeYear') return p.snapCollegeYearAtEnrollment || p.collegeYear || '';
                 if (key === 'snapNssYear') return p.snapNssYear || p.nssYear || 0;
                 return '';
             };
             const aVal = getVal(a, sortConfig.key);
             const bVal = getVal(b, sortConfig.key);
+
+            if (sortConfig.key === 'snapDepartment') {
+                const aIdx = departmentPriority.indexOf(aVal as string);
+                const bIdx = departmentPriority.indexOf(bVal as string);
+                const aRank = aIdx === -1 ? 999 : aIdx;
+                const bRank = bIdx === -1 ? 999 : bIdx;
+                if (aRank < bRank) return sortConfig.direction === 'asc' ? -1 : 1;
+                if (aRank > bRank) return sortConfig.direction === 'asc' ? 1 : -1;
+                return 0;
+            }
+
             if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
             if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
             return 0;
@@ -303,15 +342,15 @@ export const SpecialCampsTab = ({ years, currentAY }: { years: AcademicYear[]; c
                                                             }}
                                                         />
                                                     </th>
-                                                    <th className="px-4 py-2 text-left">Name</th>
-                                                    <th className="px-4 py-2 text-left">Department</th>
+                                                    <th className="px-4 py-2 text-left cursor-pointer hover:bg-gray-100" onClick={() => requestSort('snapName')}>Name {sortConfig?.key === 'snapName' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}</th>
+                                                    <th className="px-4 py-2 text-left cursor-pointer hover:bg-gray-100" onClick={() => requestSort('snapDepartment')}>Department {sortConfig?.key === 'snapDepartment' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}</th>
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y">
                                                 {ayVols.length === 0 && (
                                                     <tr><td colSpan={3} className="text-center py-4 text-gray-500">No regular active volunteers found.</td></tr>
                                                 )}
-                                                {ayVols.map(v => (
+                                                {sortParticipants(ayVols).map(v => (
                                                     <tr key={v.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => {
                                                         const newSet = new Set(selectedVolIds);
                                                         if (newSet.has(v.id)) newSet.delete(v.id);
