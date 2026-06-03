@@ -93,7 +93,7 @@ export const AttendanceTab = ({ years, currentAY }: { years: AcademicYear[]; cur
             {selectedAY?.isLocked && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">[Locked] Locked - read-only.</div>}
 
             {!selectedEvent ? (
-                <div className="bg-white rounded-xl shadow overflow-hidden">
+                <div className="bg-white rounded-xl shadow overflow-hidden overflow-x-auto">
                     <table className="w-full text-sm">
                         <thead className="bg-gray-50 border-b">
                             <tr>

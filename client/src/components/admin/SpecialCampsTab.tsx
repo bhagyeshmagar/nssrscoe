@@ -199,7 +199,7 @@ export const SpecialCampsTab = ({ years, currentAY }: { years: AcademicYear[]; c
                                             {selectedVolIds.size} Selected
                                         </span>
                                     </div>
-                                    <div className="border rounded-lg max-h-96 overflow-y-auto">
+                                    <div className="border rounded-lg max-h-96 overflow-y-auto overflow-x-auto">
                                         <table className="w-full text-sm">
                                             <thead className="bg-gray-50 sticky top-0">
                                                 <tr>

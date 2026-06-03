@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
     eventsAPI, galleryAPI, membersAPI, settingsAPI,
     academicYearsAPI, decodeToken
@@ -59,11 +58,11 @@ const getTabGroups = (isSuperadmin: boolean) => [
 ];
 
 const AdminDashboard = () => {
-    const navigate = useNavigate();
     const token = localStorage.getItem('token');
     const isSuperadmin = token ? decodeToken(token)?.role === 'superadmin' : false;
     const [activeTab, setActiveTab] = useState<TabType>('overview');
     const [loading, setLoading] = useState(false);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
     const [years, setYears] = useState<AcademicYear[]>([]);
     const [currentAY, setCurrentAY] = useState<AcademicYear | null>(null);
@@ -78,8 +77,6 @@ const AdminDashboard = () => {
     const [showMemberForm, setShowMemberForm] = useState(false);
     const [editingItem, setEditingItem] = useState<any>(null);
     const tabGroups = getTabGroups(isSuperadmin);
-
-    const handleLogout = () => { localStorage.removeItem('token'); localStorage.removeItem('userRole'); navigate('/login'); };
 
     const loadYears = useCallback(async () => {
         try {
@@ -118,8 +115,14 @@ const AdminDashboard = () => {
 
     return (
         <div className="min-h-screen bg-gray-100 flex flex-col">
-            <header className="bg-nss-blue text-white px-6 py-4 flex justify-between items-center shadow-md flex-shrink-0">
-                <div className="flex items-center gap-4">
+            <header className="bg-nss-blue text-white px-4 md:px-6 py-4 flex justify-between items-center shadow-md flex-shrink-0 relative z-40">
+                <div className="flex items-center gap-3 md:gap-4">
+                    <button 
+                        className="md:hidden p-1.5 hover:bg-white/20 rounded transition"
+                        onClick={() => setIsSidebarOpen(true)}
+                    >
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
+                    </button>
                     <h1 className="text-xl font-bold">NSS Admin</h1>
                     {currentAY && (
                         <div className="flex items-center gap-2 bg-white/10 rounded-lg px-3 py-1.5 text-sm">
@@ -128,17 +131,29 @@ const AdminDashboard = () => {
                         </div>
                     )}
                 </div>
-                <button onClick={handleLogout} className="bg-red-500/80 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium">Logout</button>
             </header>
 
-            <div className="flex flex-1 overflow-hidden">
-                <aside className="w-56 bg-white shadow-md flex-shrink-0 overflow-y-auto">
+            <div className="flex flex-1 overflow-hidden relative">
+                {/* Mobile Sidebar Overlay */}
+                {isSidebarOpen && (
+                    <div 
+                        className="fixed inset-0 bg-black/50 z-40 md:hidden" 
+                        onClick={() => setIsSidebarOpen(false)}
+                    />
+                )}
+
+                <aside className={`absolute md:relative inset-y-0 left-0 z-50 w-56 bg-white shadow-md transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 transition-transform duration-300 ease-in-out flex-shrink-0 overflow-y-auto`}>
+                    <div className="md:hidden flex justify-end p-2 border-b">
+                        <button onClick={() => setIsSidebarOpen(false)} className="p-2 text-gray-500 hover:bg-gray-100 rounded">
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
+                    </div>
                     <nav className="py-3">
                         {tabGroups.map(group => (
                             <div key={group.label} className="mb-2">
                                 <p className="px-4 py-2 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">{group.label}</p>
                                 {group.tabs.map(tab => (
-                                    <button key={tab.id} onClick={() => setActiveTab(tab.id as TabType)}
+                                    <button key={tab.id} onClick={() => { setActiveTab(tab.id as TabType); setIsSidebarOpen(false); }}
                                         className={`w-full text-left px-4 py-2.5 flex items-center gap-2.5 text-sm transition ${activeTab === tab.id ? 'bg-blue-50 text-blue-700 border-r-4 border-blue-600 font-semibold' : 'text-gray-600 hover:bg-gray-50'}`}>
                                         <span className="inline-flex items-center justify-center w-5 h-5 rounded text-[10px] font-bold bg-gray-200 text-gray-600 flex-shrink-0">{tab.icon}</span>
                                         {tab.label}

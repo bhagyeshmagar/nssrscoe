@@ -15,6 +15,7 @@ export const SettingsTab = ({ settings, onRefresh }: { settings: SiteSettings | 
         statImpactLabel: '',
         aboutMission: '',
         aboutHistory: '',
+        aboutTeamPhoto: '',
         homeSliderImages: '[]',
         socialInstagram: '',
         socialFacebook: '',
@@ -26,6 +27,7 @@ export const SettingsTab = ({ settings, onRefresh }: { settings: SiteSettings | 
     // State for managing home slider images
     const [sliderImages, setSliderImages] = useState<{ url: string, description: string }[]>([]);
     const [uploadingImage, setUploadingImage] = useState(false);
+    const [uploadingTeamPhoto, setUploadingTeamPhoto] = useState(false);
 
     useEffect(() => {
         if (settings) {
@@ -116,8 +118,42 @@ export const SettingsTab = ({ settings, onRefresh }: { settings: SiteSettings | 
                             <textarea value={formData.aboutMission} onChange={e => setFormData({ ...formData, aboutMission: e.target.value })} className="w-full border rounded px-3 py-2" rows={4} placeholder="NSS aims to provide hands on experience..." />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Our History</label>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Our History (Vision)</label>
                             <textarea value={formData.aboutHistory} onChange={e => setFormData({ ...formData, aboutHistory: e.target.value })} className="w-full border rounded px-3 py-2" rows={4} placeholder="Established in..." />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">NSS Team Photo</label>
+                            <div className="flex items-center gap-4">
+                                {formData.aboutTeamPhoto && (
+                                    <img src={uploadAPI.getFullUrl(formData.aboutTeamPhoto)} alt="Team Photo" className="h-20 w-32 object-cover rounded shadow" />
+                                )}
+                                <label className="cursor-pointer">
+                                    <span className="bg-gray-100 border border-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-200 transition inline-block">
+                                        {uploadingTeamPhoto ? 'Uploading...' : (formData.aboutTeamPhoto ? 'Change Photo' : 'Upload Photo')}
+                                    </span>
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        className="hidden"
+                                        disabled={uploadingTeamPhoto}
+                                        onChange={async (e) => {
+                                            const file = e.target.files?.[0];
+                                            if (file) {
+                                                setUploadingTeamPhoto(true);
+                                                try {
+                                                    const result = await uploadAPI.uploadFile(file);
+                                                    setFormData({ ...formData, aboutTeamPhoto: result.url });
+                                                } catch (err) {
+                                                    console.error('Error uploading team photo', err);
+                                                    alert('Error uploading image');
+                                                }
+                                                setUploadingTeamPhoto(false);
+                                                e.target.value = '';
+                                            }
+                                        }}
+                                    />
+                                </label>
+                            </div>
                         </div>
                     </div>
                 </div>

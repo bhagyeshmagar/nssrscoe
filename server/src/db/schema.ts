@@ -8,6 +8,7 @@ import {
     varchar,
     integer,
     boolean,
+    unique,
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
@@ -233,7 +234,9 @@ export const attendanceRecords = pgTable('attendance_records', {
     notes: text('notes'),
     recordedById: integer('recorded_by_id').references(() => admins.id, { onDelete: 'set null' }),
     createdAt: timestamp('created_at').defaultNow(),
-});
+}, (t) => ({
+    unqSessionVolunteer: unique('unq_session_volunteer').on(t.sessionId, t.volunteerId),
+}));
 
 // ─────────────────────────────────────────────────────────────────────────────
 // AUDIT LOGS

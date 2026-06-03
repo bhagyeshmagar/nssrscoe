@@ -50,6 +50,14 @@ const Gallery = () => {
         fetchGallery();
     }, []);
 
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') setSelectedImage(null);
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, []);
+
     if (loading) {
         return (
             <div className="max-w-7xl mx-auto px-4 py-16">

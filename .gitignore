@@ -10,6 +10,7 @@ server/dist/
 # Environment variables
 .env
 server/.env
+client/.env
 
 # Uploaded assets (images, videos, documents, etc.)
 server/uploads/

@@ -1,13 +1,13 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { authAPI } from '../services/api';
+import { Eye, EyeOff } from 'lucide-react';
 
 const Login = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
-    const navigate = useNavigate();
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -19,11 +19,11 @@ const Login = () => {
             localStorage.setItem('token', response.data.token);
             localStorage.setItem('userRole', response.data.role);
 
-            // Redirect based on role
+            // Redirect based on role (using window.location to force Navbar reload)
             if (response.data.role === 'admin') {
-                navigate('/admin');
+                window.location.href = '/admin';
             } else {
-                navigate('/volunteer');
+                window.location.href = '/volunteer';
             }
         } catch (err: unknown) {
             console.error('Login failed', err);
@@ -63,14 +63,23 @@ const Login = () => {
                 </div>
                 <div className="mb-6">
                     <label className="block text-gray-700 text-sm font-medium mb-2">Password</label>
-                    <input
-                        type="password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-nss-blue focus:border-nss-blue outline-none transition"
-                        placeholder="Enter password"
-                        required
-                    />
+                    <div className="relative">
+                        <input
+                            type={showPassword ? "text" : "password"}
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            className="w-full border border-gray-300 rounded-lg px-4 py-3 pr-10 focus:ring-2 focus:ring-nss-blue focus:border-nss-blue outline-none transition"
+                            placeholder="Enter password"
+                            required
+                        />
+                        <button
+                            type="button"
+                            onClick={() => setShowPassword(!showPassword)}
+                            className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-gray-700"
+                        >
+                            {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                        </button>
+                    </div>
                 </div>
                 <button
                     type="submit"

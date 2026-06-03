@@ -112,7 +112,7 @@ export const CoreTeamTab = ({ years, currentAY }: { years: AcademicYear[]; curre
                     </div>
                 </div>
             )}
-            <div className="bg-white rounded-xl shadow overflow-hidden">
+            <div className="bg-white rounded-xl shadow overflow-hidden overflow-x-auto">
                 <table className="w-full text-sm">
                     <thead className="bg-gray-50 border-b"><tr>{['Role', 'Name', 'Type', 'Dept', 'Actions'].map(h => <th key={h} className="text-left px-4 py-3 text-gray-600 font-medium">{h}</th>)}</tr></thead>
                     <tbody className="divide-y">

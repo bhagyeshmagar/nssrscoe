@@ -183,7 +183,7 @@ export const saveEventAttendance = async (ayId: number, eventId: number, records
             academicYearId: ayId,
             eventId: eventId,
             title: event.title,
-            date: event.date.toISOString().split('T')[0], // Store date part
+            date: (typeof event.date === 'string' ? new Date(event.date) : event.date).toISOString().split('T')[0], // Store date part
             description: `Auto-created session for event: ${event.title}`,
             createdById: adminId,
         }).returning();

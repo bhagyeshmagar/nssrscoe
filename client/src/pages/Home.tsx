@@ -89,37 +89,8 @@ const Home = () => {
                     </AnimatePresence>
                 ) : null}
 
-                <div className="absolute inset-0 bg-black opacity-40"></div>
-                <div className="relative z-10 text-center text-white px-4">
-                    <motion.h1
-                        key={`title-${currentSlideIndex}`}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.8 }}
-                        className="text-4xl md:text-5xl font-bold mb-6"
-                    >
-                        {settings?.heroTitle || 'NOT ME, BUT YOU'}
-                    </motion.h1>
-                    <motion.p
-                        key={`subtitle-${currentSlideIndex}`}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.8, delay: 0.2 }}
-                        className="text-xl md:text-2xl mb-4"
-                    >
-                        {settings?.heroSubtitle || 'National Service Scheme - JSPM RSCOE'}
-                    </motion.p>
-                    
-                    <motion.p
-                        key={`desc-${currentSlideIndex}`}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.8, delay: 0.3 }}
-                        className="text-lg md:text-xl mb-8 max-w-2xl mx-auto italic text-gray-200"
-                    >
-                        {sliderImages.length > 0 ? sliderImages[currentSlideIndex].description : ''}
-                    </motion.p>
-                </div>
+                <div className="absolute inset-0 bg-black opacity-20"></div>
+
 
                 {/* Slider Controls */}
                 {sliderImages.length > 1 && (

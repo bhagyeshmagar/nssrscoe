@@ -11,7 +11,7 @@ export const AYVolunteersTab = ({ years, currentAY }: { years: AcademicYear[]; c
     const [filter, setFilter] = useState({ dept: '', status: '' as '' | 'regular' | 'backup', search: '' });
     const [showForm, setShowForm] = useState(false);
     const [viewProfileId, setViewProfileId] = useState<number | null>(null);
-    const [form, setForm] = useState<CreateVolunteerData>({ name: '', email: '', password: '', department: 'Computer Engineering' as Department });
+    const [form, setForm] = useState<CreateVolunteerData>({ name: '', email: '', password: '12345678', department: 'Computer Engineering' as Department });
     const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
     const [attendance, setAttendance] = useState<VolunteerAttendanceRecord[]>([]);
     const [loadingAttendance, setLoadingAttendance] = useState(false);
@@ -61,7 +61,7 @@ export const AYVolunteersTab = ({ years, currentAY }: { years: AcademicYear[]; c
         try { 
             await volunteersAPI.create(selectedAyId, form); 
             setShowForm(false); 
-            setForm({ name: '', email: '', password: '', department: 'Computer Engineering' as Department }); 
+            setForm({ name: '', email: '', password: '12345678', department: 'Computer Engineering' as Department }); 
             flash('ok', 'Volunteer added.'); 
             load(); 
         } catch (e: any) { 
@@ -150,7 +150,7 @@ export const AYVolunteersTab = ({ years, currentAY }: { years: AcademicYear[]; c
                 </select>
             </div>
 
-            <div className="bg-white rounded-xl shadow overflow-hidden">
+            <div className="bg-white rounded-xl shadow overflow-hidden overflow-x-auto">
                 <table className="w-full text-sm">
                     <thead className="bg-gray-50 border-b">
                         <tr>

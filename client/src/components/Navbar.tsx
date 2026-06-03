@@ -7,6 +7,13 @@ const Navbar = () => {
     const [isOpen, setIsOpen] = useState(false);
     const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
 
+    const isLoggedIn = !!localStorage.getItem('token');
+    const handleLogout = () => {
+        localStorage.removeItem('token');
+        localStorage.removeItem('userRole');
+        window.location.href = '/login';
+    };
+
     const navLinks = [
         { name: 'Home', path: '/' },
         {
@@ -112,9 +119,15 @@ const Navbar = () => {
                                     </div>
                                 ))}
                                 <div className="ml-4">
-                                    <Link to="/login" className="bg-white text-nss-blue hover:bg-gray-200 px-3 py-1 rounded-md text-sm font-medium transition-colors duration-300 border border-nss-blue">
-                                        NSS Login
-                                    </Link>
+                                    {isLoggedIn ? (
+                                        <button onClick={handleLogout} className="bg-nss-red text-white hover:bg-red-700 px-3 py-1 rounded-md text-sm font-medium transition-colors duration-300">
+                                            Logout
+                                        </button>
+                                    ) : (
+                                        <Link to="/login" className="bg-white text-nss-blue hover:bg-gray-200 px-3 py-1 rounded-md text-sm font-medium transition-colors duration-300 border border-nss-blue">
+                                            NSS Login
+                                        </Link>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -165,13 +178,22 @@ const Navbar = () => {
                                         )}
                                     </div>
                                 ))}
-                                <Link
-                                    to="/login"
-                                    className="block bg-white text-nss-blue hover:bg-gray-200 px-3 py-2 rounded-md text-base font-medium mt-4 mx-2 text-center"
-                                    onClick={() => setIsOpen(false)}
-                                >
-                                    NSS Login
-                                </Link>
+                                {isLoggedIn ? (
+                                    <button
+                                        onClick={handleLogout}
+                                        className="block w-full bg-nss-red text-white hover:bg-red-700 px-3 py-2 rounded-md text-base font-medium mt-4 mx-2 text-center"
+                                    >
+                                        Logout
+                                    </button>
+                                ) : (
+                                    <Link
+                                        to="/login"
+                                        className="block bg-white text-nss-blue hover:bg-gray-200 px-3 py-2 rounded-md text-base font-medium mt-4 mx-2 text-center"
+                                        onClick={() => setIsOpen(false)}
+                                    >
+                                        NSS Login
+                                    </Link>
+                                )}
                             </div>
                         </motion.div>
                     )}

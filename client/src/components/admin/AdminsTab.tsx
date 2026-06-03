@@ -88,7 +88,7 @@ export const AdminsTab = () => {
                 </div>
             )}
 
-            <div className="bg-white rounded-xl shadow overflow-hidden">
+            <div className="bg-white rounded-xl shadow overflow-hidden overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                     <thead>
                         <tr className="bg-gray-50 border-b border-gray-200">

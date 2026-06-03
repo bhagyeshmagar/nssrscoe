@@ -49,7 +49,7 @@ export const RegistrationsTab = ({ events }: { events: any[] }) => {
             </div>
 
             {selectedEventId && (
-                <div className="bg-white rounded-lg shadow overflow-hidden">
+                <div className="bg-white rounded-lg shadow overflow-hidden overflow-x-auto">
                     <div className="px-6 py-4 border-b flex justify-between items-center bg-gray-50">
                         <h3 className="font-semibold text-gray-800">
                             Total Registrations: {registrations.length}

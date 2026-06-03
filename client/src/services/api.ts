@@ -502,7 +502,7 @@ export interface SiteSettings {
     statEventsCount?: string; statEventsLabel?: string;
     statVolunteersCount?: string; statVolunteersLabel?: string;
     statImpactCount?: string; statImpactLabel?: string;
-    aboutMission?: string; aboutHistory?: string; aboutText?: string;
+    aboutMission?: string; aboutHistory?: string; aboutText?: string; aboutTeamPhoto?: string;
     contactEmail?: string; contactPhone?: string; contactAddress?: string;
     socialInstagram?: string; socialFacebook?: string; socialTwitter?: string; socialYoutube?: string;
     homeSliderImages?: string;

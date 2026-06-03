@@ -1,8 +1,10 @@
-import { Suspense, lazy } from 'react';
+import { Suspense, lazy, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { AnimatePresence } from 'framer-motion';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import ProtectedRoute from './components/ProtectedRoute';
+import SplashScreen from './components/SplashScreen';
 
 // Lazy loaded pages for performance optimization
 const Home = lazy(() => import('./pages/Home'));
@@ -31,8 +33,13 @@ const PageLoader = () => (
 );
 
 function App() {
+  const [showSplash, setShowSplash] = useState(true);
+
   return (
     <Router>
+      <AnimatePresence>
+        {showSplash && <SplashScreen onComplete={() => setShowSplash(false)} />}
+      </AnimatePresence>
       <div className="flex flex-col min-h-screen">
         <Navbar />
         <main className="flex-grow">

@@ -91,7 +91,7 @@ export const ActivityCalendarTab = ({ years, currentAY }: { years: AcademicYear[
                 </div>
             )}
 
-            <div className="bg-white rounded-xl shadow overflow-hidden">
+            <div className="bg-white rounded-xl shadow overflow-hidden overflow-x-auto">
                 <table className="min-w-full text-left text-sm">
                     <thead className="bg-gray-50 border-b">
                         <tr>
