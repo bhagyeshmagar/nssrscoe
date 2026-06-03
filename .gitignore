@@ -27,4 +27,5 @@ ts_errors.txt
 
 # Archives
 *.tar.gz
+*.tar
 *.zip

@@ -11,7 +11,7 @@ interface Event {
     date: string;
     location: string;
     imageUrl?: string;
-    type: 'upcoming' | 'past';
+    type: 'upcoming' | 'today' | 'past';
     reportUrl?: string;
 }
 
@@ -23,7 +23,7 @@ const PastEvents = () => {
         const fetchEvents = async () => {
             try {
                 const response = await eventsAPI.getAll();
-                const past = response.data.filter((e: Event) => e.type === 'past');
+                const past = response.data.filter((e: Event) => e.type === 'past' || e.type === 'today');
                 setEvents(past);
             } catch (error) {
                 console.error('Error fetching events:', error);

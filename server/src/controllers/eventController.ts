@@ -11,7 +11,7 @@ export const getEvents = async (req: Request, res: Response) => {
             description: events.description,
             date: events.date,
             location: events.location,
-            type: events.type,
+            type: sql<string>`CASE WHEN DATE(events.date) > CURRENT_DATE THEN 'upcoming' WHEN DATE(events.date) = CURRENT_DATE THEN 'today' ELSE 'past' END`.as('type'),
             reportUrl: events.reportUrl,
             academicYearId: events.academicYearId,
             createdAt: events.createdAt,
@@ -34,12 +34,11 @@ export const createEvent = async (req: Request, res: Response) => {
             .where(eq(academicYears.isCurrent, true))
             .limit(1);
 
-        const { title, description, location, type, reportUrl } = req.body;
+        const { title, description, location, reportUrl, date } = req.body;
         const newEvent = await db.insert(events).values({
             title,
             description,
             location,
-            type: type || 'upcoming',
             reportUrl,
             academicYearId: currentAY?.id || null,
             date: new Date(req.body.date) // Ensure date is Date object
@@ -54,12 +53,11 @@ export const createEvent = async (req: Request, res: Response) => {
 export const updateEvent = async (req: Request, res: Response) => {
     const { id } = req.params;
     try {
-        const { title, description, location, type, reportUrl, date } = req.body;
+        const { title, description, location, reportUrl, date } = req.body;
         const updateData: any = {};
         if (title !== undefined) updateData.title = title;
         if (description !== undefined) updateData.description = description;
         if (location !== undefined) updateData.location = location;
-        if (type !== undefined) updateData.type = type;
         if (reportUrl !== undefined) updateData.reportUrl = reportUrl;
         if (date !== undefined) updateData.date = new Date(date);
 

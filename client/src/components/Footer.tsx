@@ -62,7 +62,7 @@ const Footer = () => {
                 <div className="border-t border-gray-800 mt-8 pt-8 flex flex-col md:flex-row justify-between items-center text-sm text-gray-500">
                     <div>&copy; {new Date().getFullYear()} NSS JSPM RSCOE. All rights reserved.</div>
                     <div className="mt-2 md:mt-0">
-                        Made for NSS With ❤️ by Bhagyesh Magar
+                        Made for NSS-RSCOE by Bhagyesh Magar
                     </div>
                 </div>
             </div>

@@ -15,7 +15,7 @@ interface Event {
     date: string;
     location: string;
     imageUrl?: string;
-    type: 'upcoming' | 'past';
+    type: 'upcoming' | 'today' | 'past';
     reportUrl?: string;
     volunteersCount?: number;
 }
@@ -121,7 +121,7 @@ const EventDetail = () => {
                         </button>
 
                         <div className="flex items-center gap-3 mb-4">
-                            <span className={`px-4 py-1.5 rounded-full text-sm font-bold uppercase tracking-wider shadow-sm ${event.type === 'upcoming' ? 'bg-green-500 text-white' : 'bg-orange-500 text-white'}`}>
+                            <span className={`px-4 py-1.5 rounded-full text-sm font-bold uppercase tracking-wider shadow-sm ${event.type === 'upcoming' ? 'bg-green-500 text-white' : event.type === 'today' ? 'bg-blue-500 text-white' : 'bg-orange-500 text-white'}`}>
                                 {event.type}
                             </span>
                             <span className="text-blue-100 flex items-center gap-1 bg-black/20 px-3 py-1.5 rounded-full backdrop-blur-sm">

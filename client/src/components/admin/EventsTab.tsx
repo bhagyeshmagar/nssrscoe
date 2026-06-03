@@ -164,10 +164,6 @@ export const EventsTab = ({ events, onRefresh, showForm, setShowForm, editingIte
                             <input type="text" placeholder="Title" required value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} className="border rounded px-3 py-2" />
                             <input type="date" required value={formData.date} onChange={e => setFormData({ ...formData, date: e.target.value })} className="border rounded px-3 py-2" />
                             <input type="text" placeholder="Location" required value={formData.location} onChange={e => setFormData({ ...formData, location: e.target.value })} className="border rounded px-3 py-2" />
-                            <select value={formData.type} onChange={e => setFormData({ ...formData, type: e.target.value as 'upcoming' | 'past' })} className="border rounded px-3 py-2">
-                                <option value="upcoming">Upcoming</option>
-                                <option value="past">Past</option>
-                            </select>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

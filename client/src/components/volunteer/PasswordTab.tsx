@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { volunteerProfileAPI } from '../../services/api';
+import { PasswordStrengthMeter } from '../PasswordStrengthMeter';
 
 export const PasswordTab = ({ setMessage }: { setMessage: (msg: { type: 'success' | 'error'; text: string } | null) => void }) => {
     const [showPasswordForm, setShowPasswordForm] = useState(false);
@@ -16,6 +17,12 @@ export const PasswordTab = ({ setMessage }: { setMessage: (msg: { type: 'success
         }
         if (newPassword.length < 6) {
             setMessage({ type: 'error', text: 'New password must be at least 6 characters' });
+            return;
+        }
+
+        const isStrong = newPassword.length >= 8 && /[A-Z]/.test(newPassword) && /[a-z]/.test(newPassword) && /[0-9]/.test(newPassword) && /[^A-Za-z0-9]/.test(newPassword);
+        if (!isStrong) {
+            setMessage({ type: 'error', text: 'Please ensure your new password meets all security requirements.' });
             return;
         }
 
@@ -70,6 +77,7 @@ export const PasswordTab = ({ setMessage }: { setMessage: (msg: { type: 'success
                             required
                             minLength={6}
                         />
+                        <PasswordStrengthMeter password={newPassword} />
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">Confirm New Password</label>

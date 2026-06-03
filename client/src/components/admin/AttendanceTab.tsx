@@ -27,11 +27,11 @@ export const AttendanceTab = ({ years, currentAY }: { years: AcademicYear[]; cur
                     const belongsToAY = ev.academicYearId
                         ? ev.academicYearId === selectedAyId
                         : (evDate >= ayStart && evDate <= ayEnd);
-                    return belongsToAY && ev.type === 'past';
+                    return belongsToAY && (ev.type === 'past' || ev.type === 'today');
                 });
                 setEventsList(filteredEvents);
             } else {
-                setEventsList((eRes.data as any[]).filter(ev => ev.type === 'past'));
+                setEventsList((eRes.data as any[]).filter(ev => ev.type === 'past' || ev.type === 'today'));
             }
             setVolunteersList((vRes.data as any)?.data ?? vRes.data);
         } catch { }

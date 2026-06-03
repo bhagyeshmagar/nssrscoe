@@ -486,7 +486,7 @@ export interface EventData {
     description: string;
     date: string;
     location: string;
-    type: 'upcoming' | 'past';
+    type?: 'upcoming' | 'today' | 'past';
     volunteersCount?: number;
     images?: EventImage[];
     reportUrl?: string;

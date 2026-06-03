@@ -11,7 +11,7 @@ interface Event {
     date: string;
     location: string;
     imageUrl?: string;
-    type: 'upcoming' | 'past';
+    type: 'upcoming' | 'today' | 'past';
 }
 
 const UpcomingEvents = () => {

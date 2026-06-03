@@ -1,11 +1,19 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { Menu, X, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const Navbar = () => {
     const [isOpen, setIsOpen] = useState(false);
     const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
+    const location = useLocation();
+
+    const isActive = (path: string) => {
+        if (path === '/') {
+            return location.pathname === '/';
+        }
+        return location.pathname.startsWith(path);
+    };
 
     const isLoggedIn = !!localStorage.getItem('token');
     const handleLogout = () => {
@@ -27,12 +35,12 @@ const Navbar = () => {
         },
         {
             name: 'Activities',
-            path: '/events',
+            path: '/events/past',
             dropdown: [
-                { name: 'Upcoming Events', path: '/events/upcoming' },
-                { name: 'Previous Events', path: '/events/past' },
-                { name: 'Activity Reports', path: '/events/reports' },
                 { name: 'Activity Calendar', path: '/events/calendar' },
+                { name: 'Previous Events', path: '/events/past' },
+                { name: 'Upcoming Events', path: '/events/upcoming' },
+                { name: 'Activity Reports', path: '/events/reports' },
             ]
         },
         {
@@ -96,7 +104,8 @@ const Navbar = () => {
                                     >
                                         <Link
                                             to={link.path}
-                                            className="hover:bg-nss-red px-4 py-3 rounded-t-md text-sm font-medium transition-colors duration-300 flex items-center"
+                                            className={`px-4 py-3 rounded-t-md text-sm font-medium transition-colors duration-300 flex items-center ${isActive(link.path) ? 'bg-nss-red' : 'hover:bg-nss-red'
+                                                }`}
                                         >
                                             {link.name} {link.dropdown && <ChevronDown className="ml-1 w-4 h-4" />}
                                         </Link>
@@ -118,11 +127,16 @@ const Navbar = () => {
                                         )}
                                     </div>
                                 ))}
-                                <div className="ml-4">
+                                <div className="ml-4 flex items-center space-x-2">
                                     {isLoggedIn ? (
-                                        <button onClick={handleLogout} className="bg-nss-red text-white hover:bg-red-700 px-3 py-1 rounded-md text-sm font-medium transition-colors duration-300">
-                                            Logout
-                                        </button>
+                                        <>
+                                            <Link to={localStorage.getItem('userRole') === 'admin' ? '/admin' : '/volunteer'} className="bg-blue-800 text-white hover:bg-blue-700 px-3 py-1 rounded-md text-sm font-medium transition-colors duration-300 border border-white">
+                                                Dashboard
+                                            </Link>
+                                            <button onClick={handleLogout} className="bg-nss-red text-white hover:bg-red-700 px-3 py-1 rounded-md text-sm font-medium transition-colors duration-300">
+                                                Logout
+                                            </button>
+                                        </>
                                     ) : (
                                         <Link to="/login" className="bg-white text-nss-blue hover:bg-gray-200 px-3 py-1 rounded-md text-sm font-medium transition-colors duration-300 border border-nss-blue">
                                             NSS Login
@@ -157,7 +171,8 @@ const Navbar = () => {
                                     <div key={link.name}>
                                         <Link
                                             to={link.path}
-                                            className="block hover:bg-nss-red px-3 py-2 rounded-md text-base font-medium"
+                                            className={`block px-3 py-2 rounded-md text-base font-medium ${isActive(link.path) ? 'bg-nss-red' : 'hover:bg-nss-red'
+                                                }`}
                                             onClick={() => !link.dropdown && setIsOpen(false)}
                                         >
                                             {link.name}
@@ -179,12 +194,21 @@ const Navbar = () => {
                                     </div>
                                 ))}
                                 {isLoggedIn ? (
-                                    <button
-                                        onClick={handleLogout}
-                                        className="block w-full bg-nss-red text-white hover:bg-red-700 px-3 py-2 rounded-md text-base font-medium mt-4 mx-2 text-center"
-                                    >
-                                        Logout
-                                    </button>
+                                    <>
+                                        <Link
+                                            to={localStorage.getItem('userRole') === 'admin' ? '/admin' : '/volunteer'}
+                                            className="block w-full bg-blue-800 text-white hover:bg-blue-700 px-3 py-2 rounded-md text-base font-medium mt-4 mx-2 text-center"
+                                            onClick={() => setIsOpen(false)}
+                                        >
+                                            Dashboard
+                                        </Link>
+                                        <button
+                                            onClick={handleLogout}
+                                            className="block w-full bg-nss-red text-white hover:bg-red-700 px-3 py-2 rounded-md text-base font-medium mt-2 mx-2 text-center"
+                                        >
+                                            Logout
+                                        </button>
+                                    </>
                                 ) : (
                                     <Link
                                         to="/login"
