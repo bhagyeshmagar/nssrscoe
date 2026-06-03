@@ -181,6 +181,7 @@ export const specialCamps = pgTable('special_camps', {
     startDate: date('start_date').notNull(),
     endDate: date('end_date').notNull(),
     description: text('description'),
+    volunteerCap: integer('volunteer_cap').default(50).notNull(),
     isFinalized: boolean('is_finalized').default(false).notNull(),
     finalizedAt: timestamp('finalized_at'),
     finalizedById: integer('finalized_by_id').references(() => admins.id),

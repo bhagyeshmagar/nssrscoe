@@ -87,6 +87,12 @@ export const AcademicYearsTab = ({ years, onRefresh, isSuperadmin }: { years: Ac
                                 {isSuperadmin && ay.isLocked && !ay.isArchived && (
                                     <button disabled={busy === ay.id} onClick={() => { const pwd = prompt(`Superadmin Password required to unlock AY ${ay.label}:`); if (pwd) act(() => academicYearsAPI.unlock(ay.id, pwd), ay.id); }} className="text-xs border border-red-500 text-red-600 px-3 py-1.5 rounded-lg hover:bg-red-50 disabled:opacity-50">🔓 Unlock</button>
                                 )}
+                                {isSuperadmin && ay.isArchived && (
+                                    <button disabled={busy === ay.id} onClick={() => { if (confirm(`Unarchive AY ${ay.label}?`)) act(() => academicYearsAPI.unarchive(ay.id), ay.id); }} className="text-xs bg-purple-600 text-white px-3 py-1.5 rounded-lg hover:bg-purple-700 disabled:opacity-50">Unarchive</button>
+                                )}
+                                {!ay.isCurrent && (
+                                    <button disabled={busy === ay.id} onClick={() => { if (confirm(`Delete AY ${ay.label}? This is permanent and might fail if there are linked records.`)) act(() => academicYearsAPI.delete(ay.id), ay.id); }} className="text-xs bg-red-100 text-red-700 px-3 py-1.5 rounded-lg hover:bg-red-200 disabled:opacity-50">Delete</button>
+                                )}
                             </div>
                         </div>
 

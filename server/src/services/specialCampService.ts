@@ -14,6 +14,7 @@ import {
     ConflictError,
     ForbiddenError,
     AYLockedError,
+    ValidationError,
 } from '../lib/errors';
 import { logAudit, auditCampFinalize } from './auditService';
 
@@ -62,9 +63,12 @@ export const getCamp = async (campId: number) => {
             // Live volunteer name (may differ from snapshot if updated after finalization)
             currentName: volunteers.name,
             currentDept: volunteers.department,
+            collegeYear: volunteerProfiles.collegeYearAtEnrollment,
+            nssYear: volunteerProfiles.nssYear,
         })
         .from(specialCampParticipants)
         .leftJoin(volunteers, eq(specialCampParticipants.volunteerId, volunteers.id))
+        .leftJoin(volunteerProfiles, eq(volunteers.id, volunteerProfiles.volunteerId))
         .where(eq(specialCampParticipants.specialCampId, campId))
         .orderBy(specialCampParticipants.snapName);
 
@@ -75,7 +79,7 @@ export const getCamp = async (campId: number) => {
 
 export const createCamp = async (
     ayId: number,
-    input: { name: string; location: string; startDate: string; endDate: string; description?: string },
+    input: { name: string; location: string; startDate: string; endDate: string; description?: string; volunteerCap?: number },
     adminId: number,
 ) => {
     await requireUnlockedAY(ayId);
@@ -87,6 +91,7 @@ export const createCamp = async (
         startDate: input.startDate,
         endDate: input.endDate,
         description: input.description ?? null,
+        volunteerCap: input.volunteerCap ?? 50,
         isFinalized: false,
     }).returning();
 
@@ -97,7 +102,7 @@ export const createCamp = async (
 
 export const updateCamp = async (
     campId: number,
-    input: Partial<{ name: string; location: string; startDate: string; endDate: string; description: string }>,
+    input: Partial<{ name: string; location: string; startDate: string; endDate: string; description: string; volunteerCap: number }>,
     adminId: number,
 ) => {
     const camp = await requireEditableCamp(campId);
@@ -173,6 +178,10 @@ export const removeParticipant = async (campId: number, participantId: number, a
 
 export const setParticipantsBulk = async (campId: number, volunteerIds: number[], adminId: number) => {
     const camp = await requireEditableCamp(campId);
+
+    if (volunteerIds.length !== camp.volunteerCap) {
+        throw new ValidationError(`Exactly ${camp.volunteerCap} volunteers must be selected for this camp.`);
+    }
 
     // Clear existing participants
     await db.delete(specialCampParticipants).where(eq(specialCampParticipants.specialCampId, campId));

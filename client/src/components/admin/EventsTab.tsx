@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { eventsAPI, eventImagesAPI, uploadAPI } from '../../services/api';
-import type { EventData, EventImage } from '../../services/api';
+import type { EventData, EventImage, AcademicYear } from '../../services/api';
 
-export const EventsTab = ({ events, onRefresh, showForm, setShowForm, editingItem, setEditingItem }: any) => {
+export const EventsTab = ({ events, onRefresh, showForm, setShowForm, editingItem, setEditingItem, years, currentAY }: { events: any[], onRefresh: () => void, showForm: boolean, setShowForm: (val: boolean) => void, editingItem: any, setEditingItem: (val: any) => void, years: AcademicYear[], currentAY: AcademicYear | null }) => {
     const [formData, setFormData] = useState<EventData>({
         id: 0, title: '', description: '', date: '', location: '', type: 'upcoming', volunteersCount: 0
     });
@@ -148,12 +148,14 @@ export const EventsTab = ({ events, onRefresh, showForm, setShowForm, editingIte
         <div>
             <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-bold text-gray-800">Manage Events</h2>
-                <button
-                    onClick={() => { resetForm(); setShowForm(true); }}
-                    className="bg-nss-blue text-white px-4 py-2 rounded hover:bg-blue-900 transition"
-                >
-                    + Add Event
-                </button>
+                {currentAY && !currentAY.isLocked && (
+                    <button
+                        onClick={() => { resetForm(); setShowForm(true); }}
+                        className="bg-nss-blue text-white px-4 py-2 rounded hover:bg-blue-900 transition"
+                    >
+                        + Add Event
+                    </button>
+                )}
             </div>
 
             {showForm && (
@@ -276,8 +278,12 @@ export const EventsTab = ({ events, onRefresh, showForm, setShowForm, editingIte
                                     </span>
                                 </td>
                                 <td className="px-4 py-3">
-                                    <button onClick={() => setEditingItem(event)} className="text-blue-600 hover:underline mr-3">Edit</button>
-                                    <button onClick={() => handleDelete(event.id)} className="text-red-600 hover:underline">Delete</button>
+                                    {(!years.find(y => y.id === event.academicYearId)?.isLocked) && (
+                                        <>
+                                            <button onClick={() => setEditingItem(event)} className="text-blue-600 hover:underline mr-3">Edit</button>
+                                            <button onClick={() => handleDelete(event.id)} className="text-red-600 hover:underline">Delete</button>
+                                        </>
+                                    )}
                                 </td>
                             </tr>
                         ))}

@@ -29,10 +29,14 @@ export const getEvents = async (req: Request, res: Response) => {
 export const createEvent = async (req: Request, res: Response) => {
     try {
         const [currentAY] = await db
-            .select({ id: academicYears.id })
+            .select({ id: academicYears.id, isLocked: academicYears.isLocked })
             .from(academicYears)
             .where(eq(academicYears.isCurrent, true))
             .limit(1);
+
+        if (currentAY?.isLocked) {
+            return res.status(403).json({ success: false, message: 'Current academic year is locked.' });
+        }
 
         const { title, description, location, reportUrl, date } = req.body;
         const newEvent = await db.insert(events).values({
@@ -61,6 +65,14 @@ export const updateEvent = async (req: Request, res: Response) => {
         if (reportUrl !== undefined) updateData.reportUrl = reportUrl;
         if (date !== undefined) updateData.date = new Date(date);
 
+        const [eventToUpdate] = await db.select({ academicYearId: events.academicYearId }).from(events).where(eq(events.id, Number(id))).limit(1);
+        if (!eventToUpdate) return res.status(404).json({ message: 'Event not found' });
+        
+        if (eventToUpdate.academicYearId) {
+            const [ay] = await db.select({ isLocked: academicYears.isLocked }).from(academicYears).where(eq(academicYears.id, eventToUpdate.academicYearId)).limit(1);
+            if (ay?.isLocked) return res.status(403).json({ message: 'Cannot update event in a locked academic year' });
+        }
+
         const updated = await db.update(events).set(updateData).where(eq(events.id, Number(id))).returning();
         res.json(updated[0]);
     } catch (error) {
@@ -72,6 +84,14 @@ export const updateEvent = async (req: Request, res: Response) => {
 export const deleteEvent = async (req: Request, res: Response) => {
     const { id } = req.params;
     try {
+        const [eventToDelete] = await db.select({ academicYearId: events.academicYearId }).from(events).where(eq(events.id, Number(id))).limit(1);
+        if (!eventToDelete) return res.status(404).json({ message: 'Event not found' });
+
+        if (eventToDelete.academicYearId) {
+            const [ay] = await db.select({ isLocked: academicYears.isLocked }).from(academicYears).where(eq(academicYears.id, eventToDelete.academicYearId)).limit(1);
+            if (ay?.isLocked) return res.status(403).json({ message: 'Cannot delete event in a locked academic year' });
+        }
+
         await db.delete(events).where(eq(events.id, Number(id)));
         res.json({ message: 'Event deleted' });
     } catch (error) {

@@ -7,7 +7,7 @@ export const SpecialCampsTab = ({ years, currentAY }: { years: AcademicYear[]; c
     const [selectedAyId, setSelectedAyId] = useState<number>(currentAY?.id ?? 0);
     const [camps, setCamps] = useState<SpecialCamp[]>([]);
     const [showForm, setShowForm] = useState(false);
-    const [form, setForm] = useState({ name: '', location: '', startDate: '', endDate: '', description: '' });
+    const [form, setForm] = useState({ name: '', location: '', startDate: '', endDate: '', description: '', volunteerCap: 50 });
     const { msg, flash } = useFlash();
 
     // Manage Participants State
@@ -43,7 +43,7 @@ export const SpecialCampsTab = ({ years, currentAY }: { years: AcademicYear[]; c
         try { 
             await specialCampsAPI.create(selectedAyId, form); 
             setShowForm(false); 
-            setForm({ name: '', location: '', startDate: '', endDate: '', description: '' }); 
+            setForm({ name: '', location: '', startDate: '', endDate: '', description: '', volunteerCap: 50 }); 
             flash('ok', 'Camp created.'); 
             load(); 
         } catch (e: any) { 
@@ -69,12 +69,17 @@ export const SpecialCampsTab = ({ years, currentAY }: { years: AcademicYear[]; c
     };
 
     const handleSaveParticipants = async () => {
-        if (!manageCampId) return;
+        if (!manageCampId || !campDetails) return;
+        if (selectedVolIds.size !== campDetails.volunteerCap) {
+            flash('err', `You must select exactly ${campDetails.volunteerCap} volunteers. You have selected ${selectedVolIds.size}.`);
+            return;
+        }
         setSavingParticipants(true);
         try {
             await specialCampsAPI.setParticipantsBulk(manageCampId, Array.from(selectedVolIds));
             flash('ok', 'Participants updated.');
             setManageCampId(null);
+            load();
         } catch (e: any) {
             flash('err', e.response?.data?.message ?? 'Failed to update participants.');
         } finally {
@@ -116,6 +121,52 @@ export const SpecialCampsTab = ({ years, currentAY }: { years: AcademicYear[]; c
             flash('err', e.response?.data?.message ?? 'Invalid password or failed to unlock.');
         }
     };
+
+    const [expandedCampId, setExpandedCampId] = useState<number | null>(null);
+    const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
+
+    const sortParticipants = (participants: any[]) => {
+        if (!sortConfig) return participants;
+        return [...participants].sort((a, b) => {
+            const getVal = (p: any, key: string) => {
+                if (key === 'snapName') return p.snapName || p.currentName || '';
+                if (key === 'snapDepartment') return p.snapDepartment || p.currentDept || '';
+                if (key === 'snapCollegeYear') return p.snapCollegeYearAtEnrollment || p.collegeYear || '';
+                if (key === 'snapNssYear') return p.snapNssYear || p.nssYear || 0;
+                return '';
+            };
+            const aVal = getVal(a, sortConfig.key);
+            const bVal = getVal(b, sortConfig.key);
+            if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+            if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+            return 0;
+        });
+    };
+
+    const requestSort = (key: string) => {
+        let direction: 'asc' | 'desc' = 'asc';
+        if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+            direction = 'desc';
+        }
+        setSortConfig({ key, direction });
+    };
+
+    const toggleExpand = async (campId: number) => {
+        if (expandedCampId === campId) {
+            setExpandedCampId(null);
+        } else {
+            // we already load the camp and participants when we expand it
+            // actually we only have participants if we fetch getById. Let's make sure it's loaded.
+            try {
+                const res = await specialCampsAPI.getById(campId);
+                const cData = (res.data as any)?.data ?? res.data;
+                setCamps(prev => prev.map(c => c.id === campId ? { ...c, participants: cData.participants, volunteerCap: cData.volunteerCap } : c));
+                setExpandedCampId(campId);
+            } catch (e) {
+                flash('err', 'Failed to load participants.');
+            }
+        }
+    };
     
     return (
         <div>
@@ -135,7 +186,8 @@ export const SpecialCampsTab = ({ years, currentAY }: { years: AcademicYear[]; c
                     <div className="grid grid-cols-2 gap-4 mb-4">
                         {[{ k: 'name', l: 'Camp Name' }, { k: 'location', l: 'Location' }].map(f => <div key={f.k}><label className="block text-sm text-gray-600 mb-1">{f.l}</label><input value={(form as any)[f.k]} onChange={e => setForm({ ...form, [f.k]: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" /></div>)}
                         {[{ k: 'startDate', l: 'Start' }, { k: 'endDate', l: 'End' }].map(f => <div key={f.k}><label className="block text-sm text-gray-600 mb-1">{f.l}</label><input type="date" value={(form as any)[f.k]} onChange={e => setForm({ ...form, [f.k]: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" /></div>)}
-                        <div className="col-span-2"><label className="block text-sm text-gray-600 mb-1">Description</label><input value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" /></div>
+                        <div><label className="block text-sm text-gray-600 mb-1">Volunteer Cap</label><input type="number" min="1" value={form.volunteerCap} onChange={e => setForm({ ...form, volunteerCap: Number(e.target.value) })} className="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" /></div>
+                        <div><label className="block text-sm text-gray-600 mb-1">Description</label><input value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" /></div>
                     </div>
                     <div className="flex gap-3"><button onClick={handleCreate} className="bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700 text-sm font-medium">Create</button><button onClick={() => setShowForm(false)} className="border px-5 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button></div>
                 </div>
@@ -151,6 +203,9 @@ export const SpecialCampsTab = ({ years, currentAY }: { years: AcademicYear[]; c
                             </div>
                             {selectedAY && !selectedAY.isLocked && (
                                 <div className="flex gap-2">
+                                    <button onClick={() => toggleExpand(c.id)} className="text-xs px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">
+                                        {expandedCampId === c.id ? 'Hide Participants' : 'View Participants'}
+                                    </button>
                                     <button onClick={() => openManage(c.id)} className="text-xs px-3 py-1.5 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200">Manage</button>
                                     {!c.isFinalized ? (
                                         <>
@@ -162,7 +217,42 @@ export const SpecialCampsTab = ({ years, currentAY }: { years: AcademicYear[]; c
                                     )}
                                 </div>
                             )}
+                            {(!selectedAY || selectedAY.isLocked) && (
+                                <button onClick={() => toggleExpand(c.id)} className="text-xs px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">
+                                    {expandedCampId === c.id ? 'Hide Participants' : 'View Participants'}
+                                </button>
+                            )}
                         </div>
+                        {expandedCampId === c.id && (c as any).participants && (
+                            <div className="mt-4 border-t pt-4">
+                                <h4 className="font-semibold text-gray-700 mb-3">Selected Volunteers ({(c as any).participants.length} / {(c as any).volunteerCap ?? 50})</h4>
+                                <div className="overflow-x-auto border rounded-lg">
+                                    <table className="w-full text-sm">
+                                        <thead className="bg-gray-50">
+                                            <tr>
+                                                <th className="px-4 py-2 text-left cursor-pointer hover:bg-gray-100" onClick={() => requestSort('snapName')}>Name {sortConfig?.key === 'snapName' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}</th>
+                                                <th className="px-4 py-2 text-left cursor-pointer hover:bg-gray-100" onClick={() => requestSort('snapDepartment')}>Department {sortConfig?.key === 'snapDepartment' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}</th>
+                                                <th className="px-4 py-2 text-left cursor-pointer hover:bg-gray-100" onClick={() => requestSort('snapCollegeYear')}>College Year {sortConfig?.key === 'snapCollegeYear' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}</th>
+                                                <th className="px-4 py-2 text-left cursor-pointer hover:bg-gray-100" onClick={() => requestSort('snapNssYear')}>NSS Year {sortConfig?.key === 'snapNssYear' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y">
+                                            {sortParticipants((c as any).participants).map(p => (
+                                                <tr key={p.id} className="hover:bg-gray-50">
+                                                    <td className="px-4 py-2">{p.snapName || p.currentName}</td>
+                                                    <td className="px-4 py-2">{p.snapDepartment || p.currentDept}</td>
+                                                    <td className="px-4 py-2">{p.snapCollegeYearAtEnrollment || p.collegeYear || '-'}</td>
+                                                    <td className="px-4 py-2">{p.snapNssYear || p.nssYear || '-'}</td>
+                                                </tr>
+                                            ))}
+                                            {(c as any).participants.length === 0 && (
+                                                <tr><td colSpan={4} className="px-4 py-4 text-center text-gray-500">No volunteers selected yet.</td></tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 ))}
             </div>
@@ -194,9 +284,9 @@ export const SpecialCampsTab = ({ years, currentAY }: { years: AcademicYear[]; c
                             ) : (
                                 <div>
                                     <div className="flex justify-between items-center mb-4">
-                                        <h4 className="font-semibold">Select Volunteers</h4>
-                                        <span className="text-sm bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                                            {selectedVolIds.size} Selected
+                                        <h4 className="font-semibold">Select Volunteers (Cap: {campDetails.volunteerCap ?? 50})</h4>
+                                        <span className={`text-sm px-2 py-1 rounded ${selectedVolIds.size === (campDetails.volunteerCap ?? 50) ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}`}>
+                                            {selectedVolIds.size} / {campDetails.volunteerCap ?? 50} Selected
                                         </span>
                                     </div>
                                     <div className="border rounded-lg max-h-96 overflow-y-auto overflow-x-auto">

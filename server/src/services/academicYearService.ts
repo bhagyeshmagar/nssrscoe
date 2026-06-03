@@ -266,6 +266,48 @@ export const archiveAcademicYear = async (id: number, adminId: number) => {
     return findAY(id);
 };
 
+/**
+ * Unarchive: transition an archived AY back to unarchived (still locked).
+ */
+export const unarchiveAcademicYear = async (id: number, adminId: number) => {
+    const ay = await findAY(id);
+
+    if (!ay.isLocked) throw new ForbiddenError(`Academic year "${ay.label}" must be locked before unarchiving.`, 'AY_NOT_LOCKED');
+    if (!ay.isArchived) throw new ConflictError(`Academic year "${ay.label}" is not archived.`);
+
+    await db
+        .update(academicYears)
+        .set({ isArchived: false })
+        .where(eq(academicYears.id, id));
+
+    await logAudit({
+        action: 'academic_year.unarchive',
+        entityType: 'academic_year',
+        entityId: id,
+        performedById: adminId,
+        academicYearId: id,
+        details: { label: ay.label },
+    });
+
+    return findAY(id);
+};
+
+export const deleteAcademicYear = async (id: number, adminId: number) => {
+    const ay = await findAY(id);
+    if (ay.isCurrent) throw new ForbiddenError('Cannot delete the currently active academic year.');
+
+    await db.delete(academicYears).where(eq(academicYears.id, id));
+
+    await logAudit({
+        action: 'academic_year.delete',
+        entityType: 'academic_year',
+        entityId: id,
+        performedById: adminId,
+        academicYearId: id,
+        details: { label: ay.label },
+    });
+};
+
 // ── Stats ──────────────────────────────────────────────────────────────────────
 
 export const getAcademicYearStats = async (id: number) => {

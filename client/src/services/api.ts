@@ -56,6 +56,8 @@ export const academicYearsAPI = {
     lock:      (id: number)=> api.post<AcademicYear>(`/academic-years/${id}/lock`),
     unlock:    (id: number, password: string) => api.post<AcademicYear>(`/academic-years/${id}/unlock`, { password }),
     archive:   (id: number)=> api.post<AcademicYear>(`/academic-years/${id}/archive`),
+    unarchive: (id: number)=> api.post<AcademicYear>(`/academic-years/${id}/unarchive`),
+    delete:    (id: number)=> api.delete(`/academic-years/${id}`),
 };
 
 // ── Activity Calendar ────────────────────────────────────────────────────────
@@ -447,6 +449,7 @@ export interface SpecialCamp {
     description?: string;
     isFinalized: boolean;
     finalizedAt?: string;
+    volunteerCap?: number;
     createdAt: string;
 }
 
@@ -461,6 +464,9 @@ export interface SpecialCampWithParticipants extends SpecialCamp {
         snapCgpa?: string;
         snapFinalizedAt?: string;
         currentName?: string;
+        currentDept?: string;
+        collegeYear?: string;
+        nssYear?: number;
     }>;
 }
 
@@ -470,6 +476,7 @@ export interface CreateCampData {
     startDate: string;
     endDate: string;
     description?: string;
+    volunteerCap?: number;
 }
 
 export interface ExperienceData {

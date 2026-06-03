@@ -19,7 +19,7 @@ export const ActivityCalendarTab = ({ years, currentAY }: { years: AcademicYear[
     }, [selectedAyId]);
 
     useEffect(() => { load(); }, [load]);
-    
+
     useEffect(() => {
         if (!selectedAyId && years.length > 0) {
             setSelectedAyId(currentAY?.id ?? years[0].id);

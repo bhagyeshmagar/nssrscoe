@@ -62,7 +62,8 @@ All major entities are strictly scoped to an Academic Year:
 - **Volunteers**: Tracked per AY with active/backup statuses and comprehensive individual profiles.
 - **Core Team**: Hierarchical roles (Institution level, Department level, Student Coordinators) are assigned per AY.
 - **Attendance**: Managed individually for events within a specific AY.
-- **Special Camps**: Camp assignments, participants, and details are isolated per AY.
+- **Special Camps**: Camp assignments, participants, and details are isolated per AY. Features a configurable exact volunteer capacity (e.g. exactly 50 volunteers).
+- **CRUD & Locking**: Superadmins have full CRUD capabilities for Academic Years, including unarchiving and deleting. When an Academic Year is locked, all CRUD operations on its associated academic calendar and events are strictly disabled.
 
 ### 2. Modular Frontend Architecture
 The React application is structured into scalable, maintainable components:

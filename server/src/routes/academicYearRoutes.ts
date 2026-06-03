@@ -17,5 +17,7 @@ router.post('/:id/activate',   authenticateToken, requireAdmin, ayCtrl.activateA
 router.post('/:id/lock',       authenticateToken, requireAdmin, ayCtrl.lockAcademicYear);
 router.post('/:id/unlock',     authenticateToken, requireSuperAdmin, ayCtrl.unlockAcademicYear);
 router.post('/:id/archive',    authenticateToken, requireAdmin, ayCtrl.archiveAcademicYear);
+router.post('/:id/unarchive',  authenticateToken, requireSuperAdmin, ayCtrl.unarchiveAcademicYear);
+router.delete('/:id',          authenticateToken, requireAdmin, ayCtrl.deleteAcademicYear);
 
 export default router;

@@ -177,7 +177,7 @@ const AdminDashboard = () => {
                             {activeTab === 'attendance' && <AttendanceTab years={years} currentAY={currentAY} />}
                             {activeTab === 'special-camps' && <SpecialCampsTab years={years} currentAY={currentAY} />}
                             {activeTab === 'archive' && <ArchiveTab years={years} />}
-                            {activeTab === 'events' && <EventsTab events={events} onRefresh={fetchSiteData} showForm={showEventForm} setShowForm={setShowEventForm} editingItem={editingItem} setEditingItem={setEditingItem} />}
+                            {activeTab === 'events' && <EventsTab events={events} onRefresh={fetchSiteData} showForm={showEventForm} setShowForm={setShowEventForm} editingItem={editingItem} setEditingItem={setEditingItem} years={years} currentAY={currentAY} />}
                             {activeTab === 'registrations' && <RegistrationsTab events={events} />}
                             {activeTab === 'gallery' && <GalleryTab gallery={gallery} onRefresh={fetchSiteData} showForm={showGalleryForm} setShowForm={setShowGalleryForm} editingItem={editingItem} setEditingItem={setEditingItem} />}
                             {activeTab === 'members' && <MembersTab members={members} onRefresh={fetchSiteData} showForm={showMemberForm} setShowForm={setShowMemberForm} editingItem={editingItem} setEditingItem={setEditingItem} />}

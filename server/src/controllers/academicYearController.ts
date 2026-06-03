@@ -77,6 +77,22 @@ export const archiveAcademicYear = async (req: Request, res: Response) => {
     } catch (err) { handleError(res, err); }
 };
 
+export const unarchiveAcademicYear = async (req: Request, res: Response) => {
+    try {
+        const adminId = (req as AuthRequest).user!.id;
+        const ay = await ayService.unarchiveAcademicYear(Number(req.params.id), adminId);
+        ok(res, ay, `Academic year "${ay.label}" has been unarchived.`);
+    } catch (err) { handleError(res, err); }
+};
+
+export const deleteAcademicYear = async (req: Request, res: Response) => {
+    try {
+        const adminId = (req as AuthRequest).user!.id;
+        await ayService.deleteAcademicYear(Number(req.params.id), adminId);
+        ok(res, null, `Academic year deleted.`);
+    } catch (err) { handleError(res, err); }
+};
+
 export const getAcademicYearStats = async (req: Request, res: Response) => {
     try {
         const stats = await ayService.getAcademicYearStats(Number(req.params.id));
