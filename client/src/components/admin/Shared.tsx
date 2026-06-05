@@ -1,41 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { AcademicYear } from '../../services/api';
 
-export type TabType =
-    | 'overview' | 'academic-years' | 'volunteers' | 'core-team'
-    | 'attendance' | 'special-camps' | 'archive' | 'activity-calendar'
-    | 'events' | 'registrations' | 'gallery' | 'members' | 'settings' | 'admins' | 'profile';
-
-export const getTabGroups = (isSuperadmin: boolean) => [
-    {
-        label: 'AY Platform', tabs: [
-            { id: 'overview', label: 'Overview', icon: '🏠' },
-            { id: 'academic-years', label: 'Academic Years', icon: '🏛️' },
-            { id: 'activity-calendar', label: 'Activity Calendar', icon: '📅' },
-            { id: 'volunteers', label: 'Volunteers', icon: '🦾' },
-            { id: 'core-team', label: 'Core Team', icon: '👥' },
-            { id: 'attendance', label: 'Attendance', icon: '🧾' },
-            { id: 'special-camps', label: 'Special Camps', icon: '⛺' },
-            { id: 'archive', label: 'Archive', icon: '🗄️' },
-        ]
-    },
-    {
-        label: 'Site Management', tabs: [
-            { id: 'events', label: 'Events', icon: '🎯' },
-            { id: 'registrations', label: 'Registrations', icon: '📝' },
-            { id: 'gallery', label: 'Gallery', icon: '🖼️' },
-            { id: 'members', label: 'Members', icon: '👥' },
-            ...(isSuperadmin ? [{ id: 'settings', label: 'Settings', icon: '⚙️' }] : []),
-            ...(isSuperadmin ? [{ id: 'admins', label: 'Admins', icon: '🔑' }] : []),
-        ]
-    },
-    {
-        label: 'Account', tabs: [
-            { id: 'profile', label: 'My Profile', icon: '👤' },
-        ]
-    },
-];
-
 export const DEPT_LIST: import('../../services/api').Department[] = [
     'Computer Engineering',
     'Computer Science and Business Systems',
@@ -95,11 +60,7 @@ export function useFlash() {
         setMsg({ type, text });
         setTimeout(() => setMsg(null), 4000);
     };
-    const flashString = (text: string) => {
-        setMsg({ type: 'ok', text });
-        setTimeout(() => setMsg(null), 4000);
-    };
-    return { msg, flash, flashString };
+    return { msg, flash };
 }
 
 export function useAYSelector(years: AcademicYear[], currentAY: AcademicYear | null) {

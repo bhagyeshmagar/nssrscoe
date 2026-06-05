@@ -13,7 +13,7 @@ export const ActivityCalendarTab = ({ years, currentAY }: { years: AcademicYear[
         if (!selectedAyId) return;
         try {
             const res = await activityCalendarAPI.getByAcademicYear(selectedAyId);
-            const acts = (res.data as any)?.data ?? res.data;
+            const acts = res.data.data;
             setActivities(Array.isArray(acts) ? acts : []);
         } catch { setActivities([]); }
     }, [selectedAyId]);

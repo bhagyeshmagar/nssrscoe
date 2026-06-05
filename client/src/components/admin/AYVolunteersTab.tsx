@@ -1,41 +1,60 @@
 import { useState, useEffect, useCallback } from 'react';
 import { volunteersAPI, academicYearsAPI, uploadAPI, attendanceAPI } from '../../services/api';
 import type { AcademicYear, AYStats, VolunteerWithProfile, CreateVolunteerData, Department, VolunteerAttendanceRecord } from '../../services/api';
-import { CapBar } from './Shared';
-import { DEPT_LIST } from './Shared';
+import { CapBar, useFlash, useAYSelector, DEPT_LIST } from './Shared';
+import { ExportDataModal } from '../common/ExportDataModal';
+import { Download } from 'lucide-react';
 
 export const AYVolunteersTab = ({ years, currentAY }: { years: AcademicYear[]; currentAY: AcademicYear | null }) => {
-    const [selectedAyId, setSelectedAyId] = useState<number>(currentAY?.id ?? 0);
+    const { selectedAyId, setSelectedAyId, selectedAY } = useAYSelector(years, currentAY);
     const [vols, setVols] = useState<VolunteerWithProfile[]>([]);
     const [stats, setStats] = useState<AYStats | null>(null);
     const [filter, setFilter] = useState({ dept: '', status: '' as '' | 'regular' | 'backup', search: '' });
+    const [searchInput, setSearchInput] = useState('');
+    const [page, setPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
     const [showForm, setShowForm] = useState(false);
     const [viewProfileId, setViewProfileId] = useState<number | null>(null);
+    const [showExportModal, setShowExportModal] = useState(false);
     const [form, setForm] = useState<CreateVolunteerData>({ name: '', email: '', password: '12345678', department: 'Computer Engineering' as Department });
-    const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
+    const { msg, flash } = useFlash();
     const [attendance, setAttendance] = useState<VolunteerAttendanceRecord[]>([]);
     const [loadingAttendance, setLoadingAttendance] = useState(false);
-    const flash = (type: 'ok' | 'err', text: string) => { setMsg({ type, text }); setTimeout(() => setMsg(null), 4000); };
 
     const load = useCallback(async () => {
         if (!selectedAyId) return;
         try {
             const [vRes, sRes] = await Promise.all([
-                volunteersAPI.getByAY(selectedAyId, { ...(filter.dept && { department: filter.dept }), ...(filter.status && { status: filter.status }), ...(filter.search && { search: filter.search }) }),
+                volunteersAPI.getByAY(selectedAyId, { 
+                    ...(filter.dept && { department: filter.dept }), 
+                    ...(filter.status && { status: filter.status }), 
+                    ...(filter.search && { search: filter.search }),
+                    page,
+                    limit: 20
+                }),
                 academicYearsAPI.getStats(selectedAyId),
             ]);
-            setVols((vRes.data as any)?.data ?? vRes.data); setStats((sRes.data as any)?.data ?? sRes.data);
+            setVols(vRes.data.data?.data || []);
+            setTotalPages(vRes.data.meta?.totalPages || 1);
+            setStats(sRes.data.data);
         } catch { }
-    }, [selectedAyId, filter]);
+    }, [selectedAyId, filter, page]);
 
     useEffect(() => { load(); }, [load]);
+    
+    useEffect(() => {
+        const timeout = setTimeout(() => {
+            setFilter(f => f.search !== searchInput ? { ...f, search: searchInput } : f);
+        }, 300);
+        return () => clearTimeout(timeout);
+    }, [searchInput]);
     
     useEffect(() => {
         if (viewProfileId && selectedAyId) {
             setLoadingAttendance(true);
             attendanceAPI.getVolunteer(selectedAyId, viewProfileId)
                 .then(res => {
-                    const data = (res.data as any)?.data ?? res.data;
+                    const data = res.data.data;
                     setAttendance(data || []);
                 })
                 .catch(() => {
@@ -54,8 +73,6 @@ export const AYVolunteersTab = ({ years, currentAY }: { years: AcademicYear[]; c
             setSelectedAyId(currentAY?.id ?? years[0].id);
         }
     }, [currentAY, years, selectedAyId]);
-
-    const selectedAY = years.find(y => y.id === selectedAyId);
 
     const handleCreate = async () => {
         try { 
@@ -82,7 +99,7 @@ export const AYVolunteersTab = ({ years, currentAY }: { years: AcademicYear[]; c
 
     const handleStatusChange = async (id: number, s: 'regular' | 'backup') => {
         try { 
-            await volunteersAPI.changeStatus(selectedAyId, id, s); 
+            await volunteersAPI.changeStatus(selectedAyId!, id, s); 
             load(); 
         } catch (e: any) { 
             flash('err', e.response?.data?.message ?? 'Error.'); 
@@ -94,9 +111,12 @@ export const AYVolunteersTab = ({ years, currentAY }: { years: AcademicYear[]; c
             <div className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-bold text-gray-800">Volunteers</h2>
                 <div className="flex items-center gap-3">
-                    <select value={selectedAyId} onChange={e => setSelectedAyId(Number(e.target.value))} className="border rounded-lg px-3 py-2 text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500">
+                    <select value={selectedAyId || ''} onChange={e => setSelectedAyId(Number(e.target.value))} className="border rounded-lg px-3 py-2 text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500">
                         {years.map(y => <option key={y.id} value={y.id}>{y.label} {y.isCurrent ? '(Active)' : y.isLocked ? '[Locked]' : ''}</option>)}
                     </select>
+                    <button onClick={() => setShowExportModal(true)} className="bg-green-600 text-white px-3 py-2 rounded-lg hover:bg-green-700 text-sm font-medium flex items-center">
+                        <Download className="w-4 h-4 mr-1" /> Export
+                    </button>
                     {selectedAY && !selectedAY.isLocked && <button onClick={() => setShowForm(!showForm)} className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm font-medium">+ Add</button>}
                 </div>
             </div>
@@ -141,12 +161,15 @@ export const AYVolunteersTab = ({ years, currentAY }: { years: AcademicYear[]; c
             )}
 
             <div className="flex gap-3 mb-4 flex-wrap">
-                <input placeholder="Search..." value={filter.search} onChange={e => setFilter({ ...filter, search: e.target.value })} className="border rounded-lg px-3 py-2 text-sm flex-1 min-w-[180px] outline-none focus:ring-2 focus:ring-blue-500" />
-                <select value={filter.dept} onChange={e => setFilter({ ...filter, dept: e.target.value })} className="border rounded-lg px-3 py-2 text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="">All Departments</option>{DEPT_LIST.map(d => <option key={d} value={d}>{d}</option>)}
+                <input type="text" placeholder="Search..." value={searchInput} onChange={e => { setSearchInput(e.target.value); setPage(1); }} className="border rounded-lg px-3 py-2 text-sm flex-1 min-w-[180px] outline-none focus:ring-2 focus:ring-blue-500" />
+                <select value={filter.dept} onChange={e => { setFilter(f => ({ ...f, dept: e.target.value })); setPage(1); }} className="border rounded-lg px-3 py-2 text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">All Departments</option>
+                    {DEPT_LIST.map(d => <option key={d} value={d}>{d}</option>)}
                 </select>
-                <select value={filter.status} onChange={e => setFilter({ ...filter, status: e.target.value as '' | 'regular' | 'backup' })} className="border rounded-lg px-3 py-2 text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="">All Status</option><option value="regular">Regular</option><option value="backup">Backup</option>
+                <select value={filter.status} onChange={e => { setFilter(f => ({ ...f, status: e.target.value as any })); setPage(1); }} className="border rounded-lg px-3 py-2 text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">All Statuses</option>
+                    <option value="regular">Regular</option>
+                    <option value="backup">Backup</option>
                 </select>
             </div>
 
@@ -186,6 +209,14 @@ export const AYVolunteersTab = ({ years, currentAY }: { years: AcademicYear[]; c
                 </table>
             </div>
 
+            {totalPages > 1 && (
+                <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-gray-100 shadow mt-4">
+                    <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="px-4 py-2 border rounded-lg text-sm font-medium disabled:opacity-50 hover:bg-gray-50">Previous</button>
+                    <span className="text-gray-600 text-sm font-medium">Page {page} of {totalPages}</span>
+                    <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="px-4 py-2 border rounded-lg text-sm font-medium disabled:opacity-50 hover:bg-gray-50">Next</button>
+                </div>
+            )}
+
             {/* Profile Modal */}
             {viewProfileId && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -195,87 +226,145 @@ export const AYVolunteersTab = ({ years, currentAY }: { years: AcademicYear[]; c
                             <button onClick={() => setViewProfileId(null)} className="text-gray-400 hover:text-gray-600">✖</button>
                         </div>
                         <div className="p-6">
-                            {(() => {
-                                const vol = vols.find(v => v.id === viewProfileId);
-                                if (!vol) return <p>Loading...</p>;
-                                const p = vol.profile || {};
-                                const renderField = (label: string, value: any) => (
-                                    <div className="mb-4">
-                                        <div className="text-xs text-gray-500 font-medium">{label}</div>
-                                        <div className="text-sm font-medium text-gray-900 bg-gray-50 px-3 py-2 rounded mt-1">{value || '-'}</div>
-                                    </div>
-                                );
-                                return (
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div className="col-span-full flex items-center gap-4 mb-4">
-                                            {p.profilePhotoUrl ? (
-                                                <img src={uploadAPI.getFullUrl(p.profilePhotoUrl)} alt="Profile" className="w-24 h-24 rounded-full object-cover border" />
-                                            ) : (
-                                                <div className="w-24 h-24 rounded-full bg-gray-200 flex items-center justify-center text-gray-400">No Photo</div>
-                                            )}
-                                            <div>
-                                                <h4 className="text-lg font-bold text-gray-800">{vol.name}</h4>
-                                                <p className="text-sm text-gray-500">{vol.email}</p>
-                                                <span className={`px-2 py-0.5 rounded-full text-xs font-medium inline-block mt-1 ${vol.status === 'regular' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}`}>{vol.status.toUpperCase()}</span>
-                                            </div>
-                                        </div>
-                                        {renderField("Full Name (Profile)", p.fullName)}
-                                        {renderField("PRN No", p.prnNo)}
-                                        {renderField("Department", vol.department)}
-                                        {renderField("College Year", p.collegeYearAtEnrollment)}
-                                        {renderField("NSS Year", p.nssYear)}
-                                        {renderField("CGPA", p.cgpa)}
-                                        {renderField("Eligibility No", p.eligibilityNo)}
-                                        {renderField("Religion", p.religion)}
-                                        {renderField("Caste", p.caste)}
-                                        {renderField("Caste Category", p.casteCategory)}
-                                        {renderField("Phone Number", p.phoneNo)}
-
-                                        <div className="col-span-full mt-2">
-                                            <div className="text-xs text-gray-500 font-medium mb-1">Volunteering Experience</div>
-                                            <div className="text-sm text-gray-800 bg-gray-50 px-4 py-3 rounded whitespace-pre-wrap">{p.experienceText || '-'}</div>
-                                        </div>
-
-                                        {p.marksheetUrl && (
-                                            <div className="col-span-full mt-4">
-                                                <a href={uploadAPI.getFullUrl(p.marksheetUrl)} target="_blank" rel="noreferrer" className="inline-block bg-blue-50 text-blue-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-100">
-                                                    📄 View Marksheet
-                                                </a>
-                                            </div>
-                                        )}
-
-                                        {/* Attended Events Section */}
-                                        <div className="col-span-full mt-6 border-t pt-4">
-                                            <h5 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                                                <span>📅</span> Attended Events ({attendance.filter(a => a.status === 'present').length})
-                                            </h5>
-                                            {loadingAttendance ? (
-                                                <div className="text-sm text-gray-500 py-2">Loading attendance records...</div>
-                                            ) : attendance.filter(a => a.status === 'present').length > 0 ? (
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                                    {attendance.filter(a => a.status === 'present').map((att, idx) => (
-                                                        <div key={idx} className="bg-green-50/50 border border-green-100 rounded-lg p-3 flex justify-between items-center">
-                                                            <div>
-                                                                <div className="text-sm font-semibold text-gray-800">{att.sessionTitle}</div>
-                                                                <div className="text-xs text-gray-500 mt-0.5">{new Date(att.date).toLocaleDateString()}</div>
-                                                            </div>
-                                                            <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded text-xs font-semibold uppercase">Present</span>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            ) : (
-                                                <div className="text-sm text-gray-500 py-4 bg-gray-50 rounded-lg text-center border border-dashed">
-                                                    No events attended yet for this academic year.
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                );
-                            })()}
+                            <VolunteerProfileModal 
+                                vol={vols.find(v => v.id === viewProfileId)} 
+                                attendance={attendance} 
+                                loadingAttendance={loadingAttendance} 
+                            />
                         </div>
                     </div>
                 </div>
             )}
+
+            <ExportDataModal 
+                isOpen={showExportModal}
+                onClose={() => setShowExportModal(false)}
+                data={vols.map(v => ({
+                    id: v.id,
+                    name: v.name,
+                    email: v.email,
+                    department: v.department,
+                    status: v.status,
+                    isActive: v.isActive,
+                    eventsAttendedCount: v.eventsAttendedCount,
+                    fullName: v.profile?.fullName,
+                    prnNo: v.profile?.prnNo,
+                    collegeYearAtEnrollment: v.profile?.collegeYearAtEnrollment,
+                    nssYear: v.profile?.nssYear,
+                    cgpa: v.profile?.cgpa,
+                    eligibilityNo: v.profile?.eligibilityNo,
+                    religion: v.profile?.religion,
+                    caste: v.profile?.caste,
+                    casteCategory: v.profile?.casteCategory,
+                    phoneNo: v.profile?.phoneNo,
+                }))}
+                columns={[
+                    { key: 'name', label: 'Name' },
+                    { key: 'email', label: 'Email' },
+                    { key: 'department', label: 'Department' },
+                    { key: 'status', label: 'Status (Regular/Backup)' },
+                    { key: 'isActive', label: 'Is Active' },
+                    { key: 'eventsAttendedCount', label: 'Events Attended' },
+                    { key: 'fullName', label: 'Full Name (Profile)' },
+                    { key: 'prnNo', label: 'PRN No' },
+                    { key: 'collegeYearAtEnrollment', label: 'College Year' },
+                    { key: 'nssYear', label: 'NSS Year' },
+                    { key: 'cgpa', label: 'CGPA' },
+                    { key: 'eligibilityNo', label: 'Eligibility No' },
+                    { key: 'religion', label: 'Religion' },
+                    { key: 'caste', label: 'Caste' },
+                    { key: 'casteCategory', label: 'Caste Category' },
+                    { key: 'phoneNo', label: 'Phone Number' }
+                ]}
+                filename={`Volunteers_Export_AY_${selectedAY?.label || 'All'}`}
+            />
         </div>
     );
 };
+
+const VolunteerProfileModal = ({ vol, attendance, loadingAttendance }: { vol: any, attendance: any[], loadingAttendance: boolean }) => {
+    if (!vol) return <p>Loading...</p>;
+    const p = vol.profile || {};
+    const presentAttendance = attendance.filter(a => a.status === 'present');
+    
+    const renderField = (label: string, value: any) => (
+        <div className="mb-4">
+            <div className="text-xs text-gray-500 font-medium">{label}</div>
+            <div className="text-sm font-medium text-gray-900 bg-gray-50 px-3 py-2 rounded mt-1">{value || '-'}</div>
+        </div>
+    );
+    
+    return (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="col-span-full flex items-center gap-4 mb-4">
+                {p.profilePhotoUrl ? (
+                    <img src={uploadAPI.getFullUrl(p.profilePhotoUrl)} alt="Profile" className="w-24 h-24 rounded-full object-cover border" />
+                ) : (
+                    <div className="w-24 h-24 rounded-full bg-gray-200 flex items-center justify-center text-gray-400">No Photo</div>
+                )}
+                <div>
+                    <h4 className="text-lg font-bold text-gray-800">{vol.name}</h4>
+                    <p className="text-sm text-gray-500">{vol.email}</p>
+                    <span className="inline-block mt-1 bg-gray-100 px-2 py-0.5 rounded text-xs text-gray-600 border font-medium">
+                        {vol.department}
+                    </span>
+                </div>
+            </div>
+
+            <div>
+                <h5 className="font-bold text-gray-800 mb-3 border-b pb-1">Academic Details</h5>
+                {renderField('Full Name', p.fullName)}
+                {renderField('PRN Number', p.prnNo)}
+                {renderField('College Year', p.collegeYearAtEnrollment)}
+                {renderField('NSS Year', p.nssYear)}
+            </div>
+            <div>
+                <h5 className="font-bold text-gray-800 mb-3 border-b pb-1">Personal Details</h5>
+                {renderField('Phone Number', p.phoneNo)}
+                {renderField('Email ID', p.emailId)}
+                {renderField('Caste Category', p.casteCategory)}
+                {renderField('Religion / Caste', `${p.religion || '-'} / ${p.caste || '-'}`)}
+            </div>
+            {p.experienceText && (
+                <div className="col-span-full mt-4 bg-blue-50/50 border border-blue-100 p-4 rounded-lg">
+                    <h5 className="font-semibold text-blue-800 mb-2">Volunteer Experience</h5>
+                    <p className="text-sm text-gray-700 italic">"{p.experienceText}"</p>
+                </div>
+            )}
+            {p.marksheetUrl && (
+                <div className="col-span-full">
+                    <a href={uploadAPI.getFullUrl(p.marksheetUrl)} target="_blank" rel="noreferrer" className="inline-flex items-center text-sm text-blue-600 hover:underline">
+                        📄 View Marksheet Document
+                    </a>
+                </div>
+            )}
+
+            {/* Attended Events Section */}
+            <div className="col-span-full mt-6 border-t pt-4">
+                <h5 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                    <span>📅</span> Attended Events ({presentAttendance.length})
+                </h5>
+                {loadingAttendance ? (
+                    <div className="text-sm text-gray-500 py-2">Loading attendance records...</div>
+                ) : presentAttendance.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        {presentAttendance.map((att: any, idx: number) => (
+                            <div key={idx} className="bg-green-50/50 border border-green-100 rounded-lg p-3 flex justify-between items-center">
+                                <div>
+                                    <div className="text-sm font-semibold text-gray-800">{att.sessionTitle}</div>
+                                    <div className="text-xs text-gray-500 mt-0.5">{new Date(att.date).toLocaleDateString()}</div>
+                                </div>
+                                <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded text-xs font-semibold uppercase">Present</span>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="text-sm text-gray-500 py-4 bg-gray-50 rounded-lg text-center border border-dashed">
+                        No events attended yet for this academic year.
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+

@@ -1,12 +1,15 @@
 import { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Menu, X, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useAuthStore } from '../stores/authStore';
 
 const Navbar = () => {
     const [isOpen, setIsOpen] = useState(false);
     const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
     const location = useLocation();
+    const navigate = useNavigate();
+    const { token, userRole, clearAuth } = useAuthStore();
 
     const isActive = (path: string) => {
         if (path === '/') {
@@ -15,11 +18,10 @@ const Navbar = () => {
         return location.pathname.startsWith(path);
     };
 
-    const isLoggedIn = !!localStorage.getItem('token');
+    const isLoggedIn = !!token;
     const handleLogout = () => {
-        localStorage.removeItem('token');
-        localStorage.removeItem('userRole');
-        window.location.href = '/login';
+        clearAuth();
+        navigate('/login');
     };
 
     const navLinks = [
@@ -130,7 +132,7 @@ const Navbar = () => {
                                 <div className="ml-4 flex items-center space-x-2">
                                     {isLoggedIn ? (
                                         <>
-                                            <Link to={localStorage.getItem('userRole') === 'admin' ? '/admin' : '/volunteer'} className="bg-blue-800 text-white hover:bg-blue-700 px-3 py-1 rounded-md text-sm font-medium transition-colors duration-300 border border-white">
+                                            <Link to={userRole === 'admin' ? '/admin' : '/volunteer'} className="bg-blue-800 text-white hover:bg-blue-700 px-3 py-1 rounded-md text-sm font-medium transition-colors duration-300 border border-white">
                                                 Dashboard
                                             </Link>
                                             <button onClick={handleLogout} className="bg-nss-red text-white hover:bg-red-700 px-3 py-1 rounded-md text-sm font-medium transition-colors duration-300">
@@ -193,18 +195,20 @@ const Navbar = () => {
                                         )}
                                     </div>
                                 ))}
+                                {isLoggedIn && (
+                                    <Link
+                                        to={userRole === 'admin' ? '/admin' : '/volunteer'}
+                                        className="block w-full bg-blue-800 text-white hover:bg-blue-700 px-3 py-2 rounded-md text-base font-medium mt-4 mx-2 text-center"
+                                        onClick={() => setIsOpen(false)}
+                                    >
+                                        Dashboard
+                                    </Link>
+                                )}
                                 {isLoggedIn ? (
                                     <>
-                                        <Link
-                                            to={localStorage.getItem('userRole') === 'admin' ? '/admin' : '/volunteer'}
-                                            className="block w-full bg-blue-800 text-white hover:bg-blue-700 px-3 py-2 rounded-md text-base font-medium mt-4 mx-2 text-center"
-                                            onClick={() => setIsOpen(false)}
-                                        >
-                                            Dashboard
-                                        </Link>
                                         <button
                                             onClick={handleLogout}
-                                            className="block w-full bg-nss-red text-white hover:bg-red-700 px-3 py-2 rounded-md text-base font-medium mt-2 mx-2 text-center"
+                                            className="block w-[calc(100%-16px)] bg-nss-red text-white hover:bg-red-700 px-3 py-2 rounded-md text-base font-medium mt-2 mx-2 text-center"
                                         >
                                             Logout
                                         </button>

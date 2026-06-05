@@ -41,7 +41,7 @@ const Gallery = () => {
         const fetchGallery = async () => {
             try {
                 const response = await galleryAPI.getAll();
-                setItems(response.data.filter((item: GalleryItem) => item.type === 'image'));
+                setItems((response.data.data || []).filter((item: GalleryItem) => item.type === 'image'));
             } catch (error) {
                 console.error('Error fetching gallery:', error);
             }

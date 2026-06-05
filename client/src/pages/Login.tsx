@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { toast } from 'react-hot-toast';
+import { useAuthStore } from '../stores/authStore';
 import { authAPI } from '../services/api';
 import { Eye, EyeOff } from 'lucide-react';
 
@@ -16,9 +18,9 @@ const Login = () => {
 
         try {
             const response = await authAPI.login(email, password);
-            localStorage.setItem('token', response.data.token);
-            localStorage.setItem('userRole', response.data.role);
+            useAuthStore.getState().setAuth(response.data.token, response.data.role);
 
+            toast.success('Login successful!');
             // Redirect based on role (using window.location to force Navbar reload)
             if (response.data.role === 'admin') {
                 window.location.href = '/admin';

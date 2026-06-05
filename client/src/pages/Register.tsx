@@ -27,8 +27,7 @@ const Register = () => {
         const fetchUpcomingEvents = async () => {
             try {
                 const res = await eventsAPI.getAll();
-                // Filter for upcoming events only
-                const upcoming = res.data.filter((e: EventData) => e.type === 'upcoming');
+                const upcoming = (res.data.data || []).filter((e: EventData) => e.type === 'upcoming');
                 setEvents(upcoming);
                 if (upcoming.length > 0) {
                     setFormData(prev => ({ ...prev, eventId: upcoming[0].id.toString() }));
@@ -57,7 +56,7 @@ const Register = () => {
                 ...formData,
                 eventId: Number(formData.eventId)
             });
-            setVisitorPassId(res.data.visitorPassId);
+            setVisitorPassId(res.data.data.visitorPassId);
             setStep(2);
         } catch (err) {
             console.error("Failed to register", err);
@@ -76,16 +75,17 @@ const Register = () => {
         
         try {
             const res = await registrationsAPI.getByVisitorId(lookupId.trim());
-            setLookupResult(res.data);
-            setVisitorPassId(res.data.registration.visitorPassId!);
+            const resultData = res.data.data;
+            setLookupResult(resultData);
+            setVisitorPassId(resultData.registration.visitorPassId!);
             // We set formData for the pass generation view
             setFormData({
-                name: res.data.registration.name,
-                email: res.data.registration.email,
-                phone: res.data.registration.phone,
-                department: res.data.registration.department,
-                year: res.data.registration.year,
-                eventId: res.data.event.id.toString(),
+                name: resultData.registration.name,
+                email: resultData.registration.email,
+                phone: resultData.registration.phone,
+                department: resultData.registration.department,
+                year: resultData.registration.year,
+                eventId: resultData.event.id.toString(),
             });
             setStep(2); // Go to pass view
         } catch (err: unknown) {
@@ -137,23 +137,23 @@ const Register = () => {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="mb-4">
                                 <label className="block text-gray-700 font-bold mb-2">Full Name</label>
-                                <input type="text" name="name" onChange={handleChange} className="w-full border rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-nss-blue" required placeholder="John Doe" />
+                                <input type="text" name="name" value={formData.name} onChange={handleChange} className="w-full border rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-nss-blue" required placeholder="John Doe" />
                             </div>
                             <div className="mb-4">
                                 <label className="block text-gray-700 font-bold mb-2">Email</label>
-                                <input type="email" name="email" onChange={handleChange} className="w-full border rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-nss-blue" required placeholder="john@example.com" />
+                                <input type="email" name="email" value={formData.email} onChange={handleChange} className="w-full border rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-nss-blue" required placeholder="john@example.com" />
                             </div>
                             <div className="mb-4">
                                 <label className="block text-gray-700 font-bold mb-2">Phone</label>
-                                <input type="tel" name="phone" onChange={handleChange} className="w-full border rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-nss-blue" required placeholder="1234567890" />
+                                <input type="tel" name="phone" value={formData.phone} onChange={handleChange} className="w-full border rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-nss-blue" required placeholder="1234567890" />
                             </div>
                             <div className="mb-4">
                                 <label className="block text-gray-700 font-bold mb-2">Department</label>
-                                <input type="text" name="department" onChange={handleChange} className="w-full border rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-nss-blue" required placeholder="Comp / IT / EnTC" />
+                                <input type="text" name="department" value={formData.department} onChange={handleChange} className="w-full border rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-nss-blue" required placeholder="Comp / IT / EnTC" />
                             </div>
                             <div className="mb-4">
                                 <label className="block text-gray-700 font-bold mb-2">Year</label>
-                                <select name="year" onChange={handleChange} className="w-full border rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-nss-blue" required>
+                                <select name="year" value={formData.year} onChange={handleChange} className="w-full border rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-nss-blue" required>
                                     <option value="">Select Year</option>
                                     <option value="FE">First Year (FE)</option>
                                     <option value="SE">Second Year (SE)</option>

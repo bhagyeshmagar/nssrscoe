@@ -38,7 +38,7 @@ export const EventsTab = ({ events, onRefresh, showForm, setShowForm, editingIte
     const fetchEventImages = async (eventId: number) => {
         try {
             const response = await eventImagesAPI.getByEvent(eventId);
-            setExistingImages(response.data);
+            setExistingImages(response.data.data || []);
         } catch (error) {
             console.error('Error fetching event images:', error);
         }
@@ -98,7 +98,7 @@ export const EventsTab = ({ events, onRefresh, showForm, setShowForm, editingIte
                 await eventsAPI.update(editingItem.id, formData);
             } else {
                 const response = await eventsAPI.create(formData);
-                eventId = response.data.id;
+                eventId = response.data.data.id;
             }
 
             if (selectedFiles.length > 0 && eventId) {

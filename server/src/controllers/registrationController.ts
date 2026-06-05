@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { db } from '../db';
 import { eventRegistrations, events } from '../db/schema';
 import { eq } from 'drizzle-orm';
+import { ok, created } from '../lib/response';
 
 // Helper to generate a unique Visitor Pass ID
 const generateVisitorId = () => {
@@ -37,7 +38,7 @@ export const createRegistration = async (req: Request, res: Response) => {
             visitorPassId: uniqueId
         }).returning();
 
-        res.status(201).json(newRegistration[0]);
+        created(res, newRegistration[0]);
     } catch (error) {
         console.error('Error creating registration:', error);
         res.status(500).json({ message: 'Error creating registration', error });
@@ -61,7 +62,7 @@ export const getRegistrationByVisitorId = async (req: Request, res: Response) =>
             return res.status(404).json({ message: 'Registration not found' });
         }
 
-        res.json(results[0]);
+        ok(res, results[0]);
     } catch (error) {
         console.error('Error fetching registration:', error);
         res.status(500).json({ message: 'Error fetching registration', error });
@@ -75,7 +76,7 @@ export const getRegistrationsByEventId = async (req: Request, res: Response) => 
             .from(eventRegistrations)
             .where(eq(eventRegistrations.eventId, Number(eventId)));
             
-        res.json(results);
+        ok(res, results);
     } catch (error) {
         console.error('Error fetching event registrations:', error);
         res.status(500).json({ message: 'Error fetching event registrations', error });

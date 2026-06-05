@@ -5,6 +5,7 @@ interface Member {
     id: number;
     name: string;
     role: string;
+    category?: string;
     photoUrl?: string;
     year?: string;
     order?: number;
@@ -19,7 +20,7 @@ const Members = () => {
         const fetchMembers = async () => {
             try {
                 const response = await membersAPI.getAll();
-                setMembers(response.data);
+                setMembers(response.data.data || []);
             } catch (error) {
                 console.error('Error fetching members:', error);
             }
@@ -28,19 +29,18 @@ const Members = () => {
         fetchMembers();
     }, []);
 
-    // Group members by base role
+    // Group members by category
     const groupedMembers = members.reduce((acc, member) => {
-        let baseRole = member.role;
-        let subRole = '';
+        let baseRole = member.category || 'Other';
+        let subRole = member.role;
         
-        if (member.role.startsWith('Department Coordinator')) {
-            baseRole = 'Department Coordinators';
+        // Remove prefixes for cleaner display
+        if (member.role.startsWith('Department Coordinator - ')) {
             subRole = member.role.replace('Department Coordinator - ', '').trim();
-        } else if (member.role.startsWith('Portfolio Lead')) {
-            baseRole = 'Portfolio Leads';
+        } else if (member.role.startsWith('Portfolio Lead - ')) {
             subRole = member.role.replace('Portfolio Lead - ', '').trim();
         }
-        
+
         if (!acc[baseRole]) {
             acc[baseRole] = { order: member.order || 99, members: [] };
         }

@@ -1,15 +1,32 @@
 import axios from 'axios';
+import type { AxiosInstance, AxiosResponse, AxiosRequestConfig } from 'axios';
+import { useAuthStore } from '../stores/authStore';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 const UPLOAD_BASE_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
 
+export interface ApiResponse<T> {
+    success: boolean;
+    data: T;
+    meta?: any;
+    message?: string;
+}
+
+interface CustomAxiosInstance extends Omit<AxiosInstance, 'get' | 'post' | 'put' | 'patch' | 'delete'> {
+    get<T = any, R = AxiosResponse<ApiResponse<T>>, D = any>(url: string, config?: AxiosRequestConfig<D>): Promise<R>;
+    post<T = any, R = AxiosResponse<ApiResponse<T>>, D = any>(url: string, data?: D, config?: AxiosRequestConfig<D>): Promise<R>;
+    put<T = any, R = AxiosResponse<ApiResponse<T>>, D = any>(url: string, data?: D, config?: AxiosRequestConfig<D>): Promise<R>;
+    patch<T = any, R = AxiosResponse<ApiResponse<T>>, D = any>(url: string, data?: D, config?: AxiosRequestConfig<D>): Promise<R>;
+    delete<T = any, R = AxiosResponse<ApiResponse<T>>, D = any>(url: string, config?: AxiosRequestConfig<D>): Promise<R>;
+}
+
 const api = axios.create({
     baseURL: API_BASE_URL,
     headers: { 'Content-Type': 'application/json' },
-});
+}) as CustomAxiosInstance;
 
 api.interceptors.request.use((config) => {
-    const token = localStorage.getItem('token');
+    const token = useAuthStore.getState().token;
     if (token) config.headers.Authorization = `Bearer ${token}`;
     return config;
 });
@@ -18,8 +35,7 @@ api.interceptors.response.use(
     (response) => response,
     (error) => {
         if (error.response?.status === 401) {
-            localStorage.removeItem('token');
-            localStorage.removeItem('userRole');
+            useAuthStore.getState().clearAuth();
             window.location.href = '/login';
         }
         return Promise.reject(error);
@@ -60,6 +76,34 @@ export const academicYearsAPI = {
     delete:    (id: number)=> api.delete(`/academic-years/${id}`),
 };
 
+export interface PaginatedResponse<T> {
+    success: boolean;
+    data: T[];
+    meta: {
+        total: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+    };
+}
+
+export interface AuditLog {
+    id: number;
+    action: string;
+    entityType: string;
+    entityId: number | null;
+    performedById: number | null;
+    performedByRole: string;
+    details: string | null;
+    createdAt: string;
+}
+
+// ── Audit Logs ──────────────────────────────────────────────────────────────
+export const auditAPI = {
+    getLogs: (page: number, limit: number) =>
+        api.get<PaginatedResponse<AuditLog>>(`/audit-logs?page=${page}&limit=${limit}`),
+};
+
 // ── Activity Calendar ────────────────────────────────────────────────────────
 export const activityCalendarAPI = {
     getByAcademicYear: (ayId: number) => api.get<ActivityCalendarItem[]>(`/activity-calendar/${ayId}`),
@@ -72,7 +116,7 @@ export const activityCalendarAPI = {
 export const volunteersAPI = {
     // Admin AY-scoped operations
     getByAY:     (ayId: number, params?: VolunteerFilters) =>
-        api.get<VolunteerWithProfile[]>(`/academic-years/${ayId}/volunteers`, { params }),
+        api.get<{ data: VolunteerWithProfile[], meta?: any }>(`/academic-years/${ayId}/volunteers`, { params }),
     create:      (ayId: number, data: CreateVolunteerData) =>
         api.post<VolunteerData>(`/academic-years/${ayId}/volunteers`, data),
     getById:     (ayId: number, id: number) =>
@@ -92,12 +136,23 @@ export const volunteersAPI = {
     getAllPublic:    () => api.get<VolunteerData[]>('/volunteers/public'),
 };
 
+export interface MyAttendanceItem {
+    id: number;
+    status: 'present' | 'absent' | 'late';
+    date: string;
+    eventId: number;
+    title: string;
+    type: 'event' | 'meeting';
+    location?: string;
+}
+
 // ── Volunteer self-service ────────────────────────────────────────────────────
 export const volunteerProfileAPI = {
     getMyProfile:   () => api.get<VolunteerWithProfile>('/volunteers/me'),
     updateProfile:  (data: VolunteerProfileData) => api.put('/volunteers/me/profile', data),
     updatePassword: (currentPassword: string, newPassword: string) =>
         api.put('/volunteers/me/password', { currentPassword, newPassword }),
+    getMyAttendance:  () => api.get<MyAttendanceItem[]>('/volunteers/me/attendance'),
 };
 
 // ── Core Team ─────────────────────────────────────────────────────────────────
@@ -153,6 +208,34 @@ export const specialCampsAPI = {
     unlock:           (campId: number, password: string) => api.post<SpecialCamp>(`/special-camps/${campId}/unlock`, { password }),
 };
 
+// ── Meetings ──────────────────────────────────────────────────────────────────
+export const meetingsAPI = {
+    getByAY:          (ayId: number, params?: { type?: string; status?: string }) => api.get<Meeting[]>(`/academic-years/${ayId}/meetings`, { params }),
+    create:           (ayId: number, data: CreateMeetingData) => api.post<Meeting>(`/academic-years/${ayId}/meetings`, data),
+    getById:          (meetingId: number) => api.get<Meeting>(`/meetings/${meetingId}`),
+    update:           (meetingId: number, data: Partial<CreateMeetingData>) => api.put<Meeting>(`/meetings/${meetingId}`, data),
+    delete:           (meetingId: number) => api.delete(`/meetings/${meetingId}`),
+    start:            (meetingId: number) => api.post<Meeting>(`/meetings/${meetingId}/start`),
+    end:              (meetingId: number) => api.post<Meeting>(`/meetings/${meetingId}/end`),
+    reopen:           (meetingId: number) => api.post<Meeting>(`/meetings/${meetingId}/reopen`),
+    getAttendance:    (meetingId: number) => api.get<{ attendance: MeetingAttendanceWithVolunteer[]; stats: MeetingAttendanceStats }>(`/meetings/${meetingId}/attendance`),
+    markAttendance:   (meetingId: number, volunteerId: number, data: MarkMeetingAttendanceData) => api.post(`/meetings/${meetingId}/attendance/volunteers/${volunteerId}`, data),
+    getStats:         (meetingId: number) => api.get<{ stats: MeetingAttendanceStats }>(`/meetings/${meetingId}/attendance/stats`),
+};
+
+// ── Notifications ─────────────────────────────────────────────────────────────
+export const notificationsAPI = {
+    getMy:            (params?: { limit?: number; offset?: number }) => api.get<{ notifications: AppNotification[] }>('/volunteers/me/notifications', { params }),
+    getUnreadCount:   () => api.get<{ count: number }>('/volunteers/me/notifications/count'),
+    markAsRead:       (id: number) => api.put(`/volunteers/me/notifications/${id}/read`),
+    markAllAsRead:    () => api.put('/volunteers/me/notifications/read-all'),
+};
+
+// ── Core Team Dashboard ───────────────────────────────────────────────────────
+export const coreTeamDashboardAPI = {
+    getDashboard:       () => api.get<{ volunteers: any[] }>('/core-team-dashboard/dashboard'),
+};
+
 // ── Existing APIs (unchanged) ─────────────────────────────────────────────────
 export const adminsAPI = {
     getMe:   () => api.get('/admins/me'),
@@ -201,13 +284,13 @@ export const uploadAPI = {
         const formData = new FormData();
         formData.append('file', file);
         const response = await api.post('/upload/single', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
-        return response.data;
+        return response.data as any;
     },
     uploadMultiple: async (files: File[]): Promise<{ files: { url: string }[] }> => {
         const formData = new FormData();
         files.forEach(file => formData.append('files', file));
         const response = await api.post('/upload/multiple', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
-        return response.data;
+        return response.data as any;
     },
     getFullUrl: (path: string) => {
         if (!path) return '';
@@ -317,6 +400,8 @@ export interface VolunteerFilters {
     status?: 'regular' | 'backup';
     isActive?: boolean;
     search?: string;
+    page?: number;
+    limit?: number;
 }
 
 export interface ImportVolunteerData {
@@ -520,5 +605,70 @@ export interface EventRegistration {
     visitorPassId?: string; createdAt?: string;
 }
 export interface RegistrationWithEvent { registration: EventRegistration; event: EventData; }
+
+// ── Meeting Types ─────────────────────────────────────────────────────────────
+export interface Meeting {
+    id: number;
+    academicYearId: number;
+    title: string;
+    description?: string;
+    meetingType: 'regular' | 'core_team';
+    status: 'scheduled' | 'active' | 'ended';
+    scheduledDate: string;
+    location: string;
+    startedAt?: string;
+    endedAt?: string;
+    durationMinutes?: number;
+    createdAt: string;
+}
+
+export interface CreateMeetingData {
+    title: string;
+    description?: string;
+    meetingType: 'regular' | 'core_team';
+    scheduledDate: string;
+    location: string;
+    sendEmail?: boolean;
+}
+
+export interface MeetingAttendanceWithVolunteer {
+    volunteer: {
+        id: number;
+        name: string;
+        department: string;
+        status: string;
+    };
+    attendance: {
+        id: number;
+        status: 'present' | 'absent' | 'late';
+        notes?: string;
+        volunteerType: string;
+    } | null;
+}
+
+export interface MarkMeetingAttendanceData {
+    status: 'present' | 'absent' | 'late';
+    notes?: string | null;
+}
+
+export interface MeetingAttendanceStats {
+    totalPresent: number;
+    totalAbsent: number;
+    totalLate: number;
+    regularPresent: number;
+    backupPresent: number;
+}
+
+export interface AppNotification {
+    id: number;
+    type: string;
+    title: string;
+    body: string;
+    referenceType?: string;
+    referenceId?: number;
+    isRead: boolean;
+    createdAt: string;
+}
+
 
 export default api;

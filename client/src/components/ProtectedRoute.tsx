@@ -1,14 +1,16 @@
+import { type ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
+import { useAuthStore } from '../stores/authStore';
 import { decodeToken } from '../services/api';
 
 interface ProtectedRouteProps {
-    children: React.ReactNode;
+    children: ReactNode;
     adminOnly?: boolean;
     volunteerOnly?: boolean;
 }
 
 const ProtectedRoute = ({ children, adminOnly = false, volunteerOnly = false }: ProtectedRouteProps) => {
-    const token = localStorage.getItem('token');
+    const { token, userRole, clearAuth } = useAuthStore();
     const location = useLocation();
 
     // No token - redirect to login
@@ -20,12 +22,9 @@ const ProtectedRoute = ({ children, adminOnly = false, volunteerOnly = false }: 
 
     // Invalid/expired token - clear and redirect to login
     if (!decoded) {
-        localStorage.removeItem('token');
-        localStorage.removeItem('userRole');
+        clearAuth();
         return <Navigate to="/login" replace />;
     }
-
-    const userRole = decoded.role;
 
     // Role-based access control with loop prevention
     if (adminOnly && userRole !== 'admin' && userRole !== 'superadmin') {

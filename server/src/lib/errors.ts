@@ -1,5 +1,6 @@
 /** Centralised error hierarchy. All custom errors extend AppError so that the
  *  error-handling middleware can produce consistent JSON responses. */
+import { Request, Response, NextFunction } from 'express';
 
 export class AppError extends Error {
     public readonly statusCode: number;
@@ -94,3 +95,9 @@ export class RoleAssignmentError extends AppError {
         super(message, 400, 'ROLE_ASSIGNMENT_ERROR');
     }
 }
+
+export const catchAsync = (fn: Function) => {
+    return (req: Request, res: Response, next: NextFunction) => {
+        fn(req, res, next).catch(next);
+    };
+};

@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { db } from '../db';
 import { siteSettings } from '../db/schema';
 import { eq } from 'drizzle-orm';
+import { ok } from '../lib/response';
 
 // Default settings structure
 const defaultSettings = {
@@ -28,7 +29,7 @@ export const getSettings = async (req: Request, res: Response) => {
             settingsObj[s.key] = s.value;
         });
 
-        res.json(settingsObj);
+        ok(res, settingsObj);
     } catch (error) {
         res.status(500).json({ message: 'Error fetching settings', error });
     }
@@ -51,7 +52,7 @@ export const updateSettings = async (req: Request, res: Response) => {
             }
         }
 
-        res.json({ message: 'Settings updated successfully' });
+        ok(res, { message: 'Settings updated successfully' });
     } catch (error) {
         res.status(500).json({ message: 'Error updating settings', error });
     }

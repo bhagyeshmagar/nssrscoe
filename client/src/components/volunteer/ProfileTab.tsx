@@ -1,19 +1,6 @@
 import { useState, useEffect } from 'react';
-import { volunteerProfileAPI, uploadAPI } from '../../services/api';
+import { volunteerProfileAPI, uploadAPI, DEPARTMENTS } from '../../services/api';
 import type { VolunteerProfileData } from '../../services/api';
-
-const DEPARTMENTS = [
-    'Computer Engineering',
-    'Computer Science and Business Systems',
-    'Information Technology',
-    'Electronics and Telecommunication',
-    'Electrical Engineering',
-    'Automation and Robotics',
-    'Mechanical Engineering',
-    'Civil Engineering',
-    'Bachelor of Computer Applications',
-];
-
 const ACADEMIC_YEARS = ['FY', 'SY', 'TY', 'B-Tech'];
 const NSS_YEARS = [1, 2];
 const CASTE_CATEGORIES = ['General', 'OBC', 'SC', 'ST', 'NT', 'SBC', 'VJ/DT'];

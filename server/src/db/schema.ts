@@ -148,6 +148,7 @@ export const coreTeamRoles = pgTable('core_team_roles', {
     roleType: roleTypeEnum('role_type').notNull(),
     isUniquePerAy: boolean('is_unique_per_ay').default(true).notNull(),
     displayOrder: integer('display_order').default(0).notNull(),
+    category: varchar('category', { length: 100 }),
     createdAt: timestamp('created_at').defaultNow(),
 });
 
@@ -408,3 +409,53 @@ export const registrationRelations = relations(eventRegistrations, ({ one }) => 
 export const galleryRelations = relations(gallery, ({ one }) => ({
     event: one(events, { fields: [gallery.eventId], references: [events.id] }),
 }));
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MEETINGS
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const meetings = pgTable('meetings', {
+    id: serial('id').primaryKey(),
+    academicYearId: integer('academic_year_id').notNull().references(() => academicYears.id),
+    title: varchar('title', { length: 255 }).notNull(),
+    description: text('description'),
+    meetingType: varchar('meeting_type', { length: 50 }).notNull(), // 'regular' | 'core_team'
+    status: varchar('status', { length: 50 }).default('scheduled').notNull(), // 'scheduled' | 'active' | 'ended'
+    scheduledDate: timestamp('scheduled_date').notNull(),
+    location: varchar('location', { length: 255 }).notNull(),
+    startedAt: timestamp('started_at'),
+    endedAt: timestamp('ended_at'),
+    durationMinutes: integer('duration_minutes'),
+    createdById: integer('created_by_id').references(() => admins.id),
+    createdAt: timestamp('created_at').defaultNow(),
+});
+
+export const meetingAttendance = pgTable('meeting_attendance', {
+    id: serial('id').primaryKey(),
+    meetingId: integer('meeting_id').notNull().references(() => meetings.id, { onDelete: 'cascade' }),
+    volunteerId: integer('volunteer_id').notNull().references(() => volunteers.id, { onDelete: 'cascade' }),
+    status: attendanceStatusEnum('status').notNull(),
+    volunteerType: volunteerStatusEnum('volunteer_type').notNull(),
+    notes: text('notes'),
+    markedById: integer('marked_by_id').references(() => admins.id),
+    markedAt: timestamp('marked_at').defaultNow(),
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NOTIFICATIONS
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const notifications = pgTable('notifications', {
+    id: serial('id').primaryKey(),
+    volunteerId: integer('volunteer_id').notNull().references(() => volunteers.id, { onDelete: 'cascade' }),
+    type: varchar('type', { length: 50 }).notNull(),
+    title: varchar('title', { length: 255 }).notNull(),
+    body: text('body').notNull(),
+    isRead: boolean('is_read').default(false).notNull(),
+    emailSent: boolean('email_sent').default(false).notNull(),
+    referenceType: varchar('reference_type', { length: 50 }),
+    referenceId: integer('reference_id'),
+    createdAt: timestamp('created_at').defaultNow(),
+});
+
+

@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
 import path from 'path';
+import http from 'http';
 import authRoutes from './routes/authRoutes';
 import eventRoutes from './routes/eventRoutes';
 import galleryRoutes from './routes/galleryRoutes';
@@ -11,6 +12,9 @@ import settingsRoutes from './routes/settingsRoutes';
 import uploadRoutes from './routes/uploadRoutes';
 import eventImagesRoutes from './routes/eventImagesRoutes';
 import registrationRoutes from './routes/registrationRoutes';
+import { errorHandler } from './middleware/errorHandler';
+import { initSocket } from './services/socketService';
+import { startCronJobs } from './services/cronService';
 
 // New AY-scoped route imports
 import academicYearRoutes from './routes/academicYearRoutes';
@@ -19,7 +23,11 @@ import coreTeamRoutes, { ayCoreTeamRouter } from './routes/coreTeamRoutes';
 import attendanceRoutes, { ayAttendanceRouter } from './routes/attendanceRoutes';
 import specialCampRoutes, { ayCampsRouter } from './routes/specialCampRoutes';
 import adminRoutes from './routes/adminRoutes';
+import auditRoutes from './routes/auditRoutes';
 import activityCalendarRoutes from './routes/activityCalendarRoutes';
+import meetingRoutes from './routes/meetingRoutes';
+import notificationRoutes from './routes/notificationRoutes';
+import coreTeamDashboardRoutes from './routes/coreTeamDashboardRoutes';
 import { apiRateLimiter } from './middleware/rateLimiter';
 
 dotenv.config();
@@ -68,6 +76,7 @@ app.use('/api/academic-years/:ayId/special-camps', ayCampsRouter);
 // ── Flat / self-service routes ────────────────────────────────────────────────
 app.use('/api/auth',          authRoutes);
 app.use('/api/admins',        adminRoutes);
+app.use('/api/audit-logs',    auditRoutes);
 app.use('/api/events',        eventRoutes);
 app.use('/api/gallery',       galleryRoutes);
 app.use('/api/members',       membersRoutes);
@@ -82,7 +91,21 @@ app.use('/api/volunteers',    volunteerRoutes);     // /me, /me/profile, /me/pas
 app.use('/api/core-team',     coreTeamRoutes);      // /roles
 app.use('/api/attendance',    attendanceRoutes);    // /sessions/:id, /sessions/:id/records
 app.use('/api/special-camps', specialCampRoutes);   // /:campId, /:campId/participants, /:campId/finalize
+app.use('/api/core-team-dashboard', coreTeamDashboardRoutes);
+app.use('/api',               meetingRoutes);       // handles both /academic-years/:ayId/meetings and /meetings/:id
+app.use('/api',               notificationRoutes);  // handles /volunteers/me/notifications
 
-app.listen(port, () => {
+// Error handling middleware
+app.use(errorHandler);
+
+const server = http.createServer(app);
+
+// Initialize Socket.io
+initSocket(server);
+
+// Start Cron Jobs
+startCronJobs();
+
+server.listen(port, async () => {
     console.log(`⚡️[server]: Server is running at http://localhost:${port}`);
 });

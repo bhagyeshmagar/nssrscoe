@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, Suspense, lazy } from 'react';
 import {
     eventsAPI, galleryAPI, membersAPI, settingsAPI,
     academicYearsAPI, decodeToken
@@ -6,26 +6,28 @@ import {
 import type { SiteSettings, AcademicYear } from '../services/api';
 
 import { AYStatusBadge } from '../components/admin/Shared';
-import { OverviewTab } from '../components/admin/OverviewTab';
-import { AcademicYearsTab } from '../components/admin/AcademicYearsTab';
-import { ActivityCalendarTab } from '../components/admin/ActivityCalendarTab';
-import { AYVolunteersTab } from '../components/admin/AYVolunteersTab';
-import { CoreTeamTab } from '../components/admin/CoreTeamTab';
-import { AttendanceTab } from '../components/admin/AttendanceTab';
-import { SpecialCampsTab } from '../components/admin/SpecialCampsTab';
-import { ArchiveTab } from '../components/admin/ArchiveTab';
-import { EventsTab } from '../components/admin/EventsTab';
-import { RegistrationsTab } from '../components/admin/RegistrationsTab';
-import { GalleryTab } from '../components/admin/GalleryTab';
-import { MembersTab } from '../components/admin/MembersTab';
-import { SettingsTab } from '../components/admin/SettingsTab';
-import { AdminsTab } from '../components/admin/AdminsTab';
-import { ProfileTab } from '../components/admin/ProfileTab';
+import { useAuthStore } from '../stores/authStore';
+const OverviewTab = lazy(() => import('../components/admin/OverviewTab').then(m => ({ default: m.OverviewTab })));
+const AcademicYearsTab = lazy(() => import('../components/admin/AcademicYearsTab').then(m => ({ default: m.AcademicYearsTab })));
+const ActivityCalendarTab = lazy(() => import('../components/admin/ActivityCalendarTab').then(m => ({ default: m.ActivityCalendarTab })));
+const MeetingsTab = lazy(() => import('../components/admin/MeetingsTab').then(m => ({ default: m.MeetingsTab })));
+const AYVolunteersTab = lazy(() => import('../components/admin/AYVolunteersTab').then(m => ({ default: m.AYVolunteersTab })));
+const CoreTeamTab = lazy(() => import('../components/admin/CoreTeamTab').then(m => ({ default: m.CoreTeamTab })));
+const AttendanceTab = lazy(() => import('../components/admin/AttendanceTab').then(m => ({ default: m.AttendanceTab })));
+const SpecialCampsTab = lazy(() => import('../components/admin/SpecialCampsTab').then(m => ({ default: m.SpecialCampsTab })));
+const ArchiveTab = lazy(() => import('../components/admin/ArchiveTab').then(m => ({ default: m.ArchiveTab })));
+const EventsTab = lazy(() => import('../components/admin/EventsTab').then(m => ({ default: m.EventsTab })));
+const RegistrationsTab = lazy(() => import('../components/admin/RegistrationsTab').then(m => ({ default: m.RegistrationsTab })));
+const GalleryTab = lazy(() => import('../components/admin/GalleryTab').then(m => ({ default: m.GalleryTab })));
+const SettingsTab = lazy(() => import('../components/admin/SettingsTab').then(m => ({ default: m.SettingsTab })));
+const AdminsTab = lazy(() => import('../components/admin/AdminsTab').then(m => ({ default: m.AdminsTab })));
+const ProfileTab = lazy(() => import('../components/admin/ProfileTab').then(m => ({ default: m.ProfileTab })));
+const AuditLogTab = lazy(() => import('../components/admin/AuditLogTab'));
 
 type TabType =
     | 'overview' | 'academic-years' | 'volunteers' | 'core-team'
     | 'attendance' | 'special-camps' | 'archive' | 'activity-calendar'
-    | 'events' | 'registrations' | 'gallery' | 'members' | 'settings' | 'admins' | 'profile';
+    | 'events' | 'registrations' | 'gallery' | 'members' | 'settings' | 'admins' | 'profile' | 'meetings' | 'audit-logs';
 
 const getTabGroups = (isSuperadmin: boolean) => [
     {
@@ -36,7 +38,9 @@ const getTabGroups = (isSuperadmin: boolean) => [
             { id: 'volunteers', label: 'Volunteers', icon: '🦾' },
             { id: 'core-team', label: 'Core Team', icon: '👥' },
             { id: 'attendance', label: 'Attendance', icon: '🧾' },
+            { id: 'meetings', label: 'Meetings', icon: '🗣️' },
             { id: 'special-camps', label: 'Special Camps', icon: '⛺' },
+            { id: 'audit-logs', label: 'Audit Logs', icon: '📜' },
             { id: 'archive', label: 'Archive', icon: '🗄️' },
         ]
     },
@@ -45,7 +49,6 @@ const getTabGroups = (isSuperadmin: boolean) => [
             { id: 'events', label: 'Events', icon: '🎯' },
             { id: 'registrations', label: 'Registrations', icon: '📝' },
             { id: 'gallery', label: 'Gallery', icon: '🖼️' },
-            { id: 'members', label: 'Members', icon: '👥' },
             ...(isSuperadmin ? [{ id: 'settings', label: 'Settings', icon: '⚙️' }] : []),
             ...(isSuperadmin ? [{ id: 'admins', label: 'Admins', icon: '🔑' }] : []),
         ]
@@ -58,7 +61,7 @@ const getTabGroups = (isSuperadmin: boolean) => [
 ];
 
 const AdminDashboard = () => {
-    const token = localStorage.getItem('token');
+    const { token } = useAuthStore();
     const isSuperadmin = token ? decodeToken(token)?.role === 'superadmin' : false;
     const [activeTab, setActiveTab] = useState<TabType>('overview');
     const [loading, setLoading] = useState(false);
@@ -74,7 +77,6 @@ const AdminDashboard = () => {
 
     const [showEventForm, setShowEventForm] = useState(false);
     const [showGalleryForm, setShowGalleryForm] = useState(false);
-    const [showMemberForm, setShowMemberForm] = useState(false);
     const [editingItem, setEditingItem] = useState<any>(null);
     const tabGroups = getTabGroups(isSuperadmin);
 
@@ -84,8 +86,8 @@ const AdminDashboard = () => {
                 academicYearsAPI.getAll(),
                 academicYearsAPI.getCurrent().catch(() => ({ data: { data: null } })),
             ]);
-            const yearsArr = (allRes.data as any)?.data ?? allRes.data;
-            const currentAyObj = (currRes.data as any)?.data ?? null;
+            const yearsArr = allRes.data.data;
+            const currentAyObj = currRes.data.data ?? null;
             setYears(Array.isArray(yearsArr) ? yearsArr : []);
             setCurrentAY(currentAyObj);
         } catch { setYears([]); }
@@ -100,11 +102,10 @@ const AdminDashboard = () => {
         setLoading(true);
         try {
             switch (activeTab) {
-                case 'overview': { const [eR, gR, mR] = await Promise.all([eventsAPI.getAll(), galleryAPI.getAll(), membersAPI.getAll()]); setEvents(eR.data); setGallery(gR.data); setMembers(mR.data); break; }
-                case 'events': { const r = await eventsAPI.getAll(); setEvents(r.data); break; }
-                case 'gallery': { const r = await galleryAPI.getAll(); setGallery(r.data); break; }
-                case 'members': { const r = await membersAPI.getAll(); setMembers(r.data); break; }
-                case 'settings': { const r = await settingsAPI.get(); setSettings(r.data); break; }
+                case 'overview': { const [eR, gR, mR] = await Promise.all([eventsAPI.getAll(), galleryAPI.getAll(), membersAPI.getAll()]); setEvents(eR.data.data || []); setGallery(gR.data.data || []); setMembers(mR.data.data || []); break; }
+                case 'events': { const r = await eventsAPI.getAll(); setEvents(r.data.data || []); break; }
+                case 'gallery': { const r = await galleryAPI.getAll(); setGallery(r.data.data || []); break; }
+                case 'settings': { const r = await settingsAPI.get(); setSettings(r.data.data as any); break; }
             }
         } catch (e) { console.error('fetchSiteData:', e); }
         setLoading(false);
@@ -168,23 +169,24 @@ const AdminDashboard = () => {
                     {loading ? (
                         <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600" /></div>
                     ) : (
-                        <>
+                        <Suspense fallback={<div className="flex justify-center items-center h-64 text-gray-500 font-medium animate-pulse">Loading component...</div>}>
                             {activeTab === 'overview' && <OverviewTab events={events} gallery={gallery} members={members} />}
                             {activeTab === 'academic-years' && <AcademicYearsTab years={years} onRefresh={loadYears} isSuperadmin={isSuperadmin} />}
                             {activeTab === 'activity-calendar' && <ActivityCalendarTab years={years} currentAY={currentAY} />}
                             {activeTab === 'volunteers' && <AYVolunteersTab years={years} currentAY={currentAY} />}
-                            {activeTab === 'core-team' && <CoreTeamTab years={years} currentAY={currentAY} />}
+                            { activeTab === 'core-team' && <CoreTeamTab years={years} currentAY={currentAY} />}
                             {activeTab === 'attendance' && <AttendanceTab years={years} currentAY={currentAY} />}
+                            {activeTab === 'meetings' && <MeetingsTab years={years} currentAY={currentAY} />}
                             {activeTab === 'special-camps' && <SpecialCampsTab years={years} currentAY={currentAY} />}
+                            {activeTab === 'audit-logs' && <AuditLogTab />}
                             {activeTab === 'archive' && <ArchiveTab years={years} />}
                             {activeTab === 'events' && <EventsTab events={events} onRefresh={fetchSiteData} showForm={showEventForm} setShowForm={setShowEventForm} editingItem={editingItem} setEditingItem={setEditingItem} years={years} currentAY={currentAY} />}
                             {activeTab === 'registrations' && <RegistrationsTab events={events} />}
                             {activeTab === 'gallery' && <GalleryTab gallery={gallery} onRefresh={fetchSiteData} showForm={showGalleryForm} setShowForm={setShowGalleryForm} editingItem={editingItem} setEditingItem={setEditingItem} />}
-                            {activeTab === 'members' && <MembersTab members={members} onRefresh={fetchSiteData} showForm={showMemberForm} setShowForm={setShowMemberForm} editingItem={editingItem} setEditingItem={setEditingItem} />}
                             {activeTab === 'settings' && <SettingsTab settings={settings} onRefresh={fetchSiteData} />}
                             {activeTab === 'admins' && <AdminsTab />}
                             {activeTab === 'profile' && <ProfileTab />}
-                        </>
+                        </Suspense>
                     )}
                 </main>
             </div>

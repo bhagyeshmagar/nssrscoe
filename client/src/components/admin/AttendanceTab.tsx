@@ -1,15 +1,18 @@
 import { useState, useEffect, useCallback } from 'react';
 import { attendanceAPI, eventsAPI, volunteersAPI } from '../../services/api';
 import type { AcademicYear, VolunteerWithProfile } from '../../services/api';
-import { useFlash } from './Shared';
+import { useFlash, useAYSelector } from './Shared';
+import { ExportDataModal } from '../common/ExportDataModal';
+import { Download } from 'lucide-react';
 
 export const AttendanceTab = ({ years, currentAY }: { years: AcademicYear[]; currentAY: AcademicYear | null }) => {
-    const [selectedAyId, setSelectedAyId] = useState<number>(currentAY?.id ?? 0);
+    const { selectedAyId, setSelectedAyId, selectedAY } = useAYSelector(years, currentAY);
     const [eventsList, setEventsList] = useState<any[]>([]);
     const [volunteersList, setVolunteersList] = useState<VolunteerWithProfile[]>([]);
     const [selectedEvent, setSelectedEvent] = useState<any | null>(null);
     const [attendanceMap, setAttendanceMap] = useState<Record<number, boolean>>({});
-    const { msg, flashString: flash } = useFlash();
+    const [showExportModal, setShowExportModal] = useState(false);
+    const { msg, flash } = useFlash();
 
     const load = useCallback(async () => {
         if (!selectedAyId) return;
@@ -18,11 +21,10 @@ export const AttendanceTab = ({ years, currentAY }: { years: AcademicYear[]; cur
                 eventsAPI.getAll(),
                 volunteersAPI.getByAY(selectedAyId, { status: 'regular', isActive: true })
             ]);
-            const selectedAY = years.find(y => y.id === selectedAyId);
             if (selectedAY) {
                 const ayStart = new Date(selectedAY.startDate);
                 const ayEnd = new Date(selectedAY.endDate);
-                const filteredEvents = (eRes.data as any[]).filter(ev => {
+                const filteredEvents = (eRes.data.data as any[]).filter(ev => {
                     const evDate = new Date(ev.date);
                     const belongsToAY = ev.academicYearId
                         ? ev.academicYearId === selectedAyId
@@ -31,9 +33,9 @@ export const AttendanceTab = ({ years, currentAY }: { years: AcademicYear[]; cur
                 });
                 setEventsList(filteredEvents);
             } else {
-                setEventsList((eRes.data as any[]).filter(ev => ev.type === 'past' || ev.type === 'today'));
+                setEventsList((eRes.data.data as any[]).filter(ev => ev.type === 'past' || ev.type === 'today'));
             }
-            setVolunteersList((vRes.data as any)?.data ?? vRes.data);
+            setVolunteersList(vRes.data.data?.data || []);
         } catch { }
     }, [selectedAyId, years]);
 
@@ -45,12 +47,12 @@ export const AttendanceTab = ({ years, currentAY }: { years: AcademicYear[]; cur
         }
     }, [currentAY, years, selectedAyId]);
 
-    const selectedAY = years.find(y => y.id === selectedAyId);
+
 
     const handleManage = async (event: any) => {
         try {
             const res = await attendanceAPI.getEventAttendance(selectedAyId, event.id);
-            const data = (res.data as any).data || res.data;
+            const data = res.data.data;
             const records = data?.records || [];
             const map: Record<number, boolean> = {};
             volunteersList.forEach(v => map[v.id] = false); // Default absent
@@ -60,7 +62,7 @@ export const AttendanceTab = ({ years, currentAY }: { years: AcademicYear[]; cur
             setAttendanceMap(map);
             setSelectedEvent(event);
         } catch (e: any) {
-            flash(e.response?.data?.message ?? 'Failed to load attendance.');
+            flash('err', e.response?.data?.message ?? 'Failed to load attendance.');
         }
     };
 
@@ -72,10 +74,10 @@ export const AttendanceTab = ({ years, currentAY }: { years: AcademicYear[]; cur
         }));
         try {
             await attendanceAPI.saveEventAttendance(selectedAyId, selectedEvent.id, records);
-            flash('Attendance saved successfully.');
+            flash('ok', 'Attendance saved successfully.');
             setSelectedEvent(null);
         } catch (e: any) {
-            flash(e.response?.data?.message ?? 'Failed to save attendance.');
+            flash('err', e.response?.data?.message ?? 'Failed to save attendance.');
         }
     };
 
@@ -84,9 +86,14 @@ export const AttendanceTab = ({ years, currentAY }: { years: AcademicYear[]; cur
             <div className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-bold text-gray-800">Event Attendance</h2>
                 <div className="flex gap-3">
-                    <select value={selectedAyId} onChange={e => setSelectedAyId(Number(e.target.value))} className="border rounded-lg px-3 py-2 text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500">
-                        {years.map(y => <option key={y.id} value={y.id}>{y.label} {y.isCurrent ? '(Active)' : ''}</option>)}
+                    <select value={selectedAyId || ''} onChange={e => setSelectedAyId(Number(e.target.value))} className="border rounded-lg px-3 py-2 text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500">
+                        {years.map(y => <option key={y.id} value={y.id}>{y.label}</option>)}
                     </select>
+                    {selectedEvent && (
+                        <button onClick={() => setShowExportModal(true)} className="bg-green-600 text-white px-3 py-2 rounded-lg hover:bg-green-700 text-sm font-medium flex items-center">
+                            <Download className="w-4 h-4 mr-1" /> Export
+                        </button>
+                    )}
                 </div>
             </div>
             {msg && <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded text-blue-700 text-sm">{msg.text}</div>}
@@ -164,6 +171,22 @@ export const AttendanceTab = ({ years, currentAY }: { years: AcademicYear[]; cur
                     )}
                 </div>
             )}
+            
+            <ExportDataModal 
+                isOpen={showExportModal}
+                onClose={() => setShowExportModal(false)}
+                data={volunteersList.map(v => ({
+                    volunteerName: v.name,
+                    department: v.department,
+                    status: attendanceMap[v.id] ? 'Present' : 'Absent',
+                }))}
+                columns={[
+                    { key: 'volunteerName', label: 'Volunteer Name' },
+                    { key: 'department', label: 'Department' },
+                    { key: 'status', label: 'Attendance Status' }
+                ]}
+                filename={`Attendance_${selectedEvent?.title}_AY_${selectedAY?.label || 'All'}`}
+            />
         </div>
     );
 };

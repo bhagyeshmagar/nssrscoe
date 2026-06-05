@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
-import { specialCampsAPI, volunteersAPI } from '../../services/api';
+import { specialCampsAPI, volunteersAPI, DEPARTMENTS } from '../../services/api';
 import type { AcademicYear, SpecialCamp, VolunteerWithProfile } from '../../services/api';
-import { useFlash } from './Shared';
+import { useFlash, useAYSelector } from './Shared';
 
 export const SpecialCampsTab = ({ years, currentAY }: { years: AcademicYear[]; currentAY: AcademicYear | null }) => {
-    const [selectedAyId, setSelectedAyId] = useState<number>(currentAY?.id ?? 0);
+    const { selectedAyId, setSelectedAyId, selectedAY } = useAYSelector(years, currentAY);
     const [camps, setCamps] = useState<SpecialCamp[]>([]);
     const [showForm, setShowForm] = useState(false);
     const [form, setForm] = useState({ name: '', location: '', startDate: '', endDate: '', description: '', volunteerCap: 50 });
@@ -25,7 +25,7 @@ export const SpecialCampsTab = ({ years, currentAY }: { years: AcademicYear[]; c
         if (!selectedAyId) return; 
         try { 
             const r = await specialCampsAPI.getByAY(selectedAyId); 
-            setCamps((r.data as any)?.data ?? r.data); 
+            setCamps(r.data.data);
         } catch { } 
     }, [selectedAyId]);
     
@@ -37,8 +37,6 @@ export const SpecialCampsTab = ({ years, currentAY }: { years: AcademicYear[]; c
         }
     }, [currentAY, years, selectedAyId]);
     
-    const selectedAY = years.find(y => y.id === selectedAyId);
-
     const handleCreate = async () => {
         try { 
             await specialCampsAPI.create(selectedAyId, form); 
@@ -57,10 +55,10 @@ export const SpecialCampsTab = ({ years, currentAY }: { years: AcademicYear[]; c
                 specialCampsAPI.getById(campId),
                 volunteersAPI.getByAY(selectedAyId, { status: 'regular', isActive: true })
             ]);
-            const cData = (cRes.data as any)?.data ?? cRes.data;
-            const vData = (vRes.data as any)?.data ?? vRes.data;
+            const cData = cRes.data.data;
+            const vData = vRes.data.data;
             setCampDetails(cData);
-            setAyVols(vData);
+            setAyVols(vData?.data || []);
             setSelectedVolIds(new Set(cData.participants.map((p: any) => p.volunteerId)));
             setManageCampId(campId);
         } catch (e: any) {
@@ -125,60 +123,32 @@ export const SpecialCampsTab = ({ years, currentAY }: { years: AcademicYear[]; c
     const [expandedCampId, setExpandedCampId] = useState<number | null>(null);
     const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
 
-    const departmentPriority = [
-        'Computer Engineering',
-        'Computer Science and Business Systems',
-        'Information Technology',
-        'Electronics and Telecommunication',
-        'Electrical Engineering',
-        'Automation and Robotics',
-        'Mechanical Engineering',
-        'Civil Engineering',
-        'Bachelor of Computer Applications'
-    ];
+
 
     const sortParticipants = (participants: any[]) => {
-        const sorted = [...participants];
-        if (!sortConfig) {
-            // Default sort: Department priority -> Name
-            return sorted.sort((a, b) => {
-                const aDept = a.snapDepartment || a.currentDept || a.department || '';
-                const bDept = b.snapDepartment || b.currentDept || b.department || '';
-                const aIdx = departmentPriority.indexOf(aDept);
-                const bIdx = departmentPriority.indexOf(bDept);
-                const aRank = aIdx === -1 ? 999 : aIdx;
-                const bRank = bIdx === -1 ? 999 : bIdx;
-                if (aRank !== bRank) return aRank - bRank;
-                
-                const aName = a.snapName || a.currentName || a.name || '';
-                const bName = b.snapName || b.currentName || b.name || '';
-                return aName.localeCompare(bName);
-            });
-        }
-        return sorted.sort((a, b) => {
-            const getVal = (p: any, key: string) => {
-                if (key === 'snapName') return p.snapName || p.currentName || p.name || '';
-                if (key === 'snapDepartment') return p.snapDepartment || p.currentDept || p.department || '';
-                if (key === 'snapCollegeYear') return p.snapCollegeYearAtEnrollment || p.collegeYear || '';
-                if (key === 'snapNssYear') return p.snapNssYear || p.nssYear || 0;
-                return '';
-            };
-            const aVal = getVal(a, sortConfig.key);
-            const bVal = getVal(b, sortConfig.key);
+        const getVal = (p: any, key: string) => {
+            if (key === 'snapName') return p.snapName || p.currentName || p.name || '';
+            if (key === 'snapDepartment') return p.snapDepartment || p.currentDept || p.department || '';
+            if (key === 'snapCollegeYear') return p.snapCollegeYearAtEnrollment || p.collegeYear || '';
+            if (key === 'snapNssYear') return p.snapNssYear || p.nssYear || 0;
+            return '';
+        };
 
-            if (sortConfig.key === 'snapDepartment') {
-                const aIdx = departmentPriority.indexOf(aVal as string);
-                const bIdx = departmentPriority.indexOf(bVal as string);
-                const aRank = aIdx === -1 ? 999 : aIdx;
-                const bRank = bIdx === -1 ? 999 : bIdx;
-                if (aRank < bRank) return sortConfig.direction === 'asc' ? -1 : 1;
-                if (aRank > bRank) return sortConfig.direction === 'asc' ? 1 : -1;
-                return 0;
+        return [...participants].sort((a, b) => {
+            const key = sortConfig?.key || 'snapDepartment';
+            const dir = sortConfig?.direction === 'desc' ? -1 : 1;
+            const aVal = getVal(a, key);
+            const bVal = getVal(b, key);
+
+            if (key === 'snapDepartment') {
+                const aRank = DEPARTMENTS.indexOf(aVal as any) > -1 ? DEPARTMENTS.indexOf(aVal as any) : 999;
+                const bRank = DEPARTMENTS.indexOf(bVal as any) > -1 ? DEPARTMENTS.indexOf(bVal as any) : 999;
+                if (aRank !== bRank) return (aRank - bRank) * dir;
+                // Default fallback if no specific sort config
+                if (!sortConfig) return getVal(a, 'snapName').localeCompare(getVal(b, 'snapName'));
             }
 
-            if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
-            if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
-            return 0;
+            return aVal < bVal ? -dir : aVal > bVal ? dir : 0;
         });
     };
 
@@ -198,7 +168,7 @@ export const SpecialCampsTab = ({ years, currentAY }: { years: AcademicYear[]; c
             // actually we only have participants if we fetch getById. Let's make sure it's loaded.
             try {
                 const res = await specialCampsAPI.getById(campId);
-                const cData = (res.data as any)?.data ?? res.data;
+                const cData = res.data.data;
                 setCamps(prev => prev.map(c => c.id === campId ? { ...c, participants: cData.participants, volunteerCap: cData.volunteerCap } : c));
                 setExpandedCampId(campId);
             } catch (e) {
@@ -211,12 +181,14 @@ export const SpecialCampsTab = ({ years, currentAY }: { years: AcademicYear[]; c
         <div>
             <div className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-bold text-gray-800">Special Camps</h2>
-                <div className="flex gap-3">
-                    <select value={selectedAyId} onChange={e => setSelectedAyId(Number(e.target.value))} className="border rounded-lg px-3 py-2 text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500">
-                        {years.map(y => <option key={y.id} value={y.id}>{y.label} {y.isCurrent ? '(Active)' : ''}</option>)}
-                    </select>
-                    {selectedAY && !selectedAY.isLocked && <button onClick={() => setShowForm(!showForm)} className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm font-medium">+ New Camp</button>}
-                </div>
+                <div className="flex items-center gap-3">
+                <select value={selectedAyId || ''} onChange={e => setSelectedAyId(Number(e.target.value))} className="border rounded-lg px-3 py-2 text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500">
+                    {years.map(y => <option key={y.id} value={y.id}>{y.label}</option>)}
+                </select>
+                <button onClick={() => setShowForm(true)} className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 font-medium text-sm">
+                    + New Camp
+                </button>
+            </div>
             </div>
             {msg && <div className={`mb-4 p-3 rounded-lg text-sm border ${msg.type === 'ok' ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700'}`}>{msg.text}</div>}
             {selectedAY?.isLocked && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">[Locked] Locked - read-only.</div>}

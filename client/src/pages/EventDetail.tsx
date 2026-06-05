@@ -47,12 +47,12 @@ const EventDetail = () => {
         const fetchData = async () => {
             try {
                 const eventsResponse = await eventsAPI.getAll();
-                const foundEvent = eventsResponse.data.find((e: Event) => e.id === Number(id));
+                const foundEvent = (eventsResponse.data.data || []).find((e: Event) => e.id === Number(id));
                 setEvent(foundEvent || null);
 
                 if (foundEvent) {
                     const imagesResponse = await eventImagesAPI.getByEvent(Number(id));
-                    setEventImages(imagesResponse.data);
+                    setEventImages(imagesResponse.data.data || []);
                 }
             } catch (error) {
                 console.error('Error fetching data:', error);

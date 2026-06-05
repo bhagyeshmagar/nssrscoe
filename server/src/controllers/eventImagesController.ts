@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { db } from '../db';
 import { eventImages } from '../db/schema';
 import { eq, and } from 'drizzle-orm';
+import { ok, created } from '../lib/response';
 
 // Get all images for an event
 export const getEventImages = async (req: Request, res: Response) => {
@@ -10,7 +11,7 @@ export const getEventImages = async (req: Request, res: Response) => {
         const images = await db.select().from(eventImages)
             .where(eq(eventImages.eventId, parseInt(eventId)))
             .orderBy(eventImages.isMaster);
-        res.json(images);
+        ok(res, images);
     } catch (error) {
         res.status(500).json({ message: 'Error fetching event images', error });
     }
@@ -38,7 +39,7 @@ export const addEventImages = async (req: Request, res: Response) => {
         }));
 
         const result = await db.insert(eventImages).values(insertData).returning();
-        res.status(201).json(result);
+        created(res, result);
     } catch (error) {
         res.status(500).json({ message: 'Error adding event images', error });
     }
@@ -62,7 +63,7 @@ export const setMasterImage = async (req: Request, res: Response) => {
                 eq(eventImages.eventId, parseInt(eventId))
             ));
 
-        res.json({ message: 'Master image updated' });
+        ok(res, { message: 'Master image updated' });
     } catch (error) {
         res.status(500).json({ message: 'Error setting master image', error });
     }
@@ -73,7 +74,7 @@ export const deleteEventImage = async (req: Request, res: Response) => {
     const { imageId } = req.params;
     try {
         await db.delete(eventImages).where(eq(eventImages.id, parseInt(imageId)));
-        res.json({ message: 'Image deleted successfully' });
+        ok(res, { message: 'Image deleted successfully' });
     } catch (error) {
         res.status(500).json({ message: 'Error deleting image', error });
     }
@@ -93,7 +94,7 @@ export const updateEventImage = async (req: Request, res: Response) => {
             .set(updateData)
             .where(eq(eventImages.id, parseInt(imageId)));
 
-        res.json({ message: 'Image updated successfully' });
+        ok(res, { message: 'Image updated successfully' });
     } catch (error) {
         res.status(500).json({ message: 'Error updating image', error });
     }

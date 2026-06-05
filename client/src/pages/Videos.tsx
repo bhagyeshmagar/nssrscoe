@@ -46,8 +46,10 @@ const Videos = () => {
     const fetchSettings = async () => {
         try {
             const res = await settingsAPI.get();
-            if (res.data.socialYoutube) {
-                setYoutubeUrl(res.data.socialYoutube);
+            if (res.data.data?.youtubeChannelUrl) {
+                setYoutubeUrl(res.data.data.youtubeChannelUrl);
+            } else if (res.data.data?.socialYoutube) {
+                setYoutubeUrl(res.data.data.socialYoutube);
             }
         } catch (error) {
             console.error('Error fetching settings:', error);
@@ -58,7 +60,7 @@ const Videos = () => {
         try {
             const response = await galleryAPI.getAll();
             // Filter only videos
-            const videoItems = response.data.filter((item: VideoItem) => item.type === 'video');
+            const videoItems = (response.data.data || []).filter((item: VideoItem) => item.type === 'video');
             setVideos(videoItems);
         } catch (error) {
             console.error('Error fetching videos:', error);

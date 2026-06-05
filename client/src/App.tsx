@@ -15,6 +15,7 @@ const Register = lazy(() => import('./pages/Register'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 const Login = lazy(() => import('./pages/Login'));
 const VolunteerDashboard = lazy(() => import('./pages/VolunteerDashboard'));
+const CoreTeamDashboard = lazy(() => import('./pages/CoreTeamDashboard'));
 const Mission = lazy(() => import('./pages/Mission'));
 const History = lazy(() => import('./pages/History'));
 const Reports = lazy(() => import('./pages/Reports'));
@@ -91,6 +92,16 @@ function App() {
                 element={
                   <ProtectedRoute volunteerOnly>
                     <VolunteerDashboard />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Core Team Route - Also Volunteer Only (middleware will check core team access) */}
+              <Route
+                path="/core-team/*"
+                element={
+                  <ProtectedRoute volunteerOnly>
+                    <CoreTeamDashboard />
                   </ProtectedRoute>
                 }
               />

@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { db } from '../db';
 import { eq, desc, sql } from 'drizzle-orm';
 import { events, academicYears } from '../db/schema';
+import { ok, created } from '../lib/response';
 
 export const getEvents = async (req: Request, res: Response) => {
     try {
@@ -19,7 +20,7 @@ export const getEvents = async (req: Request, res: Response) => {
             volunteersCount: sql<number>`(SELECT COUNT(ar.id)::int FROM attendance_records ar JOIN attendance_sessions s ON ar.session_id = s.id WHERE s.event_id = events.id AND ar.status = 'present')`
         }).from(events).orderBy(desc(events.date));
 
-        res.json(allEvents);
+        ok(res, allEvents);
     } catch (error) {
         console.error("Error in getEvents:", error);
         res.status(500).json({ message: 'Error fetching events', error });
@@ -47,7 +48,7 @@ export const createEvent = async (req: Request, res: Response) => {
             academicYearId: currentAY?.id || null,
             date: new Date(req.body.date) // Ensure date is Date object
         }).returning();
-        res.json(newEvent[0]);
+        created(res, newEvent[0]);
     } catch (error) {
         console.error("Error in createEvent:", error);
         res.status(500).json({ message: 'Error creating event', error });
@@ -74,7 +75,7 @@ export const updateEvent = async (req: Request, res: Response) => {
         }
 
         const updated = await db.update(events).set(updateData).where(eq(events.id, Number(id))).returning();
-        res.json(updated[0]);
+        ok(res, updated[0]);
     } catch (error) {
         console.error("Error in updateEvent:", error);
         res.status(500).json({ message: 'Error updating event', error });
@@ -93,7 +94,7 @@ export const deleteEvent = async (req: Request, res: Response) => {
         }
 
         await db.delete(events).where(eq(events.id, Number(id)));
-        res.json({ message: 'Event deleted' });
+        ok(res, { message: 'Event deleted' });
     } catch (error) {
         console.error("Error in deleteEvent:", error);
         res.status(500).json({ message: 'Error deleting event', error });

@@ -1,4 +1,4 @@
-import { eq, and, count, ne, sql } from 'drizzle-orm';
+import { eq, and, count, ne, sql, ilike, or } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
 import { db } from '../db';
 import {
@@ -6,6 +6,10 @@ import {
     volunteerProfiles,
     academicYears,
     attendanceRecords,
+    attendanceSessions,
+    events,
+    meetingAttendance,
+    meetings,
 } from '../db/schema';
 import {
     NotFoundError,
@@ -49,6 +53,8 @@ export interface ListVolunteerFilters {
     status?: 'regular' | 'backup';
     isActive?: boolean;
     search?: string;
+    page?: number;
+    limit?: number;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -99,6 +105,26 @@ export const listVolunteersForAY = async (ayId: number, filters: ListVolunteerFi
         conditions.push(eq(volunteers.isActive, filters.isActive));
     }
 
+    if (filters.search) {
+        const q = `%${filters.search}%`;
+        conditions.push(or(
+            ilike(volunteers.name, q),
+            ilike(volunteers.email, q),
+            ilike(volunteerProfiles.prnNo, q)
+        ) as any);
+    }
+
+    const page = filters.page || 1;
+    const limit = filters.limit || 50;
+
+    const [totalRow] = await db
+        .select({ count: count() })
+        .from(volunteers)
+        .leftJoin(volunteerProfiles, eq(volunteers.id, volunteerProfiles.volunteerId))
+        .where(and(...conditions));
+        
+    const total = Number(totalRow.count);
+
     const rows = await db
         .select({
             id: volunteers.id,
@@ -121,20 +147,19 @@ export const listVolunteersForAY = async (ayId: number, filters: ListVolunteerFi
         .from(volunteers)
         .leftJoin(volunteerProfiles, eq(volunteers.id, volunteerProfiles.volunteerId))
         .where(and(...conditions))
-        .orderBy(volunteers.name);
+        .orderBy(volunteers.name)
+        .limit(limit)
+        .offset((page - 1) * limit);
 
-    // Client-side search filter (across name, email, prnNo)
-    if (filters.search) {
-        const q = filters.search.toLowerCase();
-        return rows.filter(
-            r =>
-                r.name.toLowerCase().includes(q) ||
-                r.email.toLowerCase().includes(q) ||
-                (r.profile?.prnNo ?? '').toLowerCase().includes(q),
-        );
-    }
-
-    return rows;
+    return {
+        data: rows,
+        meta: {
+            total,
+            page,
+            limit,
+            totalPages: Math.ceil(total / limit)
+        }
+    };
 };
 
 export const getVolunteerById = async (id: number) => {
@@ -155,6 +180,35 @@ export const getVolunteerById = async (id: number) => {
         .limit(1);
     if (!row) throw new NotFoundError(`Volunteer ${id} not found.`);
     return { ...row.volunteers, profile: row.profile, eventsAttendedCount: row.eventsAttendedCount };
+};
+
+export const getMyAttendance = async (volunteerId: number) => {
+    const eventAtts = await db.select({
+        id: attendanceRecords.id,
+        status: attendanceRecords.status,
+        date: attendanceSessions.date,
+        eventId: events.id,
+        title: events.title,
+        type: sql<string>`'event'`.as('type'),
+        location: events.location,
+    }).from(attendanceRecords)
+      .innerJoin(attendanceSessions, eq(attendanceRecords.sessionId, attendanceSessions.id))
+      .leftJoin(events, eq(attendanceSessions.eventId, events.id))
+      .where(eq(attendanceRecords.volunteerId, volunteerId));
+
+    const meetingAtts = await db.select({
+        id: meetingAttendance.id,
+        status: meetingAttendance.status,
+        date: meetings.scheduledDate,
+        eventId: meetings.id,
+        title: meetings.title,
+        type: sql<string>`'meeting'`.as('type'),
+        location: meetings.location,
+    }).from(meetingAttendance)
+      .innerJoin(meetings, eq(meetingAttendance.meetingId, meetings.id))
+      .where(eq(meetingAttendance.volunteerId, volunteerId));
+
+    return [...eventAtts, ...meetingAtts].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 };
 
 // ── Create ────────────────────────────────────────────────────────────────────

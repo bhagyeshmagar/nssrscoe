@@ -165,56 +165,18 @@ export const assignRole = async (ayId: number, input: AssignRoleInput, adminId: 
             throw new RoleAssignmentError(`Only regular volunteers can be assigned to the core team. "${vol.name}" is a backup volunteer.`);
         }
 
-        // ── Department coordinator: extra constraints ─────────────────────────
-        if (role.code === ROLE_CODES.DEPT_COORDINATOR) {
-            if (!input.department) {
-                throw new RoleAssignmentError('department is required when assigning a department_coordinator role.');
-            }
-            if (vol.department !== input.department) {
-                throw new RoleAssignmentError(
-                    `Volunteer "${vol.name}" belongs to "${vol.department}" but the coordinator position is for "${input.department}".`,
-                );
-            }
-            // One coordinator per department per AY
+        // Non-coordinator student roles
+        if (role.isUniquePerAy) {
             const [existing] = await db
                 .select({ id: coreTeamAssignments.id })
                 .from(coreTeamAssignments)
                 .where(and(
                     eq(coreTeamAssignments.academicYearId, ayId),
                     eq(coreTeamAssignments.coreTeamRoleId, role.id),
-                    eq(coreTeamAssignments.department, input.department),
                 ))
                 .limit(1);
             if (existing) {
-                throw new ConflictError(`A department coordinator for "${input.department}" is already assigned in academic year "${ay.label}".`);
-            }
-        } else {
-            // Non-coordinator student roles
-            if (role.isUniquePerAy) {
-                const [existing] = await db
-                    .select({ id: coreTeamAssignments.id })
-                    .from(coreTeamAssignments)
-                    .where(and(
-                        eq(coreTeamAssignments.academicYearId, ayId),
-                        eq(coreTeamAssignments.coreTeamRoleId, role.id),
-                    ))
-                    .limit(1);
-                if (existing) {
-                    throw new ConflictError(`Role "${role.name}" is already assigned in academic year "${ay.label}".`);
-                }
-            }
-
-            // A volunteer can only hold one role per AY
-            const [alreadyAssigned] = await db
-                .select({ id: coreTeamAssignments.id })
-                .from(coreTeamAssignments)
-                .where(and(
-                    eq(coreTeamAssignments.academicYearId, ayId),
-                    eq(coreTeamAssignments.volunteerId, input.volunteerId),
-                ))
-                .limit(1);
-            if (alreadyAssigned) {
-                throw new ConflictError(`This volunteer already holds a core team role in academic year "${ay.label}".`);
+                throw new ConflictError(`Role "${role.name}" is already assigned in academic year "${ay.label}".`);
             }
         }
     }
@@ -285,3 +247,4 @@ export const removeAssignment = async (assignmentId: number, adminId: number) =>
 
     await logAudit({ action: 'core_team.remove', entityType: 'core_team_assignment', entityId: assignmentId, performedById: adminId, academicYearId: existing.academicYearId });
 };
+ 

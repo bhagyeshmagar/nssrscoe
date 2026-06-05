@@ -23,7 +23,7 @@ const PastEvents = () => {
         const fetchEvents = async () => {
             try {
                 const response = await eventsAPI.getAll();
-                const past = response.data.filter((e: Event) => e.type === 'past' || e.type === 'today');
+                const past = (response.data.data || []).filter((e: Event) => e.type === 'past' || e.type === 'today');
                 setEvents(past);
             } catch (error) {
                 console.error('Error fetching events:', error);

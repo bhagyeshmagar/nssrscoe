@@ -1,75 +1,35 @@
 import { db } from '../db';
 import { auditLogs } from '../db/schema';
 
-interface AuditPayload {
-    action: string;         // 'volunteer.create', 'academic_year.lock', etc.
-    entityType: string;     // 'volunteer', 'academic_year', etc.
-    entityId?: number;
-    performedById?: number;
-    performedByRole?: 'admin' | 'volunteer';
-    academicYearId?: number;
-    details?: Record<string, unknown>;
-}
+type LogActionParams = {
+    adminId?: number | null;
+    volunteerId?: number | null;
+    performedById?: number | null;
+    action: string;
+    entityType: string;
+    entityId?: number | null;
+    performedByRole?: string;
+    academicYearId?: number | null;
+    details?: any;
+};
 
-/** Fire-and-forget audit log writer. Never throws — audit failures must not
- *  interrupt the primary operation. */
-export const logAudit = async (payload: AuditPayload): Promise<void> => {
+export const logAudit = async (params: LogActionParams) => {
     try {
         await db.insert(auditLogs).values({
-            action: payload.action,
-            entityType: payload.entityType,
-            entityId: payload.entityId,
-            performedById: payload.performedById,
-            performedByRole: payload.performedByRole ?? 'admin',
-            academicYearId: payload.academicYearId,
-            details: payload.details ? JSON.stringify(payload.details) : undefined,
+            action: params.action,
+            entityType: params.entityType,
+            entityId: params.entityId,
+            performedById: params.adminId || params.volunteerId || params.performedById,
+            performedByRole: params.performedByRole || 'admin',
+            academicYearId: params.academicYearId,
+            details: params.details ? JSON.stringify(params.details) : null,
         });
-    } catch (err) {
-        console.error('[AuditLog] Failed to write audit log:', err);
+    } catch (error) {
+        console.error('Failed to write audit log:', error);
     }
 };
 
-// ── Convenience wrappers ──────────────────────────────────────────────────────
-
-export const auditVolunteerCreate = (
-    volunteerId: number,
-    adminId: number,
-    ayId: number,
-    name: string,
-) => logAudit({
-    action: 'volunteer.create',
-    entityType: 'volunteer',
-    entityId: volunteerId,
-    performedById: adminId,
-    academicYearId: ayId,
-    details: { name },
-});
-
-export const auditAYLock = (ayId: number, adminId: number, label: string) =>
-    logAudit({
-        action: 'academic_year.lock',
-        entityType: 'academic_year',
-        entityId: ayId,
-        performedById: adminId,
-        academicYearId: ayId,
-        details: { label },
-    });
-
-export const auditAYArchive = (ayId: number, adminId: number, label: string) =>
-    logAudit({
-        action: 'academic_year.archive',
-        entityType: 'academic_year',
-        entityId: ayId,
-        performedById: adminId,
-        academicYearId: ayId,
-        details: { label },
-    });
-
-export const auditCampFinalize = (campId: number, adminId: number, ayId: number) =>
-    logAudit({
-        action: 'special_camp.finalize',
-        entityType: 'special_camp',
-        entityId: campId,
-        performedById: adminId,
-        academicYearId: ayId,
-    });
+export const auditAYLock = (ayId: number, adminId: number, label: string) => logAudit({ action: 'LOCK_AY', entityType: 'AcademicYear', entityId: ayId, adminId, academicYearId: ayId, details: { label } });
+export const auditAYArchive = (ayId: number, adminId: number, label: string) => logAudit({ action: 'ARCHIVE_AY', entityType: 'AcademicYear', entityId: ayId, adminId, academicYearId: ayId, details: { label } });
+export const auditCampFinalize = (campId: number, adminId: number, ayId: number) => logAudit({ action: 'FINALIZE_CAMP', entityType: 'SpecialCamp', entityId: campId, adminId, academicYearId: ayId });
+export const auditVolunteerCreate = (volunteerId: number, adminId: number, ayId: number, name: string) => logAudit({ action: 'CREATE_VOLUNTEER', entityType: 'Volunteer', entityId: volunteerId, adminId, academicYearId: ayId, details: { name } });

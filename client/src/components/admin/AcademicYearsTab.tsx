@@ -6,15 +6,15 @@ import { AYStatusBadge, useFlash } from './Shared';
 export const AcademicYearsTab = ({ years, onRefresh, isSuperadmin }: { years: AcademicYear[]; onRefresh: () => void; isSuperadmin: boolean }) => {
     const [form, setForm] = useState({ label: '', startDate: '', endDate: '', volunteerCap: '100' });
     const [showForm, setShowForm] = useState(false);
-    const { msg, flashString: flash } = useFlash();
+    const { msg, flash } = useFlash();
     const [busy, setBusy] = useState<number | null>(null);
 
     const handleCreate = async () => {
         try {
             await academicYearsAPI.create({ ...form, volunteerCap: Number(form.volunteerCap) });
             setShowForm(false); setForm({ label: '', startDate: '', endDate: '', volunteerCap: '100' });
-            onRefresh(); flash('Academic year created.');
-        } catch (e: any) { flash(e.response?.data?.message ?? 'Error.'); }
+            onRefresh(); flash('ok', 'Academic year created.');
+        } catch (e: any) { flash('err', e.response?.data?.message ?? 'Error.'); }
     };
     
     const act = async (fn: () => Promise<any>, id: number) => {
@@ -23,7 +23,7 @@ export const AcademicYearsTab = ({ years, onRefresh, isSuperadmin }: { years: Ac
             await fn(); 
             onRefresh(); 
         } catch (e: any) { 
-            flash(e.response?.data?.message ?? 'Error.'); 
+            flash('err', e.response?.data?.message ?? 'Error.'); 
         } 
         setBusy(null);
     };
@@ -34,8 +34,8 @@ export const AcademicYearsTab = ({ years, onRefresh, isSuperadmin }: { years: Ac
             const { url } = await uploadAPI.uploadFile(file);
             await academicYearsAPI.update(ayId, { [type]: url });
             onRefresh();
-            flash('Report uploaded successfully.');
-        } catch (e: any) { flash(e.response?.data?.message ?? 'Upload failed.'); }
+            flash('ok', 'Report uploaded successfully.');
+        } catch (e: any) { flash('err', e.response?.data?.message ?? 'Upload failed.'); }
         setBusy(null);
     };
 

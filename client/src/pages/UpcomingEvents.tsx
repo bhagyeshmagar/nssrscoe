@@ -22,7 +22,7 @@ const UpcomingEvents = () => {
         const fetchEvents = async () => {
             try {
                 const response = await eventsAPI.getAll();
-                const upcoming = response.data.filter((e: Event) => e.type === 'upcoming');
+                const upcoming = (response.data.data || []).filter((e: Event) => e.type === 'upcoming');
                 setEvents(upcoming);
             } catch (error) {
                 console.error('Error fetching events:', error);

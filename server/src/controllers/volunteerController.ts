@@ -11,12 +11,14 @@ import { eq } from 'drizzle-orm';
 export const listVolunteersByAY = async (req: Request, res: Response) => {
     try {
         const ayId = Number(req.params.ayId);
-        const { department, status, search, isActive } = req.query;
+        const { department, status, search, isActive, page, limit } = req.query;
         const data = await volService.listVolunteersForAY(ayId, {
             department: department as string | undefined,
             status: status as 'regular' | 'backup' | undefined,
             search: search as string | undefined,
             isActive: isActive !== undefined ? isActive === 'true' : undefined,
+            page: page ? parseInt(page as string) : undefined,
+            limit: limit ? parseInt(limit as string) : undefined,
         });
         ok(res, data);
     } catch (err) { handleError(res, err); }
@@ -93,6 +95,14 @@ export const getMyProfile = async (req: Request, res: Response) => {
     } catch (err) { handleError(res, err); }
 };
 
+export const getMyAttendance = async (req: Request, res: Response) => {
+    try {
+        const volunteerId = (req as AuthRequest).user!.id;
+        const data = await volService.getMyAttendance(volunteerId);
+        ok(res, data);
+    } catch (err) { handleError(res, err); }
+};
+
 export const updateMyProfile = async (req: Request, res: Response) => {
     try {
         const volunteerId = (req as AuthRequest).user!.id;
@@ -125,9 +135,9 @@ export const getPublicVolunteers = async (req: Request, res: Response) => {
             .limit(1);
         if (!vol) return res.status(404).json({ success: false, message: 'Volunteer not found.' });
 
-        const data = await volService.listVolunteersForAY(vol.academicYearId, { isActive: true });
+        const result = await volService.listVolunteersForAY(vol.academicYearId, { isActive: true });
         // Strip sensitive fields
-        const safe = data.map(v => ({
+        const safe = result.data.map((v: any) => ({
             id: v.id,
             name: v.name,
             department: v.department,

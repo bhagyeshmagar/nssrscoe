@@ -10,7 +10,7 @@ const About = () => {
         const fetchSettings = async () => {
             try {
                 const response = await settingsAPI.get();
-                setSettings(response.data);
+                setSettings(response.data.data);
             } catch (error) {
                 console.error('Error fetching settings:', error);
             } finally {

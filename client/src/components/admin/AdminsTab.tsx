@@ -8,7 +8,7 @@ export const AdminsTab = () => {
     const [form, setForm] = useState({ username: '', password: '', isSuperadmin: false });
     const [editingId, setEditingId] = useState<number | null>(null);
     const [showForm, setShowForm] = useState(false);
-    const { msg, flashString: flash } = useFlash();
+    const { msg, flash } = useFlash();
 
     const loadAdmins = async () => {
         try {
@@ -16,7 +16,7 @@ export const AdminsTab = () => {
             const { data } = await adminsAPI.getAll();
             setAdminsList(data.data || []);
         } catch (e: any) {
-            flash('Failed to load admins');
+            flash('err', 'Failed to load admins');
         } finally {
             setLoading(false);
         }
@@ -29,17 +29,17 @@ export const AdminsTab = () => {
         try {
             if (editingId) {
                 await adminsAPI.update(editingId, form);
-                flash('Admin updated successfully');
+                flash('ok', 'Admin updated successfully');
             } else {
                 await adminsAPI.create(form);
-                flash('Admin created successfully');
+                flash('ok', 'Admin created successfully');
             }
             setShowForm(false);
             setForm({ username: '', password: '', isSuperadmin: false });
             setEditingId(null);
             loadAdmins();
         } catch (err: any) {
-            flash(err.response?.data?.message || 'Error saving admin');
+            flash('err', err.response?.data?.message || 'Error saving admin');
         }
     };
 
@@ -47,10 +47,10 @@ export const AdminsTab = () => {
         if (!confirm('Are you sure you want to delete this admin?')) return;
         try {
             await adminsAPI.delete(id);
-            flash('Admin deleted');
+            flash('ok', 'Admin deleted');
             loadAdmins();
         } catch (err: any) {
-            flash('Failed to delete admin');
+            flash('err', 'Failed to delete admin');
         }
     };
 

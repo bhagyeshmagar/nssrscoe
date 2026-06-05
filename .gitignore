@@ -29,3 +29,44 @@ ts_errors.txt
 *.tar.gz
 *.tar
 *.zip
+*.rar
+*.7z
+*.iso
+
+# Media / Large Assets
+*.mp4
+*.mp3
+*.mov
+*.wav
+*.avi
+*.mkv
+*.flv
+*.pdf
+*.psd
+*.ai
+*.fig
+*.sketch
+
+# Databases
+*.sqlite
+*.sqlite3
+*.db
+*.db3
+
+# Office / Documents
+*.doc
+*.docx
+*.xls
+*.xlsx
+*.ppt
+*.pptx
+*.csv
+
+# Binaries / OS
+*.exe
+*.dll
+*.so
+*.dylib
+.DS_Store
+Thumbs.db
+

@@ -62,8 +62,10 @@ ayVolunteerRouter.patch(
 // Mounted at /api/volunteers
 
 router.get('/me',           authenticateToken, volCtrl.getMyProfile);
+router.get('/me/attendance', authenticateToken, volCtrl.getMyAttendance);
 router.put('/me/profile',   authenticateToken, volCtrl.updateMyProfile);
 router.put('/me/password',  authenticateToken, volCtrl.updateMyPassword);
+
 router.get('/public',       authenticateToken, volCtrl.getPublicVolunteers);
 router.get('/experiences',  volCtrl.getExperiences);
 

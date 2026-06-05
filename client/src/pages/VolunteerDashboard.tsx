@@ -1,32 +1,41 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuthStore } from '../stores/authStore';
 import { decodeToken } from '../services/api';
+import { connectSocket, disconnectSocket } from '../services/socket';
 
 import { ProfileTab } from '../components/volunteer/ProfileTab';
 import { PasswordTab } from '../components/volunteer/PasswordTab';
 import { VolunteersListTab } from '../components/volunteer/VolunteersListTab';
+import { NotificationsTab } from '../components/volunteer/NotificationsTab';
+import { MyAttendanceTab } from '../components/volunteer/MyAttendanceTab';
 
-type TabType = 'profile' | 'volunteers';
+type TabType = 'profile' | 'volunteers' | 'notifications' | 'attendance';
 
 const VolunteerDashboard = () => {
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState<TabType>('profile');
     const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+    const { token, clearAuth } = useAuthStore();
     const [userName] = useState(() => {
-        const token = localStorage.getItem('token');
         if (token) {
             const decoded = decodeToken(token);
-            if (decoded) {
-                return decoded.email || decoded.username || '';
-            }
+            return decoded?.username || decoded?.email || decoded?.username || 'Volunteer';
         }
-        return '';
+        return 'Volunteer';
     });
 
+    useEffect(() => {
+        connectSocket();
+        
+        return () => {
+            disconnectSocket();
+        };
+    }, []);
+
     const handleLogout = () => {
-        localStorage.removeItem('token');
-        localStorage.removeItem('userRole');
-        navigate('/login');
+        clearAuth();
+        navigate('/');
     };
 
     return (
@@ -69,6 +78,24 @@ const VolunteerDashboard = () => {
                         >
                             👥 Fellow Volunteers
                         </button>
+                        <button
+                            onClick={() => setActiveTab('notifications')}
+                            className={`flex-1 px-6 py-4 text-center font-medium transition ${activeTab === 'notifications'
+                                ? 'text-nss-blue border-b-2 border-nss-blue bg-blue-50'
+                                : 'text-gray-500 hover:text-gray-700'
+                                }`}
+                        >
+                            🔔 Notifications
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('attendance')}
+                            className={`flex-1 px-6 py-4 text-center font-medium transition ${activeTab === 'attendance'
+                                ? 'text-nss-blue border-b-2 border-nss-blue bg-blue-50'
+                                : 'text-gray-500 hover:text-gray-700'
+                                }`}
+                        >
+                            📅 Attendance
+                        </button>
                     </div>
                 </div>
 
@@ -81,14 +108,15 @@ const VolunteerDashboard = () => {
                 )}
 
                 {/* Tab Content */}
-                {activeTab === 'profile' ? (
+                {activeTab === 'profile' && (
                     <>
                         <ProfileTab setMessage={setMessage} />
                         <PasswordTab setMessage={setMessage} />
                     </>
-                ) : (
-                    <VolunteersListTab />
                 )}
+                {activeTab === 'volunteers' && <VolunteersListTab />}
+                {activeTab === 'notifications' && <NotificationsTab />}
+                {activeTab === 'attendance' && <MyAttendanceTab />}
             </div>
         </div>
     );

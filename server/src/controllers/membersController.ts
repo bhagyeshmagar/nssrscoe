@@ -14,6 +14,7 @@ import { Request, Response } from 'express';
 import { db } from '../db';
 import { coreTeamAssignments, coreTeamRoles, academicYears, volunteers, volunteerProfiles } from '../db/schema';
 import { eq, desc, and } from 'drizzle-orm';
+import { ok, created, noContent } from '../lib/response';
 
 /**
  * GET /api/members
@@ -31,7 +32,7 @@ export const getMembers = async (req: Request, res: Response) => {
 
         if (!currentAY) {
             // No current AY set — return empty list rather than error
-            return res.json([]);
+            return ok(res, []);
         }
 
         // Fetch assignments for the current AY, joined with role metadata
@@ -43,6 +44,7 @@ export const getMembers = async (req: Request, res: Response) => {
                 displayOrder: coreTeamAssignments.displayOrder,
                 volunteerId: coreTeamAssignments.volunteerId,
                 roleName: coreTeamRoles.name,
+                roleCategory: coreTeamRoles.category,
                 roleDisplayOrder: coreTeamRoles.displayOrder,
                 createdAt: coreTeamAssignments.createdAt,
             })
@@ -72,13 +74,14 @@ export const getMembers = async (req: Request, res: Response) => {
                 ? (volunteerMap[a.volunteerId]?.name ?? a.displayName ?? 'Unknown')
                 : (a.displayName ?? 'Unknown'),
             role: a.roleName,
+            category: a.roleCategory,
             photoUrl: a.displayPhotoUrl ?? (a.volunteerId ? volunteerMap[a.volunteerId]?.photoUrl : null) ?? null,
             year: currentAY.label,
             order: a.roleDisplayOrder,
             createdAt: a.createdAt,
         }));
 
-        res.json(members);
+        ok(res, members);
     } catch (error) {
         res.status(500).json({ message: 'Error fetching members', error });
     }
@@ -130,7 +133,7 @@ export const createMember = async (req: Request, res: Response) => {
             displayPhotoUrl: displayPhotoUrl ?? photoUrl ?? null,
         }).returning();
 
-        res.json(newAssignment);
+        created(res, newAssignment);
     } catch (error) {
         res.status(500).json({ message: 'Error creating member', error });
     }
@@ -171,7 +174,7 @@ export const updateMember = async (req: Request, res: Response) => {
             .set(updateData)
             .where(eq(coreTeamAssignments.id, Number(id)))
             .returning();
-        res.json(updated);
+        ok(res, updated);
     } catch (error) {
         res.status(500).json({ message: 'Error updating member', error });
     }
@@ -185,7 +188,7 @@ export const deleteMember = async (req: Request, res: Response) => {
     const { id } = req.params;
     try {
         await db.delete(coreTeamAssignments).where(eq(coreTeamAssignments.id, Number(id)));
-        res.json({ message: 'Member removed' });
+        noContent(res);
     } catch (error) {
         res.status(500).json({ message: 'Error deleting member', error });
     }

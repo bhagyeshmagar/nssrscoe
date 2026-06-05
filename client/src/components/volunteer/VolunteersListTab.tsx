@@ -14,7 +14,7 @@ export const VolunteersListTab = () => {
         setLoadingVolunteers(true);
         try {
             const response = await volunteersAPI.getAllPublic();
-            const volunteersArr = (response.data as any)?.data ?? response.data;
+            const volunteersArr = response.data.data;
             setAllVolunteers(Array.isArray(volunteersArr) ? volunteersArr : []);
         } catch (error) {
             console.error('Error fetching volunteers:', error);

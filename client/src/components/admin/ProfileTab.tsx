@@ -5,7 +5,7 @@ import { useFlash } from './Shared';
 export const ProfileTab = () => {
     const [form, setForm] = useState({ username: '', password: '' });
     const [loading, setLoading] = useState(true);
-    const { msg, flashString: flash } = useFlash();
+    const { msg, flash } = useFlash();
 
     const loadProfile = async () => {
         try {
@@ -13,7 +13,7 @@ export const ProfileTab = () => {
             const { data } = await adminsAPI.getMe();
             setForm({ username: data.data.username, password: '' });
         } catch (e: any) {
-            flash('Failed to load profile');
+            flash('err', 'Failed to load profile');
         } finally {
             setLoading(false);
         }
@@ -25,10 +25,10 @@ export const ProfileTab = () => {
         e.preventDefault();
         try {
             await adminsAPI.updateMe(form);
-            flash('Profile updated successfully');
+            flash('ok', 'Profile updated successfully');
             setForm(prev => ({ ...prev, password: '' }));
         } catch (err: any) {
-            flash(err.response?.data?.message || 'Error updating profile');
+            flash('err', err.response?.data?.message || 'Error updating profile');
         }
     };
 

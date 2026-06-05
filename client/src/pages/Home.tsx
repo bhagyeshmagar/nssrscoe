@@ -15,7 +15,7 @@ const Home = () => {
         const fetchSettings = async () => {
             try {
                 const response = await settingsAPI.get();
-                const fetchedSettings = response.data;
+                const fetchedSettings = response.data.data;
                 setSettings(fetchedSettings);
                 
                 if (fetchedSettings.homeSliderImages) {
