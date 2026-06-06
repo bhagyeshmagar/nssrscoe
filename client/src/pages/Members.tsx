@@ -31,9 +31,9 @@ const Members = () => {
 
     // Group members by category
     const groupedMembers = members.reduce((acc, member) => {
-        let baseRole = member.category || 'Other';
+        let baseRole = member.category || 'Department Coordinator';
         let subRole = member.role;
-        
+
         // Remove prefixes for cleaner display
         if (member.role.startsWith('Department Coordinator - ')) {
             subRole = member.role.replace('Department Coordinator - ', '').trim();

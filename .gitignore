@@ -9,8 +9,15 @@ server/dist/
 
 # Environment variables
 .env
+.env.*
 server/.env
 client/.env
+client/.env.*
+*.pem
+
+# Temporary scripts/configs
+*.sh
+nss_nginx_config
 
 # Uploaded assets (images, videos, documents, etc.)
 server/uploads/
