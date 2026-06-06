@@ -400,6 +400,7 @@ export interface VolunteerFilters {
     status?: 'regular' | 'backup';
     isActive?: boolean;
     search?: string;
+    sortBy?: 'name' | 'department';
     page?: number;
     limit?: number;
 }

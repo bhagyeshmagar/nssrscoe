@@ -11,11 +11,12 @@ import { eq } from 'drizzle-orm';
 export const listVolunteersByAY = async (req: Request, res: Response) => {
     try {
         const ayId = Number(req.params.ayId);
-        const { department, status, search, isActive, page, limit } = req.query;
+        const { department, status, search, isActive, sortBy, page, limit } = req.query;
         const data = await volService.listVolunteersForAY(ayId, {
             department: department as string | undefined,
             status: status as 'regular' | 'backup' | undefined,
             search: search as string | undefined,
+            sortBy: sortBy as 'name' | 'department' | undefined,
             isActive: isActive !== undefined ? isActive === 'true' : undefined,
             page: page ? parseInt(page as string) : undefined,
             limit: limit ? parseInt(limit as string) : undefined,
@@ -135,7 +136,7 @@ export const getPublicVolunteers = async (req: Request, res: Response) => {
             .limit(1);
         if (!vol) return res.status(404).json({ success: false, message: 'Volunteer not found.' });
 
-        const result = await volService.listVolunteersForAY(vol.academicYearId, { isActive: true });
+        const result = await volService.listVolunteersForAY(vol.academicYearId, { isActive: true, sortBy: 'department' });
         // Strip sensitive fields
         const safe = result.data.map((v: any) => ({
             id: v.id,

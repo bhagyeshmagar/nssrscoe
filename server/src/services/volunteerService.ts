@@ -53,6 +53,7 @@ export interface ListVolunteerFilters {
     status?: 'regular' | 'backup';
     isActive?: boolean;
     search?: string;
+    sortBy?: 'name' | 'department';
     page?: number;
     limit?: number;
 }
@@ -114,6 +115,25 @@ export const listVolunteersForAY = async (ayId: number, filters: ListVolunteerFi
         ) as any);
     }
 
+    let orderClause: any[] = [volunteers.name];
+    if (filters.sortBy === 'department') {
+        orderClause = [
+            sql`CASE ${volunteers.department}
+                WHEN 'Computer Engineering' THEN 1
+                WHEN 'Computer Science and Business Systems' THEN 2
+                WHEN 'Information Technology' THEN 3
+                WHEN 'Electronics and Telecommunication' THEN 4
+                WHEN 'Electrical Engineering' THEN 5
+                WHEN 'Automation and Robotics' THEN 6
+                WHEN 'Mechanical Engineering' THEN 7
+                WHEN 'Civil Engineering' THEN 8
+                WHEN 'Bachelor of Computer Applications' THEN 9
+                ELSE 10
+            END`,
+            volunteers.name
+        ];
+    }
+
     const page = filters.page || 1;
     const limit = filters.limit || 50;
 
@@ -147,7 +167,7 @@ export const listVolunteersForAY = async (ayId: number, filters: ListVolunteerFi
         .from(volunteers)
         .leftJoin(volunteerProfiles, eq(volunteers.id, volunteerProfiles.volunteerId))
         .where(and(...conditions))
-        .orderBy(volunteers.name)
+        .orderBy(...orderClause)
         .limit(limit)
         .offset((page - 1) * limit);
 

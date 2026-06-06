@@ -9,7 +9,7 @@ export const AYVolunteersTab = ({ years, currentAY }: { years: AcademicYear[]; c
     const { selectedAyId, setSelectedAyId, selectedAY } = useAYSelector(years, currentAY);
     const [vols, setVols] = useState<VolunteerWithProfile[]>([]);
     const [stats, setStats] = useState<AYStats | null>(null);
-    const [filter, setFilter] = useState({ dept: '', status: '' as '' | 'regular' | 'backup', search: '' });
+    const [filter, setFilter] = useState({ dept: '', status: '' as '' | 'regular' | 'backup', search: '', sortBy: 'name' as 'name' | 'department' });
     const [searchInput, setSearchInput] = useState('');
     const [page, setPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
@@ -29,6 +29,7 @@ export const AYVolunteersTab = ({ years, currentAY }: { years: AcademicYear[]; c
                     ...(filter.dept && { department: filter.dept }), 
                     ...(filter.status && { status: filter.status }), 
                     ...(filter.search && { search: filter.search }),
+                    ...(filter.sortBy === 'department' && { sortBy: 'department' }),
                     page,
                     limit: 20
                 }),
@@ -170,6 +171,10 @@ export const AYVolunteersTab = ({ years, currentAY }: { years: AcademicYear[]; c
                     <option value="">All Statuses</option>
                     <option value="regular">Regular</option>
                     <option value="backup">Backup</option>
+                </select>
+                <select value={filter.sortBy} onChange={e => { setFilter(f => ({ ...f, sortBy: e.target.value as any })); setPage(1); }} className="border rounded-lg px-3 py-2 text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="name">Sort by Name</option>
+                    <option value="department">Sort by Department</option>
                 </select>
             </div>
 
