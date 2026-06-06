@@ -18,11 +18,12 @@ const Login = () => {
 
         try {
             const response = await authAPI.login(email, password);
-            useAuthStore.getState().setAuth(response.data.token, response.data.role);
+            const payload = (response.data as any).data || response.data;
+            useAuthStore.getState().setAuth(payload.token, payload.role);
 
             toast.success('Login successful!');
             // Redirect based on role (using window.location to force Navbar reload)
-            if (response.data.role === 'admin') {
+            if (payload.role === 'admin') {
                 window.location.href = '/admin';
             } else {
                 window.location.href = '/volunteer';

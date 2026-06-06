@@ -9,7 +9,7 @@ const Footer = () => {
         const fetchSettings = async () => {
             try {
                 const res = await settingsAPI.get();
-                setSettings(res.data);
+                setSettings((res.data as any).data || res.data);
             } catch (err) {
                 console.error("Failed to fetch footer settings", err);
             }
