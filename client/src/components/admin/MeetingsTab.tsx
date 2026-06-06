@@ -5,8 +5,11 @@ import { useAYSelector } from './Shared';
 import { ExportDataModal } from '../common/ExportDataModal';
 import { MeetingAttendanceModal } from './MeetingAttendanceModal';
 import { Download } from 'lucide-react';
+import { useAuthStore } from '../../stores/authStore';
 
 export const MeetingsTab = ({ years, currentAY }: { years: AcademicYear[], currentAY: AcademicYear | null }) => {
+    const userRole = useAuthStore(state => state.userRole);
+    const isSuperadmin = userRole === 'superadmin';
     const { selectedAyId, setSelectedAyId } = useAYSelector(years, currentAY);
     const [meetings, setMeetings] = useState<Meeting[]>([]);
     const [loading, setLoading] = useState(false);
@@ -213,15 +216,19 @@ export const MeetingsTab = ({ years, currentAY }: { years: AcademicYear[], curre
                                                 {meeting.status === 'active' && (
                                                     <button onClick={() => handleAction(meeting.id, 'end')} className="text-red-600 hover:underline">End</button>
                                                 )}
-                                                {meeting.status === 'ended' && (
+                                                {meeting.status === 'ended' && isSuperadmin && (
                                                     <button onClick={() => handleAction(meeting.id, 'reopen')} className="text-yellow-600 hover:underline text-xs">Reopen</button>
                                                 )}
                                                 <button onClick={() => {
                                                     setSelectedMeetingForAttendance({ id: meeting.id, status: meeting.status });
                                                     setAttendanceModalOpen(true);
                                                 }} className="text-blue-600 hover:underline font-semibold">Attendance</button>
-                                                <button onClick={() => handleEdit(meeting)} className="text-blue-600 hover:underline">Edit</button>
-                                                <button onClick={() => handleDelete(meeting.id)} className="text-red-600 hover:underline">Delete</button>
+                                                {(meeting.status !== 'ended' || isSuperadmin) && (
+                                                    <button onClick={() => handleEdit(meeting)} className="text-blue-600 hover:underline">Edit</button>
+                                                )}
+                                                {isSuperadmin && (
+                                                    <button onClick={() => handleDelete(meeting.id)} className="text-red-600 hover:underline">Delete</button>
+                                                )}
                                             </div>
                                         </td>
                                     </tr>
