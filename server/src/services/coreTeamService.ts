@@ -40,6 +40,8 @@ export interface AssignRoleInput {
     displayPhotoUrl?: string;
     // Department coordinator only
     department?: string;
+    customRoleName?: string;
+    customCategory?: string;
     displayOrder?: number;
 }
 
@@ -122,15 +124,36 @@ export const getAllRoles = async () =>
 export const assignRole = async (ayId: number, input: AssignRoleInput, adminId: number) => {
     const ay = await requireUnlockedAY(ayId);
 
-    // Resolve the role definition
-    const [role] = await db
-        .select()
-        .from(coreTeamRoles)
-        .where(eq(coreTeamRoles.id, input.coreTeamRoleId))
-        .limit(1);
-    if (!role) throw new NotFoundError(`Core team role ${input.coreTeamRoleId} not found.`);
+    let role;
+    if (input.coreTeamRoleId === -1 && input.customRoleName && input.customCategory) {
+        // Create custom role
+        const code = input.customRoleName.toLowerCase().replace(/[^a-z0-9]+/g, '_').substring(0, 50);
+        const [existing] = await db.select().from(coreTeamRoles).where(eq(coreTeamRoles.code, code)).limit(1);
+        if (existing) {
+            role = existing;
+        } else {
+            const roleType = (input.customCategory === 'Institute Officers' || input.customCategory === 'NSS Program Officer') ? 'institution' : 'student';
+            const [newRole] = await db.insert(coreTeamRoles).values({
+                name: input.customRoleName,
+                code: code,
+                roleType: roleType,
+                category: input.customCategory,
+                isUniquePerAy: false,
+            }).returning();
+            role = newRole;
+        }
+    } else {
+        // Resolve the role definition
+        const [foundRole] = await db
+            .select()
+            .from(coreTeamRoles)
+            .where(eq(coreTeamRoles.id, input.coreTeamRoleId))
+            .limit(1);
+        if (!foundRole) throw new NotFoundError(`Core team role ${input.coreTeamRoleId} not found.`);
+        role = foundRole;
+    }
 
-    const isInstitution = INSTITUTION_ROLES.has(role.code);
+    const isInstitution = INSTITUTION_ROLES.has(role.code) || role.roleType === 'institution';
 
     // ── Validate by role type ──────────────────────────────────────────────────
 
@@ -222,6 +245,7 @@ export const updateAssignment = async (assignmentId: number, input: Partial<Assi
             ...(input.displayName !== undefined && { displayName: input.displayName }),
             ...(input.displayPhotoUrl !== undefined && { displayPhotoUrl: input.displayPhotoUrl }),
             ...(input.displayOrder !== undefined && { displayOrder: input.displayOrder }),
+            ...(input.volunteerId !== undefined && { volunteerId: input.volunteerId }),
         })
         .where(eq(coreTeamAssignments.id, assignmentId))
         .returning();
@@ -246,5 +270,26 @@ export const removeAssignment = async (assignmentId: number, adminId: number) =>
     await db.delete(coreTeamAssignments).where(eq(coreTeamAssignments.id, assignmentId));
 
     await logAudit({ action: 'core_team.remove', entityType: 'core_team_assignment', entityId: assignmentId, performedById: adminId, academicYearId: existing.academicYearId });
+};
+
+export const deleteCustomRole = async (roleId: number, adminId: number) => {
+    const [existing] = await db.select().from(coreTeamRoles).where(eq(coreTeamRoles.id, roleId)).limit(1);
+    if (!existing) throw new NotFoundError(`Core team role ${roleId} not found.`);
+
+    // Protect predefined roles
+    const predefinedCodes = Object.values(ROLE_CODES) as string[];
+    if (predefinedCodes.includes(existing.code)) {
+        throw new Error("Cannot delete predefined standard roles.");
+    }
+
+    // Check if there are assignments using this role
+    const assignmentsCount = await db.select().from(coreTeamAssignments).where(eq(coreTeamAssignments.coreTeamRoleId, roleId));
+    if (assignmentsCount.length > 0) {
+        throw new Error("Cannot delete this role because there are active assignments using it. Please remove them first.");
+    }
+
+    await db.delete(coreTeamRoles).where(eq(coreTeamRoles.id, roleId));
+
+    await logAudit({ action: 'core_team.delete_role', entityType: 'core_team_role', entityId: roleId, performedById: adminId });
 };
  

@@ -49,7 +49,7 @@ const getTabGroups = (isSuperadmin: boolean) => [
             { id: 'events', label: 'Events', icon: '🎯' },
             { id: 'registrations', label: 'Registrations', icon: '📝' },
             { id: 'gallery', label: 'Gallery', icon: '🖼️' },
-            ...(isSuperadmin ? [{ id: 'settings', label: 'Settings', icon: '⚙️' }] : []),
+            { id: 'settings', label: 'Settings', icon: '⚙️' },
             ...(isSuperadmin ? [{ id: 'admins', label: 'Admins', icon: '🔑' }] : []),
         ]
     },
@@ -172,9 +172,9 @@ const AdminDashboard = () => {
                         <Suspense fallback={<div className="flex justify-center items-center h-64 text-gray-500 font-medium animate-pulse">Loading component...</div>}>
                             {activeTab === 'overview' && <OverviewTab events={events} gallery={gallery} members={members} />}
                             {activeTab === 'academic-years' && <AcademicYearsTab years={years} onRefresh={loadYears} isSuperadmin={isSuperadmin} />}
-                            {activeTab === 'activity-calendar' && <ActivityCalendarTab years={years} currentAY={currentAY} />}
+                            {activeTab === 'activity-calendar' && <ActivityCalendarTab events={events} years={years} currentAY={currentAY} />}
                             {activeTab === 'volunteers' && <AYVolunteersTab years={years} currentAY={currentAY} />}
-                            { activeTab === 'core-team' && <CoreTeamTab years={years} currentAY={currentAY} />}
+                            { activeTab === 'core-team' && <CoreTeamTab years={years} currentAY={currentAY} isSuperadmin={isSuperadmin} />}
                             {activeTab === 'attendance' && <AttendanceTab years={years} currentAY={currentAY} />}
                             {activeTab === 'meetings' && <MeetingsTab years={years} currentAY={currentAY} />}
                             {activeTab === 'special-camps' && <SpecialCampsTab years={years} currentAY={currentAY} />}

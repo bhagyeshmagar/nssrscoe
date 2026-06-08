@@ -77,7 +77,7 @@ export const getMembers = async (req: Request, res: Response) => {
             category: a.roleCategory,
             photoUrl: a.displayPhotoUrl ?? (a.volunteerId ? volunteerMap[a.volunteerId]?.photoUrl : null) ?? null,
             year: currentAY.label,
-            order: a.roleDisplayOrder,
+            order: a.displayOrder || a.roleDisplayOrder,
             createdAt: a.createdAt,
         }));
 
@@ -94,7 +94,7 @@ export const getMembers = async (req: Request, res: Response) => {
  */
 export const createMember = async (req: Request, res: Response) => {
     try {
-        const { coreTeamRoleId, volunteerId, displayName, displayPhotoUrl, name, role, photoUrl } = req.body;
+        const { coreTeamRoleId, volunteerId, displayName, displayPhotoUrl, name, role, photoUrl, order } = req.body;
 
         const [currentAY] = await db
             .select({ id: academicYears.id })
@@ -113,9 +113,16 @@ export const createMember = async (req: Request, res: Response) => {
             let coreRole = await db.select().from(coreTeamRoles).where(eq(coreTeamRoles.name, role)).limit(1).then(res => res[0]);
             if (!coreRole) {
                 const code = role.toLowerCase().replace(/[^a-z0-9]+/g, '_').substring(0, 50);
+                let inferredCategory = 'Institute Officers';
+                if (role.toLowerCase().includes('coordinator')) inferredCategory = 'Department Coordinators';
+                else if (role.toLowerCase().includes('lead')) inferredCategory = 'Portfolio Leads';
+                else if (role.toLowerCase().includes('representative')) inferredCategory = 'NSS Representatives';
+                else if (role.toLowerCase().includes('nss program officer') || role.toLowerCase().includes('nss po')) inferredCategory = 'NSS Program Officer';
+
                 const [newRole] = await db.insert(coreTeamRoles).values({
                     name: role,
                     code: code,
+                    category: inferredCategory,
                     roleType: role.toLowerCase().includes('coordinator') || role.toLowerCase().includes('lead') || role.toLowerCase().includes('representative') ? 'student' : 'institution',
                 }).returning();
                 coreRole = newRole;
@@ -131,6 +138,7 @@ export const createMember = async (req: Request, res: Response) => {
             volunteerId: volunteerId ? parseInt(volunteerId) : null,
             displayName: displayName ?? name ?? null,
             displayPhotoUrl: displayPhotoUrl ?? photoUrl ?? null,
+            displayOrder: order !== undefined ? parseInt(order) : 0,
         }).returning();
 
         created(res, newAssignment);
@@ -146,22 +154,29 @@ export const createMember = async (req: Request, res: Response) => {
 export const updateMember = async (req: Request, res: Response) => {
     const { id } = req.params;
     try {
-        const { volunteerId, displayName, displayPhotoUrl, displayOrder, name, photoUrl, role } = req.body;
+        const { volunteerId, displayName, displayPhotoUrl, displayOrder, name, photoUrl, role, order } = req.body;
         
         let updateData: any = {
             volunteerId: volunteerId !== undefined ? parseInt(volunteerId) : undefined,
             displayName: displayName ?? name ?? undefined,
             displayPhotoUrl: displayPhotoUrl ?? photoUrl ?? undefined,
-            displayOrder: displayOrder !== undefined ? parseInt(displayOrder) : undefined,
+            displayOrder: displayOrder !== undefined ? parseInt(displayOrder) : (order !== undefined ? parseInt(order) : undefined),
         };
 
         if (role) {
             let coreRole = await db.select().from(coreTeamRoles).where(eq(coreTeamRoles.name, role)).limit(1).then(res => res[0]);
             if (!coreRole) {
                 const code = role.toLowerCase().replace(/[^a-z0-9]+/g, '_').substring(0, 50);
+                let inferredCategory = 'Institute Officers';
+                if (role.toLowerCase().includes('coordinator')) inferredCategory = 'Department Coordinators';
+                else if (role.toLowerCase().includes('lead')) inferredCategory = 'Portfolio Leads';
+                else if (role.toLowerCase().includes('representative')) inferredCategory = 'NSS Representatives';
+                else if (role.toLowerCase().includes('nss program officer') || role.toLowerCase().includes('nss po')) inferredCategory = 'NSS Program Officer';
+
                 const [newRole] = await db.insert(coreTeamRoles).values({
                     name: role,
                     code: code,
+                    category: inferredCategory,
                     roleType: role.toLowerCase().includes('coordinator') || role.toLowerCase().includes('lead') || role.toLowerCase().includes('representative') ? 'student' : 'institution',
                 }).returning();
                 coreRole = newRole;

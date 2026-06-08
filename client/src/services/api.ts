@@ -160,6 +160,7 @@ export const volunteerProfileAPI = {
 // ── Core Team ─────────────────────────────────────────────────────────────────
 export const coreTeamAPI = {
     getRoles:         () => api.get<CoreTeamRole[]>('/core-team/roles'),
+    deleteRole:       (id: number) => api.delete(`/core-team/roles/${id}`),
     getByAY:          (ayId: number) => api.get<CoreTeamAssignment[]>(`/academic-years/${ayId}/core-team`),
     assign:           (ayId: number, data: AssignRoleData) =>
         api.post<CoreTeamAssignment>(`/academic-years/${ayId}/core-team`, data),
@@ -457,6 +458,8 @@ export interface AssignRoleData {
     displayName?: string;
     displayPhotoUrl?: string;
     department?: string;
+    customRoleName?: string;
+    customCategory?: string;
     displayOrder?: number;
 }
 
@@ -592,7 +595,7 @@ export interface EventData {
 export interface EventImageData { url: string; isMaster?: boolean; caption?: string; }
 export interface EventImage extends EventImageData { id: number; eventId: number; createdAt: string; }
 export interface GalleryData { title?: string; url: string; type?: 'image' | 'video'; eventId?: number | null; }
-export interface MemberData { id?: number; name: string; role: string; photoUrl?: string; year?: string; }
+export interface MemberData { id?: number; name: string; role: string; photoUrl?: string; year?: string; order?: number; category?: string; }
 export interface SiteSettings {
     heroTitle?: string; heroSubtitle?: string; heroCta?: string;
     statEventsCount?: string; statEventsLabel?: string;

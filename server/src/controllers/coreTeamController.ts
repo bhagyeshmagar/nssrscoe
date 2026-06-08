@@ -36,8 +36,18 @@ export const updateAssignment = async (req: Request, res: Response) => {
 
 export const removeAssignment = async (req: Request, res: Response) => {
     try {
-        const adminId = (req as AuthRequest).user!.id;
+        const authReq = req as AuthRequest;
+        const adminId = authReq.user!.id;
         await ctService.removeAssignment(Number(req.params.id), adminId);
+        noContent(res);
+    } catch (err) { handleError(res, err); }
+};
+
+export const deleteCustomRole = async (req: Request, res: Response) => {
+    try {
+        const authReq = req as AuthRequest;
+        const adminId = authReq.user!.id;
+        await ctService.deleteCustomRole(Number(req.params.id), adminId);
         noContent(res);
     } catch (err) { handleError(res, err); }
 };

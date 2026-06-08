@@ -2,14 +2,18 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
 
-import { settingsAPI, uploadAPI } from '../services/api';
-import type { SiteSettings } from '../services/api';
+import { settingsAPI, uploadAPI, eventsAPI } from '../services/api';
+import type { SiteSettings, EventData } from '../services/api';
+import { EventsTray } from '../components/home/EventsTray';
+import { Info, Image, Users, FileText, Video, CalendarDays } from 'lucide-react';
 
 const Home = () => {
     const [settings, setSettings] = useState<SiteSettings | null>(null);
     const [loading, setLoading] = useState(true);
-    const [sliderImages, setSliderImages] = useState<{url: string, description: string}[]>([]);
+    const [sliderImages, setSliderImages] = useState<{ url: string, description: string }[]>([]);
     const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
+    const [upcomingEvents, setUpcomingEvents] = useState<EventData[]>([]);
+    const [pastEvents, setPastEvents] = useState<EventData[]>([]);
 
     useEffect(() => {
         const fetchSettings = async () => {
@@ -17,7 +21,7 @@ const Home = () => {
                 const response = await settingsAPI.get();
                 const fetchedSettings = response.data.data;
                 setSettings(fetchedSettings);
-                
+
                 if (fetchedSettings.homeSliderImages) {
                     try {
                         const parsed = JSON.parse(fetchedSettings.homeSliderImages);
@@ -27,6 +31,23 @@ const Home = () => {
                     } catch (e) {
                         console.error('Failed to parse slider images', e);
                     }
+                }
+
+                // Fetch Events
+                try {
+                    const eventsRes = await eventsAPI.getAll();
+                    const allEvents: EventData[] = eventsRes.data.data;
+                    const now = new Date();
+
+                    const upcoming = allEvents.filter(e => new Date(e.date) >= now)
+                        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+                    const past = allEvents.filter(e => new Date(e.date) < now)
+                        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+                    setUpcomingEvents(upcoming);
+                    setPastEvents(past);
+                } catch (e) {
+                    console.error('Error fetching events:', e);
                 }
             } catch (error) {
                 console.error('Error fetching settings:', error);
@@ -53,11 +74,11 @@ const Home = () => {
     // Auto-advance slider
     useEffect(() => {
         if (sliderImages.length <= 1) return;
-        
+
         const interval = setInterval(() => {
             setCurrentSlideIndex((prev) => (prev + 1) % sliderImages.length);
         }, 5000); // Change slide every 5 seconds
-        
+
         return () => clearInterval(interval);
     }, [sliderImages]);
 
@@ -99,11 +120,10 @@ const Home = () => {
                             <button
                                 key={index}
                                 onClick={() => setCurrentSlideIndex(index)}
-                                className={`w-3 h-3 rounded-full transition-all duration-300 ${
-                                    index === currentSlideIndex 
-                                        ? 'bg-white scale-125' 
+                                className={`w-3 h-3 rounded-full transition-all duration-300 ${index === currentSlideIndex
+                                        ? 'bg-white scale-125'
                                         : 'bg-white/50 hover:bg-white/80'
-                                }`}
+                                    }`}
                                 aria-label={`Go to slide ${index + 1}`}
                             />
                         ))}
@@ -151,7 +171,7 @@ const Home = () => {
                         <p className="text-gray-600">{settings?.statImpactLabel || 'Lives Impacted'}</p>
                     </motion.div>
                 </div>
-                
+
                 {/* Moved CTA Button */}
                 <div className="mt-12 text-center">
                     <Link
@@ -160,6 +180,51 @@ const Home = () => {
                     >
                         {settings?.heroCta || 'Join Us / Register'}
                     </Link>
+                </div>
+            </section>
+
+            {/* Updates & Events */}
+            <section className="py-16 bg-white">
+                <div className="max-w-7xl mx-auto px-4">
+                    <div className="text-center mb-12">
+                        <h2 className="text-3xl font-bold text-nss-blue mb-4">Updates & Events</h2>
+                        <div className="w-24 h-1 bg-nss-red mx-auto"></div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <EventsTray title="Upcoming Events" events={upcomingEvents} emptyMessage="No upcoming events currently scheduled." />
+                        <EventsTray title="Past Events" events={pastEvents} emptyMessage="No past events to display." />
+                    </div>
+                </div>
+            </section>
+
+            {/* Discover More */}
+            <section className="py-16 bg-orange-50">
+                <div className="max-w-7xl mx-auto px-4">
+                    <div className="text-center mb-12">
+                        <h2 className="text-3xl font-bold text-nss-red mb-4">Discover More</h2>
+                        <div className="w-24 h-1 bg-nss-blue mx-auto"></div>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {[
+                            { title: 'About Us', icon: Info, link: '/about' },
+                            { title: 'Gallery', icon: Image, link: '/gallery' },
+                            { title: 'Volunteering', icon: Users, link: '/volunteering' },
+                            { title: 'History', icon: CalendarDays, link: '/about/history' },
+                            { title: 'Reports', icon: FileText, link: '/events/reports' },
+                            { title: 'Videos & Reels', icon: Video, link: '/gallery/videos' }
+                        ].map((item, index) => (
+                            <Link
+                                key={index}
+                                to={item.link}
+                                className="flex items-center gap-4 bg-white p-6 rounded-lg shadow-md border-l-4 border-nss-red hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group"
+                            >
+                                <div className="p-3 bg-red-50 rounded-full text-nss-red group-hover:bg-nss-red group-hover:text-white transition-colors duration-300">
+                                    <item.icon size={24} />
+                                </div>
+                                <span className="font-bold text-gray-800 text-lg group-hover:text-nss-blue transition-colors duration-300">{item.title}</span>
+                            </Link>
+                        ))}
+                    </div>
                 </div>
             </section>
         </div>

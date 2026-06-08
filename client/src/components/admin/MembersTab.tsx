@@ -3,7 +3,7 @@ import { membersAPI, uploadAPI } from '../../services/api';
 import type { MemberData } from '../../services/api';
 
 export const MembersTab = ({ members, onRefresh, showForm, setShowForm, editingItem, setEditingItem }: any) => {
-    const [formData, setFormData] = useState<MemberData>({ name: '', role: '', photoUrl: '', year: '' });
+    const [formData, setFormData] = useState<MemberData>({ name: '', role: '', photoUrl: '', year: '', order: 0 });
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [uploading, setUploading] = useState(false);
     const [photoPreview, setPhotoPreview] = useState<string>('');
@@ -11,7 +11,7 @@ export const MembersTab = ({ members, onRefresh, showForm, setShowForm, editingI
     useEffect(() => {
         if (editingItem) {
              
-            setFormData({ name: editingItem.name, role: editingItem.role, photoUrl: editingItem.photoUrl || '', year: editingItem.year || '' });
+            setFormData({ name: editingItem.name, role: editingItem.role, photoUrl: editingItem.photoUrl || '', year: editingItem.year || '', order: editingItem.order || 0 });
             setPhotoPreview(editingItem.photoUrl ? uploadAPI.getFullUrl(editingItem.photoUrl) : '');
             setShowForm(true);
         }
@@ -71,7 +71,7 @@ export const MembersTab = ({ members, onRefresh, showForm, setShowForm, editingI
     const resetForm = () => {
         setShowForm(false);
         setEditingItem(null);
-        setFormData({ name: '', role: '', photoUrl: '', year: '' });
+        setFormData({ name: '', role: '', photoUrl: '', year: '', order: 0 });
         setSelectedFile(null);
         if (photoPreview && photoPreview.startsWith('blob:')) {
             URL.revokeObjectURL(photoPreview);
@@ -97,41 +97,111 @@ export const MembersTab = ({ members, onRefresh, showForm, setShowForm, editingI
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <input type="text" placeholder="Name" required value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} className="border rounded px-3 py-2" />
+                            <div>
                             <select
                                 required
-                                value={formData.role}
-                                onChange={e => setFormData({ ...formData, role: e.target.value })}
-                                className="border rounded px-3 py-2 bg-white"
+                                value={
+                                    [
+                                        'Institute Officer',
+                                        'Principal',
+                                        'NSS Program Officer',
+                                        'NSS Representatives - Boys Representative',
+                                        'NSS Representatives - Girls Representative',
+                                        'Department Coordinator - Computer Engineering',
+                                        'Department Coordinator - Computer Science and Business Systems',
+                                        'Department Coordinator - Information Technology',
+                                        'Department Coordinator - Electronics and telecommunication',
+                                        'Department Coordinator - Electrical Engineering',
+                                        'Department Coordinator - Automation and Robotics',
+                                        'Department Coordinator - Mechanical engineering',
+                                        'Department Coordinator - Civil Engineering',
+                                        'Department Coordinator - Bachelor of Computer Applications department',
+                                        'Portfolio Lead - Technical team Lead',
+                                        'Portfolio Lead - Event Management team Lead',
+                                        'Portfolio Lead - Social Media team Lead',
+                                        'Portfolio Lead - Cultural team Lead',
+                                        'Portfolio Lead - Graphics team Lead',
+                                        'Portfolio Lead - Documentation team Lead',
+                                        'Portfolio Lead - PR team Lead',
+                                        'Portfolio Lead - Hospitality team Lead',
+                                        'Portfolio Lead - Decoration team lead',
+                                        ''
+                                    ].includes(formData.role) ? formData.role : 'other'
+                                }
+                                onChange={e => setFormData({ ...formData, role: e.target.value === 'other' ? 'other' : e.target.value })}
+                                className="border rounded px-3 py-2 bg-white w-full"
                             >
                                 <option value="" disabled>Select Role</option>
-                                {[
+                                <optgroup label="Institute Officers">
+                                    <option value="Principal">Principal</option>
+                                    <option value="NSS Program Officer">NSS Program Officer</option>
+                                </optgroup>
+                                <optgroup label="NSS Representatives">
+                                    <option value="NSS Representatives - Boys Representative">Boys Representative</option>
+                                    <option value="NSS Representatives - Girls Representative">Girls Representative</option>
+                                </optgroup>
+                                <optgroup label="Department Coordinators">
+                                    <option value="Department Coordinator - Computer Engineering">Computer Engineering</option>
+                                    <option value="Department Coordinator - Computer Science and Business Systems">Computer Science and Business Systems</option>
+                                    <option value="Department Coordinator - Information Technology">Information Technology</option>
+                                    <option value="Department Coordinator - Electronics and telecommunication">Electronics and telecommunication</option>
+                                    <option value="Department Coordinator - Electrical Engineering">Electrical Engineering</option>
+                                    <option value="Department Coordinator - Automation and Robotics">Automation and Robotics</option>
+                                    <option value="Department Coordinator - Mechanical engineering">Mechanical engineering</option>
+                                    <option value="Department Coordinator - Civil Engineering">Civil Engineering</option>
+                                    <option value="Department Coordinator - Bachelor of Computer Applications department">Bachelor of Computer Applications department</option>
+                                </optgroup>
+                                <optgroup label="Portfolio Leads">
+                                    <option value="Portfolio Lead - Technical team Lead">Technical team Lead</option>
+                                    <option value="Portfolio Lead - Event Management team Lead">Event Management team Lead</option>
+                                    <option value="Portfolio Lead - Social Media team Lead">Social Media team Lead</option>
+                                    <option value="Portfolio Lead - Cultural team Lead">Cultural team Lead</option>
+                                    <option value="Portfolio Lead - Graphics team Lead">Graphics team Lead</option>
+                                    <option value="Portfolio Lead - Documentation team Lead">Documentation team Lead</option>
+                                    <option value="Portfolio Lead - PR team Lead">PR team Lead</option>
+                                    <option value="Portfolio Lead - Hospitality team Lead">Hospitality team Lead</option>
+                                    <option value="Portfolio Lead - Decoration team lead">Decoration team lead</option>
+                                </optgroup>
+                                <option value="other">Other (Custom Institute Officer)</option>
+                            </select>
+                            {formData.role === 'other' || (![
+                                    'Institute Officer',
                                     'Principal',
                                     'NSS Program Officer',
-                                    'Boys Representative',
-                                    'Girls Representative',
+                                    'NSS Representatives - Boys Representative',
+                                    'NSS Representatives - Girls Representative',
                                     'Department Coordinator - Computer Engineering',
                                     'Department Coordinator - Computer Science and Business Systems',
                                     'Department Coordinator - Information Technology',
-                                    'Department Coordinator - Electronics and Telecommunication',
+                                    'Department Coordinator - Electronics and telecommunication',
                                     'Department Coordinator - Electrical Engineering',
                                     'Department Coordinator - Automation and Robotics',
-                                    'Department Coordinator - Mechanical Engineering',
+                                    'Department Coordinator - Mechanical engineering',
                                     'Department Coordinator - Civil Engineering',
-                                    'Department Coordinator - Bachelor of Computer Applications',
-                                    'Portfolio Lead - Event management',
-                                    'Portfolio Lead - PR',
-                                    'Portfolio Lead - Social Media',
-                                    'Portfolio Lead - Graphic design',
-                                    'Portfolio Lead - Documentation',
-                                    'Portfolio Lead - Hospitality',
-                                    'Portfolio Lead - Cultural',
-                                    'Portfolio Lead - Technical',
-                                    'Portfolio Lead - Website'
-                                ].map((role: string) => (
-                                    <option key={role} value={role}>{role}</option>
-                                ))}
-                            </select>
+                                    'Department Coordinator - Bachelor of Computer Applications department',
+                                    'Portfolio Lead - Technical team Lead',
+                                    'Portfolio Lead - Event Management team Lead',
+                                    'Portfolio Lead - Social Media team Lead',
+                                    'Portfolio Lead - Cultural team Lead',
+                                    'Portfolio Lead - Graphics team Lead',
+                                    'Portfolio Lead - Documentation team Lead',
+                                    'Portfolio Lead - PR team Lead',
+                                    'Portfolio Lead - Hospitality team Lead',
+                                    'Portfolio Lead - Decoration team lead',
+                                    ''
+                                ].includes(formData.role)) ? (
+                                <input 
+                                    type="text" 
+                                    placeholder="Enter Custom Role" 
+                                    required 
+                                    value={formData.role === 'other' ? '' : formData.role} 
+                                    onChange={e => setFormData({ ...formData, role: e.target.value })} 
+                                    className="border rounded px-3 py-2 mt-2 w-full" 
+                                />
+                            ) : null}
+                            </div>
                             <input type="text" placeholder="Year (e.g., 2024-25)" value={formData.year} onChange={e => setFormData({ ...formData, year: e.target.value })} className="border rounded px-3 py-2" />
+                            <input type="number" placeholder="Priority / Order" value={formData.order} onChange={e => setFormData({ ...formData, order: parseInt(e.target.value) || 0 })} className="border rounded px-3 py-2" title="Lower number appears first" />
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Photo</label>
                                 <input

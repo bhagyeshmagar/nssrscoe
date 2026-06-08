@@ -39,12 +39,16 @@ const Members = () => {
             subRole = member.role.replace('Department Coordinator - ', '').trim();
         } else if (member.role.startsWith('Portfolio Lead - ')) {
             subRole = member.role.replace('Portfolio Lead - ', '').trim();
+        } else if (member.role.startsWith('NSS Representatives - ')) {
+            subRole = member.role.replace('NSS Representatives - ', '').trim();
         }
 
         if (!acc[baseRole]) {
             acc[baseRole] = { order: member.order || 99, members: [] };
         }
         acc[baseRole].members.push({ ...member, subRole });
+        // Sort members within the group by order
+        acc[baseRole].members.sort((a, b) => (a.order || 99) - (b.order || 99));
         return acc;
     }, {} as Record<string, { order: number, members: (Member & { subRole?: string })[] }>);
 
@@ -72,7 +76,15 @@ const Members = () => {
                 <div className="space-y-12">
                     {/* Show role groups in assigned order */}
                     {Object.keys(groupedMembers)
-                        .sort((a, b) => groupedMembers[a].order - groupedMembers[b].order)
+                        .sort((a, b) => {
+                            const predefinedOrder = ['Institute Officers', 'NSS Program Officer', 'NSS Representatives', 'Department Coordinators', 'Portfolio Leads'];
+                            const indexA = predefinedOrder.indexOf(a);
+                            const indexB = predefinedOrder.indexOf(b);
+                            if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+                            if (indexA !== -1) return -1;
+                            if (indexB !== -1) return 1;
+                            return groupedMembers[a].order - groupedMembers[b].order;
+                        })
                         .map((role) => (
                             <div key={role}>
                                 <h2 className="text-2xl font-bold text-gray-800 mb-6 text-center border-b pb-2">
