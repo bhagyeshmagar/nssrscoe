@@ -48,7 +48,7 @@ jobs:
         working-directory: ./server
         env:
           DATABASE_URL: postgres://postgres:password@localhost:5432/nss_test
-          JWT_SECRET: test_secret
+          JWT_SECRET: dummy_secret_for_ci
           PORT: 5000
         run: npm run test
 
