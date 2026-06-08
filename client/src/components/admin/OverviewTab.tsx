@@ -1,4 +1,5 @@
 import { StatCard } from './Shared';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 
 export const OverviewTab = ({ events, gallery, members }: { events: any[], gallery: any[], members: any[] }) => (
     <div>
@@ -11,27 +12,37 @@ export const OverviewTab = ({ events, gallery, members }: { events: any[], galle
         </div>
 
         <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-white p-6 rounded-lg shadow">
-                <h3 className="text-lg font-semibold mb-4">Recent Events</h3>
-                {events.slice(0, 5).map((event, idx) => (
-                    <div key={idx} className="py-2 border-b last:border-0">
-                        <p className="font-medium">{event.title}</p>
-                        <p className="text-sm text-gray-500">{new Date(event.date).toLocaleDateString()}</p>
+            <Card>
+                <CardHeader>
+                    <CardTitle className="text-lg">Recent Events</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="space-y-4">
+                        {events.slice(0, 5).map((event, idx) => (
+                            <div key={idx} className="pb-4 border-b last:border-0 last:pb-0">
+                                <p className="font-medium text-gray-900">{event.title}</p>
+                                <p className="text-sm text-muted-foreground">{new Date(event.date).toLocaleDateString()}</p>
+                            </div>
+                        ))}
+                        {events.length === 0 && <p className="text-muted-foreground">No events yet</p>}
                     </div>
-                ))}
-                {events.length === 0 && <p className="text-gray-500">No events yet</p>}
-            </div>
+                </CardContent>
+            </Card>
 
-            <div className="bg-white p-6 rounded-lg shadow">
-                <h3 className="text-lg font-semibold mb-4">Quick Actions</h3>
-                <div className="space-y-2">
-                    <p className="text-gray-600">- Go to <strong>Events</strong> tab to manage events</p>
-                    <p className="text-gray-600">- Go to <strong>Registrations</strong> to view event volunteers</p>
-                    <p className="text-gray-600">- Go to <strong>Gallery</strong> tab to add photos</p>
-                    <p className="text-gray-600">- Go to <strong>Members</strong> tab to update team</p>
-                    <p className="text-gray-600">- Go to <strong>Settings</strong> to customize homepage</p>
-                </div>
-            </div>
+            <Card>
+                <CardHeader>
+                    <CardTitle className="text-lg">Quick Actions</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="space-y-3">
+                        <p className="text-muted-foreground">- Go to <strong className="text-gray-900">Events</strong> tab to manage events</p>
+                        <p className="text-muted-foreground">- Go to <strong className="text-gray-900">Registrations</strong> to view event volunteers</p>
+                        <p className="text-muted-foreground">- Go to <strong className="text-gray-900">Gallery</strong> tab to add photos</p>
+                        <p className="text-muted-foreground">- Go to <strong className="text-gray-900">Members</strong> tab to update team</p>
+                        <p className="text-muted-foreground">- Go to <strong className="text-gray-900">Settings</strong> to customize homepage</p>
+                    </div>
+                </CardContent>
+            </Card>
         </div>
     </div>
 );

@@ -28,7 +28,7 @@ export const CoreTeamTab = ({ years, currentAY }: { years: AcademicYear[]; curre
             setAssignments(aRes.data.data);
             setRoles(rRes.data.data);
             setVols(vRes.data.data?.data || []);
-        } catch { }
+        } catch (e) { console.error(e); }
     }, [selectedAyId]);
 
     useEffect(() => { load(); }, [load]);

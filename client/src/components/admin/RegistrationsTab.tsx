@@ -1,21 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { registrationsAPI } from '../../services/api';
 import type { EventRegistration } from '../../services/api';
 
-export const RegistrationsTab = ({ events }: { events: any[] }) => {
+export const RegistrationsTab = ({ events }: { events: Array<any> }) => {
     const [selectedEventId, setSelectedEventId] = useState<string>('');
     const [registrations, setRegistrations] = useState<EventRegistration[]>([]);
     const [loading, setLoading] = useState(false);
 
-    useEffect(() => {
-        if (selectedEventId) {
-            fetchRegistrations(Number(selectedEventId));
-        } else {
-            setRegistrations([]);
-        }
-    }, [selectedEventId]);
-
-    const fetchRegistrations = async (eventId: number) => {
+    const fetchRegistrations = useCallback(async (eventId: number) => {
         setLoading(true);
         try {
             const response = await registrationsAPI.getByEventId(eventId);
@@ -24,7 +16,15 @@ export const RegistrationsTab = ({ events }: { events: any[] }) => {
             console.error('Error fetching registrations:', error);
         }
         setLoading(false);
-    };
+    }, []);
+
+    useEffect(() => {
+        if (selectedEventId) {
+            fetchRegistrations(Number(selectedEventId));
+        } else {
+            setRegistrations([]);
+        }
+    }, [selectedEventId, fetchRegistrations]);
 
     return (
         <div>

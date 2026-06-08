@@ -31,6 +31,7 @@ export const SettingsTab = ({ settings, onRefresh }: { settings: SiteSettings | 
 
     useEffect(() => {
         if (settings) {
+             
             setFormData({
                 ...settings,
                 homeSliderImages: settings.homeSliderImages || '[]'

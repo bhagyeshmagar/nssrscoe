@@ -70,14 +70,14 @@ const AdminDashboard = () => {
     const [years, setYears] = useState<AcademicYear[]>([]);
     const [currentAY, setCurrentAY] = useState<AcademicYear | null>(null);
 
-    const [events, setEvents] = useState<any[]>([]);
-    const [gallery, setGallery] = useState<any[]>([]);
-    const [members, setMembers] = useState<any[]>([]);
+    const [events, setEvents] = useState<unknown[]>([]);
+    const [gallery, setGallery] = useState<unknown[]>([]);
+    const [members, setMembers] = useState<unknown[]>([]);
     const [settings, setSettings] = useState<SiteSettings | null>(null);
 
     const [showEventForm, setShowEventForm] = useState(false);
     const [showGalleryForm, setShowGalleryForm] = useState(false);
-    const [editingItem, setEditingItem] = useState<any>(null);
+    const [editingItem, setEditingItem] = useState<unknown>(null);
     const tabGroups = getTabGroups(isSuperadmin);
 
     const loadYears = useCallback(async () => {
@@ -93,7 +93,7 @@ const AdminDashboard = () => {
         } catch { setYears([]); }
     }, []);
 
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+     
     useEffect(() => { loadYears(); }, [loadYears]);
 
     const fetchSiteData = useCallback(async () => {
@@ -102,16 +102,16 @@ const AdminDashboard = () => {
         setLoading(true);
         try {
             switch (activeTab) {
-                case 'overview': { const [eR, gR, mR] = await Promise.all([eventsAPI.getAll(), galleryAPI.getAll(), membersAPI.getAll()]); setEvents(eR.data.data || []); setGallery(gR.data.data || []); setMembers(mR.data.data || []); break; }
-                case 'events': { const r = await eventsAPI.getAll(); setEvents(r.data.data || []); break; }
-                case 'gallery': { const r = await galleryAPI.getAll(); setGallery(r.data.data || []); break; }
-                case 'settings': { const r = await settingsAPI.get(); setSettings(r.data.data as any); break; }
+                case 'overview': { const [eR, gR, mR] = await Promise.all([eventsAPI.getAll(), galleryAPI.getAll(), membersAPI.getAll()]); setEvents((eR.data.data as unknown[]) || []); setGallery((gR.data.data as unknown[]) || []); setMembers((mR.data.data as unknown[]) || []); break; }
+                case 'events': { const r = await eventsAPI.getAll(); setEvents((r.data.data as unknown[]) || []); break; }
+                case 'gallery': { const r = await galleryAPI.getAll(); setGallery((r.data.data as unknown[]) || []); break; }
+                case 'settings': { const r = await settingsAPI.get(); setSettings(r.data.data as SiteSettings); break; }
             }
         } catch (e) { console.error('fetchSiteData:', e); }
         setLoading(false);
     }, [activeTab]);
 
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+     
     useEffect(() => { fetchSiteData(); }, [fetchSiteData]);
 
     return (

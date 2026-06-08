@@ -14,8 +14,8 @@ export const MyAttendanceTab = () => {
                 const res = await volunteerProfileAPI.getMyAttendance();
                 const data = res.data.data;
                 setAttendanceList(data || []);
-            } catch (err: any) {
-                console.error('MyAttendance error:', err.response?.data || err);
+            } catch (err: unknown) {
+                console.error('MyAttendance error:', (err as { response?: { data?: unknown } }).response?.data || err);
                 toast.error('Failed to load attendance');
             } finally {
                 setLoading(false);
@@ -61,7 +61,7 @@ export const MyAttendanceTab = () => {
                 </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow overflow-hidden">
+            <div className="bg-white rounded-xl shadow overflow-x-auto">
                 <table className="w-full text-left text-sm">
                     <thead className="bg-gray-50 border-b">
                         <tr>

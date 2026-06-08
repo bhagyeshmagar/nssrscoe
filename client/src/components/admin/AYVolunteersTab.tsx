@@ -38,7 +38,7 @@ export const AYVolunteersTab = ({ years, currentAY }: { years: AcademicYear[]; c
             setVols(vRes.data.data?.data || []);
             setTotalPages(vRes.data.meta?.totalPages || 1);
             setStats(sRes.data.data);
-        } catch { }
+        } catch (e) { console.error(e); }
     }, [selectedAyId, filter, page]);
 
     useEffect(() => { load(); }, [load]);

@@ -1,0 +1,85 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  backend-tests:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: nss_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        working-directory: ./server
+        run: npm ci
+
+      - name: Type check backend
+        working-directory: ./server
+        run: npm run build
+
+      - name: Run Backend Tests
+        working-directory: ./server
+        env:
+          DATABASE_URL: postgres://postgres:password@localhost:5432/nss_test
+          JWT_SECRET: test_secret
+          PORT: 5000
+        run: npm run test
+
+  frontend-tests:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        working-directory: ./client
+        run: npm ci
+
+      - name: Run Linter
+        working-directory: ./client
+        run: npm run lint
+
+      - name: Run Unit Tests
+        working-directory: ./client
+        run: npm run test -- --run
+
+      - name: Install Playwright Browsers
+        working-directory: ./client
+        run: npx playwright install --with-deps
+
+      - name: Run E2E Tests
+        working-directory: ./client
+        run: npm run test:e2e

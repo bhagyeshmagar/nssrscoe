@@ -28,7 +28,7 @@ export const NotificationsTab = () => {
                 socket.off('new_notification');
             }
         };
-    }, []);
+    }, [addNotification, fetchNotifications]);
 
     return (
         <div className="bg-white p-6 rounded-lg shadow-sm">

@@ -41,7 +41,9 @@ export const MeetingsTab = ({ years, currentAY }: { years: AcademicYear[], curre
         setLoading(false);
     };
 
+     
     useEffect(() => {
+         
         loadMeetings();
     }, [selectedAyId]);
 

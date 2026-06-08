@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { adminsAPI } from '../../services/api';
 import { useFlash } from './Shared';
 
@@ -7,19 +7,19 @@ export const ProfileTab = () => {
     const [loading, setLoading] = useState(true);
     const { msg, flash } = useFlash();
 
-    const loadProfile = async () => {
+    const loadProfile = useCallback(async () => {
         try {
             setLoading(true);
             const { data } = await adminsAPI.getMe();
             setForm({ username: data.data.username, password: '' });
-        } catch (e: any) {
+        } catch {
             flash('err', 'Failed to load profile');
         } finally {
             setLoading(false);
         }
-    };
+    }, [flash]);
 
-    useEffect(() => { loadProfile(); }, []);
+    useEffect(() => { loadProfile(); }, [loadProfile]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();

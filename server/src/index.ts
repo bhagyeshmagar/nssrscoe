@@ -98,14 +98,20 @@ app.use('/api',               notificationRoutes);  // handles /volunteers/me/no
 // Error handling middleware
 app.use(errorHandler);
 
-const server = http.createServer(app);
+export const server = http.createServer(app);
 
 // Initialize Socket.io
 initSocket(server);
 
 // Start Cron Jobs
-startCronJobs();
+if (process.env.NODE_ENV !== 'test') {
+    startCronJobs();
+}
 
-server.listen(port, async () => {
-    console.log(`⚡️[server]: Server is running at http://localhost:${port}`);
-});
+if (process.env.NODE_ENV !== 'test') {
+    server.listen(port, async () => {
+        console.log(`⚡️[server]: Server is running at http://localhost:${port}`);
+    });
+}
+
+export default app;

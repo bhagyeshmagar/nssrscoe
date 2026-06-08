@@ -5,6 +5,7 @@ import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import ProtectedRoute from './components/ProtectedRoute';
 import SplashScreen from './components/SplashScreen';
+import PWAPrompt from './components/PWAPrompt';
 
 // Lazy loaded pages for performance optimization
 const Home = lazy(() => import('./pages/Home'));
@@ -42,6 +43,7 @@ function App() {
         {showSplash && <SplashScreen onComplete={() => setShowSplash(false)} />}
       </AnimatePresence>
       <div className="flex flex-col min-h-screen">
+        <PWAPrompt />
         <Navbar />
         <main className="flex-grow">
           <Suspense fallback={<PageLoader />}>

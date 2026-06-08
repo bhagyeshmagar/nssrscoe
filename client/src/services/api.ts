@@ -36,7 +36,9 @@ api.interceptors.response.use(
     (error) => {
         if (error.response?.status === 401) {
             useAuthStore.getState().clearAuth();
-            window.location.href = '/login';
+            if (window.location.pathname !== '/login') {
+                window.location.href = '/login';
+            }
         }
         return Promise.reject(error);
     }
@@ -233,7 +235,7 @@ export const notificationsAPI = {
 
 // ── Core Team Dashboard ───────────────────────────────────────────────────────
 export const coreTeamDashboardAPI = {
-    getDashboard:       () => api.get<{ volunteers: any[] }>('/core-team-dashboard/dashboard'),
+    getDashboard:       () => api.get<{ volunteers: unknown[] }>('/core-team-dashboard/dashboard'),
 };
 
 // ── Existing APIs (unchanged) ─────────────────────────────────────────────────
@@ -284,13 +286,13 @@ export const uploadAPI = {
         const formData = new FormData();
         formData.append('file', file);
         const response = await api.post('/upload/single', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
-        return response.data as any;
+        return (response.data as any) as { url: string };
     },
     uploadMultiple: async (files: File[]): Promise<{ files: { url: string }[] }> => {
         const formData = new FormData();
         files.forEach(file => formData.append('files', file));
         const response = await api.post('/upload/multiple', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
-        return response.data as any;
+        return (response.data as any) as { files: { url: string }[] };
     },
     getFullUrl: (path: string) => {
         if (!path) return '';
@@ -384,6 +386,7 @@ export interface VolunteerData {
     academicYearId: number;
     createdAt: string;
     eventsAttendedCount?: number;
+    profilePhotoUrl?: string;
 }
 
 export interface CreateVolunteerData {

@@ -6,7 +6,7 @@ import { coreTeamDashboardAPI, decodeToken } from '../services/api';
 const CoreTeamDashboard = () => {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
-    const [volunteers, setVolunteers] = useState<any[]>([]);
+    const [volunteers, setVolunteers] = useState<unknown[]>([]);
     const [error, setError] = useState<string | null>(null);
 
     const { token, clearAuth } = useAuthStore();
@@ -29,9 +29,10 @@ const CoreTeamDashboard = () => {
         try {
             const res = await coreTeamDashboardAPI.getDashboard();
             setVolunteers(res.data.data.volunteers);
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error(err);
-            if (err.response?.status === 401 || err.response?.status === 403) {
+            const axiosErr = err as { response?: { status: number } };
+            if (axiosErr.response?.status === 401 || axiosErr.response?.status === 403) {
                 setError('Access denied. You are not assigned to the core team for the current academic year.');
             } else {
                 setError('Failed to load dashboard data.');
@@ -40,7 +41,9 @@ const CoreTeamDashboard = () => {
         setLoading(false);
     };
 
+     
     useEffect(() => {
+         
         loadData();
     }, []);
 
@@ -99,7 +102,7 @@ const CoreTeamDashboard = () => {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {volunteers.map(v => (
+                                    {(volunteers as { id: number; name: string; email: string; status: string; profile?: { phoneNo?: string } }[]).map(v => (
                                         <tr key={v.id} className="border-b">
                                             <td className="px-4 py-3 font-medium text-gray-900">{v.name}</td>
                                             <td className="px-4 py-3">{v.email}</td>

@@ -31,7 +31,7 @@ const Members = () => {
 
     // Group members by category
     const groupedMembers = members.reduce((acc, member) => {
-        let baseRole = member.category || 'Department Coordinator';
+        const baseRole = member.category || 'Department Coordinator';
         let subRole = member.role;
 
         // Remove prefixes for cleaner display

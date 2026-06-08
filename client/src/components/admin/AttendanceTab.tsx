@@ -17,6 +17,8 @@ export const AttendanceTab = ({ years, currentAY }: { years: AcademicYear[]; cur
     const load = useCallback(async () => {
         if (!selectedAyId) return;
         try {
+            const selectedAY = years.find((y: any) => y.id === selectedAyId);
+
             const [eRes, vRes] = await Promise.all([
                 eventsAPI.getAll(),
                 volunteersAPI.getByAY(selectedAyId, { status: 'regular', isActive: true })
@@ -36,7 +38,7 @@ export const AttendanceTab = ({ years, currentAY }: { years: AcademicYear[]; cur
                 setEventsList((eRes.data.data as any[]).filter(ev => ev.type === 'past' || ev.type === 'today'));
             }
             setVolunteersList(vRes.data.data?.data || []);
-        } catch { }
+        } catch (e) { console.error(e); }
     }, [selectedAyId, years]);
 
     useEffect(() => { load(); }, [load]);

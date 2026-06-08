@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { volunteerProfileAPI, uploadAPI, DEPARTMENTS } from '../../services/api';
 import type { VolunteerProfileData } from '../../services/api';
 const ACADEMIC_YEARS = ['FY', 'SY', 'TY', 'B-Tech'];
@@ -35,14 +35,10 @@ export const ProfileTab = ({ setMessage }: { setMessage: (msg: { type: 'success'
         portfolioChoices: '',
     });
 
-    useEffect(() => {
-        fetchProfile();
-    }, []);
-
-    const fetchProfile = async () => {
+    const fetchProfile = useCallback(async () => {
         try {
             const response = await volunteerProfileAPI.getMyProfile();
-            const data = (response.data as any).data || response.data;
+            const data = (response.data as { data?: any }).data || response.data;
             if (data.profile) {
                 setHasProfile(true);
                 setProfile({
@@ -66,20 +62,24 @@ export const ProfileTab = ({ setMessage }: { setMessage: (msg: { type: 'success'
             } else {
                 setHasProfile(false);
                 setIsEditing(true); // No profile, start in edit mode
-                setProfile((prev: any) => ({
+                setProfile((prev) => ({
                     ...prev,
                     emailId: data.email || '',
                     department: data.department || '',
                     fullName: data.name || ''
                 }));
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error fetching profile:', error);
             setMessage({ type: 'error', text: 'Failed to load profile' });
         } finally {
             setLoading(false);
         }
-    };
+    }, [setMessage]);
+
+    useEffect(() => {
+        fetchProfile();
+    }, [fetchProfile]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -119,9 +119,9 @@ export const ProfileTab = ({ setMessage }: { setMessage: (msg: { type: 'success'
         setUploadingFile(true);
         try {
             const response = await uploadAPI.uploadFile(file);
-            setProfile((prev: any) => ({ ...prev, marksheetUrl: response.url }));
+            setProfile((prev) => ({ ...prev, marksheetUrl: response.url }));
             setMessage({ type: 'success', text: 'Marksheet uploaded successfully!' });
-        } catch (error) {
+        } catch (error: any) {
             console.error('Upload error:', error);
             setMessage({ type: 'error', text: 'Failed to upload file' });
         } finally {
@@ -149,9 +149,9 @@ export const ProfileTab = ({ setMessage }: { setMessage: (msg: { type: 'success'
         setUploadingFile(true);
         try {
             const response = await uploadAPI.uploadFile(file);
-            setProfile((prev: any) => ({ ...prev, profilePhotoUrl: response.url }));
+            setProfile((prev) => ({ ...prev, profilePhotoUrl: response.url }));
             setMessage({ type: 'success', text: 'Profile photo uploaded successfully!' });
-        } catch (error) {
+        } catch (error: any) {
             console.error('Upload error:', error);
             setMessage({ type: 'error', text: 'Failed to upload photo' });
         } finally {
@@ -269,7 +269,7 @@ export const ProfileTab = ({ setMessage }: { setMessage: (msg: { type: 'success'
                     <input
                         type="text"
                         value={profile.fullName}
-                        onChange={(e) => setProfile((prev: any) => ({ ...prev, fullName: e.target.value }))}
+                        onChange={(e) => setProfile((prev) => ({ ...prev, fullName: e.target.value }))}
                         className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-nss-blue focus:border-nss-blue outline-none transition"
                         placeholder="Enter your full name"
                         required
@@ -283,7 +283,7 @@ export const ProfileTab = ({ setMessage }: { setMessage: (msg: { type: 'success'
                     <input
                         type="text"
                         value={profile.prnNo}
-                        onChange={(e) => setProfile((prev: any) => ({ ...prev, prnNo: e.target.value }))}
+                        onChange={(e) => setProfile((prev) => ({ ...prev, prnNo: e.target.value }))}
                         className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-nss-blue focus:border-nss-blue outline-none transition"
                         placeholder="Enter PRN number"
                         required
@@ -296,7 +296,7 @@ export const ProfileTab = ({ setMessage }: { setMessage: (msg: { type: 'success'
                     </label>
                     <select
                         value={profile.department}
-                        onChange={(e) => setProfile((prev: any) => ({ ...prev, department: e.target.value }))}
+                        onChange={(e) => setProfile((prev) => ({ ...prev, department: e.target.value }))}
                         className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-nss-blue focus:border-nss-blue outline-none transition"
                         required
                     >
@@ -313,7 +313,7 @@ export const ProfileTab = ({ setMessage }: { setMessage: (msg: { type: 'success'
                     </label>
                     <select
                         value={profile.collegeYearAtEnrollment}
-                        onChange={(e) => setProfile((prev: any) => ({ ...prev, collegeYearAtEnrollment: e.target.value }))}
+                        onChange={(e) => setProfile((prev) => ({ ...prev, collegeYearAtEnrollment: e.target.value }))}
                         className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-nss-blue focus:border-nss-blue outline-none transition"
                         required
                     >
@@ -330,7 +330,7 @@ export const ProfileTab = ({ setMessage }: { setMessage: (msg: { type: 'success'
                     </label>
                     <select
                         value={profile.nssYear || ''}
-                        onChange={(e) => setProfile((prev: any) => ({ ...prev, nssYear: parseInt(e.target.value) || undefined }))}
+                        onChange={(e) => setProfile((prev) => ({ ...prev, nssYear: parseInt(e.target.value) || undefined }))}
                         className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-nss-blue focus:border-nss-blue outline-none transition"
                         required
                     >
@@ -346,7 +346,7 @@ export const ProfileTab = ({ setMessage }: { setMessage: (msg: { type: 'success'
                     <input
                         type="text"
                         value={profile.cgpa}
-                        onChange={(e) => setProfile((prev: any) => ({ ...prev, cgpa: e.target.value }))}
+                        onChange={(e) => setProfile((prev) => ({ ...prev, cgpa: e.target.value }))}
                         className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-nss-blue focus:border-nss-blue outline-none transition"
                         placeholder="e.g. 8.5"
                     />
@@ -357,7 +357,7 @@ export const ProfileTab = ({ setMessage }: { setMessage: (msg: { type: 'success'
                     <input
                         type="text"
                         value={profile.eligibilityNo}
-                        onChange={(e) => setProfile((prev: any) => ({ ...prev, eligibilityNo: e.target.value }))}
+                        onChange={(e) => setProfile((prev) => ({ ...prev, eligibilityNo: e.target.value }))}
                         className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-nss-blue focus:border-nss-blue outline-none transition"
                         placeholder="Enter eligibility number"
                     />
@@ -368,7 +368,7 @@ export const ProfileTab = ({ setMessage }: { setMessage: (msg: { type: 'success'
                     <input
                         type="text"
                         value={profile.religion}
-                        onChange={(e) => setProfile((prev: any) => ({ ...prev, religion: e.target.value }))}
+                        onChange={(e) => setProfile((prev) => ({ ...prev, religion: e.target.value }))}
                         className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-nss-blue focus:border-nss-blue outline-none transition"
                         placeholder="Enter religion"
                     />
@@ -379,7 +379,7 @@ export const ProfileTab = ({ setMessage }: { setMessage: (msg: { type: 'success'
                     <input
                         type="text"
                         value={profile.caste}
-                        onChange={(e) => setProfile((prev: any) => ({ ...prev, caste: e.target.value }))}
+                        onChange={(e) => setProfile((prev) => ({ ...prev, caste: e.target.value }))}
                         className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-nss-blue focus:border-nss-blue outline-none transition"
                         placeholder="Enter caste"
                     />
@@ -389,7 +389,7 @@ export const ProfileTab = ({ setMessage }: { setMessage: (msg: { type: 'success'
                     <label className="block text-sm font-medium text-gray-700 mb-2">Caste Category</label>
                     <select
                         value={profile.casteCategory}
-                        onChange={(e) => setProfile((prev: any) => ({ ...prev, casteCategory: e.target.value }))}
+                        onChange={(e) => setProfile((prev) => ({ ...prev, casteCategory: e.target.value }))}
                         className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-nss-blue focus:border-nss-blue outline-none transition"
                     >
                         <option value="">Select Category</option>
@@ -406,7 +406,7 @@ export const ProfileTab = ({ setMessage }: { setMessage: (msg: { type: 'success'
                     <input
                         type="tel"
                         value={profile.phoneNo}
-                        onChange={(e) => setProfile((prev: any) => ({ ...prev, phoneNo: e.target.value }))}
+                        onChange={(e) => setProfile((prev) => ({ ...prev, phoneNo: e.target.value }))}
                         className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-nss-blue focus:border-nss-blue outline-none transition"
                         placeholder="Enter phone number"
                         required
@@ -420,7 +420,7 @@ export const ProfileTab = ({ setMessage }: { setMessage: (msg: { type: 'success'
                     <input
                         type="email"
                         value={profile.emailId}
-                        onChange={(e) => setProfile((prev: any) => ({ ...prev, emailId: e.target.value }))}
+                        onChange={(e) => setProfile((prev) => ({ ...prev, emailId: e.target.value }))}
                         className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-nss-blue focus:border-nss-blue outline-none transition bg-gray-100 text-gray-500 cursor-not-allowed"
                         placeholder="Enter email address"
                         disabled={true}
@@ -434,7 +434,7 @@ export const ProfileTab = ({ setMessage }: { setMessage: (msg: { type: 'success'
                         onChange={(e) => {
                             const currentChoices = profile.portfolioChoices?.split(',') || ['', ''];
                             currentChoices[0] = e.target.value;
-                            setProfile((prev: any) => ({ ...prev, portfolioChoices: currentChoices.join(',') }));
+                            setProfile((prev) => ({ ...prev, portfolioChoices: currentChoices.join(',') }));
                         }}
                         className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-nss-blue focus:border-nss-blue outline-none transition"
                     >
@@ -449,7 +449,7 @@ export const ProfileTab = ({ setMessage }: { setMessage: (msg: { type: 'success'
                         onChange={(e) => {
                             const currentChoices = profile.portfolioChoices?.split(',') || ['', ''];
                             currentChoices[1] = e.target.value;
-                            setProfile((prev: any) => ({ ...prev, portfolioChoices: currentChoices.join(',') }));
+                            setProfile((prev) => ({ ...prev, portfolioChoices: currentChoices.join(',') }));
                         }}
                         className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-nss-blue focus:border-nss-blue outline-none transition"
                     >
@@ -465,7 +465,7 @@ export const ProfileTab = ({ setMessage }: { setMessage: (msg: { type: 'success'
                 </label>
                 <textarea
                     value={profile.experienceText}
-                    onChange={(e) => setProfile((prev: any) => ({ ...prev, experienceText: e.target.value }))}
+                    onChange={(e) => setProfile((prev) => ({ ...prev, experienceText: e.target.value }))}
                     className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-nss-blue focus:border-nss-blue outline-none transition"
                     placeholder="Share your experience working with NSS JSPM RSCOE..."
                     rows={4}

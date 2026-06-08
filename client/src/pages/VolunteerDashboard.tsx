@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { decodeToken } from '../services/api';
 import { connectSocket, disconnectSocket } from '../services/socket';
+import { LogOut } from 'lucide-react';
 
 import { ProfileTab } from '../components/volunteer/ProfileTab';
 import { PasswordTab } from '../components/volunteer/PasswordTab';
@@ -10,11 +11,13 @@ import { VolunteersListTab } from '../components/volunteer/VolunteersListTab';
 import { NotificationsTab } from '../components/volunteer/NotificationsTab';
 import { MyAttendanceTab } from '../components/volunteer/MyAttendanceTab';
 
-type TabType = 'profile' | 'volunteers' | 'notifications' | 'attendance';
+import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 const VolunteerDashboard = () => {
     const navigate = useNavigate();
-    const [activeTab, setActiveTab] = useState<TabType>('profile');
     const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
     const { token, clearAuth } = useAuthStore();
     const [userName] = useState(() => {
@@ -42,81 +45,64 @@ const VolunteerDashboard = () => {
         <div className="min-h-screen bg-gray-50 py-8">
             <div className="max-w-5xl mx-auto px-4">
                 {/* Header */}
-                <div className="bg-white rounded-xl shadow-md p-6 mb-6">
-                    <div className="flex justify-between items-center">
+                <Card className="mb-6 border-gray-100 shadow-sm">
+                    <CardHeader className="flex flex-row items-center justify-between pb-4">
                         <div>
-                            <h1 className="text-2xl font-bold text-nss-blue">Volunteer Dashboard</h1>
-                            <p className="text-gray-500">Welcome, {userName}</p>
+                            <CardTitle className="text-2xl font-bold text-nss-blue">Volunteer Dashboard</CardTitle>
+                            <CardDescription className="text-base mt-1">Welcome, <span className="font-semibold text-gray-700">{userName}</span></CardDescription>
                         </div>
-                        <button
+                        <Button
+                            variant="destructive"
                             onClick={handleLogout}
-                            className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition"
+                            className="bg-red-500 hover:bg-red-600"
                         >
+                            <LogOut className="w-4 h-4 mr-2" />
                             Logout
-                        </button>
-                    </div>
-                </div>
-
-                {/* Tabs */}
-                <div className="bg-white rounded-xl shadow-md mb-6">
-                    <div className="flex border-b">
-                        <button
-                            onClick={() => setActiveTab('profile')}
-                            className={`flex-1 px-6 py-4 text-center font-medium transition ${activeTab === 'profile'
-                                ? 'text-nss-blue border-b-2 border-nss-blue bg-blue-50'
-                                : 'text-gray-500 hover:text-gray-700'
-                                }`}
-                        >
-                            📋 My Profile
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('volunteers')}
-                            className={`flex-1 px-6 py-4 text-center font-medium transition ${activeTab === 'volunteers'
-                                ? 'text-nss-blue border-b-2 border-nss-blue bg-blue-50'
-                                : 'text-gray-500 hover:text-gray-700'
-                                }`}
-                        >
-                            👥 Fellow Volunteers
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('notifications')}
-                            className={`flex-1 px-6 py-4 text-center font-medium transition ${activeTab === 'notifications'
-                                ? 'text-nss-blue border-b-2 border-nss-blue bg-blue-50'
-                                : 'text-gray-500 hover:text-gray-700'
-                                }`}
-                        >
-                            🔔 Notifications
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('attendance')}
-                            className={`flex-1 px-6 py-4 text-center font-medium transition ${activeTab === 'attendance'
-                                ? 'text-nss-blue border-b-2 border-nss-blue bg-blue-50'
-                                : 'text-gray-500 hover:text-gray-700'
-                                }`}
-                        >
-                            📅 Attendance
-                        </button>
-                    </div>
-                </div>
+                        </Button>
+                    </CardHeader>
+                </Card>
 
                 {/* Message */}
                 {message && (
-                    <div className={`mb-6 p-4 rounded-lg ${message.type === 'success' ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-red-50 border border-red-200 text-red-700'
-                        }`}>
-                        {message.text}
-                    </div>
+                    <Alert variant={message.type === 'success' ? 'default' : 'destructive'} className={`mb-6 ${message.type === 'success' ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'}`}>
+                        <AlertDescription>{message.text}</AlertDescription>
+                    </Alert>
                 )}
 
-                {/* Tab Content */}
-                {activeTab === 'profile' && (
-                    <>
+                {/* Tabs */}
+                <Tabs defaultValue="profile" className="w-full">
+                    <TabsList className="w-full justify-start overflow-x-auto bg-white border border-gray-100 shadow-sm rounded-lg p-1 h-auto mb-6 flex-wrap md:flex-nowrap">
+                        <TabsTrigger value="profile" className="flex-1 md:flex-none py-3 px-6 data-[state=active]:bg-blue-50 data-[state=active]:text-nss-blue">
+                            📋 My Profile
+                        </TabsTrigger>
+                        <TabsTrigger value="volunteers" className="flex-1 md:flex-none py-3 px-6 data-[state=active]:bg-blue-50 data-[state=active]:text-nss-blue">
+                            👥 Fellow Volunteers
+                        </TabsTrigger>
+                        <TabsTrigger value="notifications" className="flex-1 md:flex-none py-3 px-6 data-[state=active]:bg-blue-50 data-[state=active]:text-nss-blue">
+                            🔔 Notifications
+                        </TabsTrigger>
+                        <TabsTrigger value="attendance" className="flex-1 md:flex-none py-3 px-6 data-[state=active]:bg-blue-50 data-[state=active]:text-nss-blue">
+                            📅 Attendance
+                        </TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent value="profile" className="space-y-6 mt-0">
                         <ProfileTab setMessage={setMessage} />
                         <PasswordTab setMessage={setMessage} />
-                    </>
-                )}
-                {activeTab === 'volunteers' && <VolunteersListTab />}
-                {activeTab === 'notifications' && <NotificationsTab />}
-                {activeTab === 'attendance' && <MyAttendanceTab />}
+                    </TabsContent>
+                    
+                    <TabsContent value="volunteers" className="mt-0">
+                        <VolunteersListTab />
+                    </TabsContent>
+                    
+                    <TabsContent value="notifications" className="mt-0">
+                        <NotificationsTab />
+                    </TabsContent>
+                    
+                    <TabsContent value="attendance" className="mt-0">
+                        <MyAttendanceTab />
+                    </TabsContent>
+                </Tabs>
             </div>
         </div>
     );

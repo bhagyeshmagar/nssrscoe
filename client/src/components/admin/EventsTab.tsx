@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { eventsAPI, eventImagesAPI, uploadAPI } from '../../services/api';
 import type { EventData, EventImage, AcademicYear } from '../../services/api';
 
-export const EventsTab = ({ events, onRefresh, showForm, setShowForm, editingItem, setEditingItem, years, currentAY }: { events: any[], onRefresh: () => void, showForm: boolean, setShowForm: (val: boolean) => void, editingItem: any, setEditingItem: (val: any) => void, years: AcademicYear[], currentAY: AcademicYear | null }) => {
+export const EventsTab = ({ events, onRefresh, showForm, setShowForm, editingItem, setEditingItem, years, currentAY }: { events: Array<any>, onRefresh: () => void, showForm: boolean, setShowForm: (val: boolean) => void, editingItem: any, setEditingItem: (val: any) => void, years: AcademicYear[], currentAY: AcademicYear | null }) => {
     const [formData, setFormData] = useState<EventData>({
         id: 0, title: '', description: '', date: '', location: '', type: 'upcoming', volunteersCount: 0
     });
@@ -11,6 +11,15 @@ export const EventsTab = ({ events, onRefresh, showForm, setShowForm, editingIte
     const [uploading, setUploading] = useState(false);
     const [existingImages, setExistingImages] = useState<EventImage[]>([]);
     const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+
+    const fetchEventImages = async (eventId: number) => {
+        try {
+            const response = await eventImagesAPI.getByEvent(eventId);
+            setExistingImages(response.data.data || []);
+        } catch (error) {
+            console.error('Error fetching event images:', error);
+        }
+    };
 
     useEffect(() => {
         if (editingItem) {
@@ -34,15 +43,6 @@ export const EventsTab = ({ events, onRefresh, showForm, setShowForm, editingIte
             imagePreviews.forEach(preview => URL.revokeObjectURL(preview));
         };
     }, [imagePreviews]);
-
-    const fetchEventImages = async (eventId: number) => {
-        try {
-            const response = await eventImagesAPI.getByEvent(eventId);
-            setExistingImages(response.data.data || []);
-        } catch (error) {
-            console.error('Error fetching event images:', error);
-        }
-    };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = Array.from(e.target.files || []);

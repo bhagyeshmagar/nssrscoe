@@ -2,7 +2,12 @@ import { useState } from 'react';
 import { toast } from 'react-hot-toast';
 import { useAuthStore } from '../stores/authStore';
 import { authAPI } from '../services/api';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, LockKeyhole, Loader2 } from 'lucide-react';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 const Login = () => {
     const [email, setEmail] = useState('');
@@ -18,7 +23,9 @@ const Login = () => {
 
         try {
             const response = await authAPI.login(email, password);
-            const payload = (response.data as any).data || response.data;
+            type LoginPayload = { token: string; role: 'admin' | 'volunteer'; data?: { token: string; role: 'admin' | 'volunteer' } };
+            const rawData = response.data as unknown as LoginPayload;
+            const payload = rawData.data || rawData;
             useAuthStore.getState().setAuth(payload.token, payload.role);
 
             toast.success('Login successful!');
@@ -37,76 +44,81 @@ const Login = () => {
     };
 
     return (
-        <div className="min-h-[80vh] flex items-center justify-center bg-gradient-to-br from-nss-blue/10 to-nss-red/10">
-            <form onSubmit={handleLogin} className="bg-white p-8 rounded-xl shadow-xl w-96 border border-gray-100">
-                <div className="text-center mb-6">
-                    <div className="w-16 h-16 bg-nss-blue rounded-full mx-auto mb-4 flex items-center justify-center">
-                        <span className="text-2xl text-white">🔐</span>
+        <div className="min-h-[80vh] flex items-center justify-center bg-gradient-to-br from-nss-blue/10 to-nss-red/10 p-4">
+            <Card className="w-full max-w-md shadow-xl border-gray-100">
+                <CardHeader className="text-center space-y-4">
+                    <div className="w-16 h-16 bg-nss-blue rounded-full mx-auto flex items-center justify-center shadow-inner">
+                        <LockKeyhole className="text-white w-8 h-8" />
                     </div>
-                    <h2 className="text-2xl font-bold text-nss-blue">NSS Login</h2>
-                    <p className="text-gray-500 text-sm mt-1">Sign in to access your dashboard</p>
-                </div>
-
-                {error && (
-                    <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
-                        {error}
+                    <div className="space-y-1">
+                        <CardTitle className="text-2xl font-bold text-nss-blue">NSS Login</CardTitle>
+                        <CardDescription>Sign in to access your dashboard</CardDescription>
                     </div>
-                )}
+                </CardHeader>
+                <CardContent>
+                    <form onSubmit={handleLogin} className="space-y-4">
+                        {error && (
+                            <Alert variant="destructive" className="bg-red-50">
+                                <AlertDescription>{error}</AlertDescription>
+                            </Alert>
+                        )}
+                        
+                        <div className="space-y-2">
+                            <Label htmlFor="email">Email / Username</Label>
+                            <Input
+                                id="email"
+                                type="text"
+                                value={email}
+                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)}
+                                placeholder="Enter email or username"
+                                required
+                                className="focus-visible:ring-nss-blue"
+                            />
+                        </div>
+                        
+                        <div className="space-y-2">
+                            <Label htmlFor="password">Password</Label>
+                            <div className="relative">
+                                <Input
+                                    id="password"
+                                    type={showPassword ? "text" : "password"}
+                                    value={password}
+                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
+                                    placeholder="Enter password"
+                                    required
+                                    className="pr-10 focus-visible:ring-nss-blue"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-gray-700 focus:outline-none"
+                                >
+                                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                </button>
+                            </div>
+                        </div>
 
-                <div className="mb-4">
-                    <label className="block text-gray-700 text-sm font-medium mb-2">Email / Username</label>
-                    <input
-                        type="text"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-nss-blue focus:border-nss-blue outline-none transition"
-                        placeholder="Enter email or username"
-                        required
-                    />
-                </div>
-                <div className="mb-6">
-                    <label className="block text-gray-700 text-sm font-medium mb-2">Password</label>
-                    <div className="relative">
-                        <input
-                            type={showPassword ? "text" : "password"}
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            className="w-full border border-gray-300 rounded-lg px-4 py-3 pr-10 focus:ring-2 focus:ring-nss-blue focus:border-nss-blue outline-none transition"
-                            placeholder="Enter password"
-                            required
-                        />
-                        <button
-                            type="button"
-                            onClick={() => setShowPassword(!showPassword)}
-                            className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-gray-700"
+                        <Button 
+                            type="submit" 
+                            disabled={loading} 
+                            className="w-full bg-nss-blue hover:bg-blue-900 transition-colors"
                         >
-                            {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                        </button>
-                    </div>
-                </div>
-                <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full bg-nss-blue text-white py-3 rounded-lg hover:bg-blue-900 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                    {loading ? (
-                        <span className="flex items-center justify-center gap-2">
-                            <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></span>
-                            Signing in...
-                        </span>
-                    ) : 'Sign In'}
-                </button>
-
-                <div className="mt-6 pt-4 border-t border-gray-100">
-                    <p className="text-center text-gray-400 text-xs">
-                        <strong>Admin:</strong> Use your admin username
-                    </p>
-                    <p className="text-center text-gray-400 text-xs mt-1">
-                        <strong>Volunteers:</strong> Use your registered email
-                    </p>
-                </div>
-            </form>
+                            {loading ? (
+                                <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Signing in...
+                                </>
+                            ) : 'Sign In'}
+                        </Button>
+                    </form>
+                </CardContent>
+                <CardFooter className="flex flex-col text-center text-xs text-muted-foreground border-t bg-gray-50/50 px-6 py-4 rounded-b-xl">
+                    <p><strong>Admin:</strong> Use your admin username</p>
+                    <p className="mt-1"><strong>Volunteers:</strong> Use your registered email</p>
+                </CardFooter>
+            </Card>
         </div>
     );
 }
+
 export default Login;

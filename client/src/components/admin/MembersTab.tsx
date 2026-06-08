@@ -10,11 +10,12 @@ export const MembersTab = ({ members, onRefresh, showForm, setShowForm, editingI
 
     useEffect(() => {
         if (editingItem) {
+             
             setFormData({ name: editingItem.name, role: editingItem.role, photoUrl: editingItem.photoUrl || '', year: editingItem.year || '' });
             setPhotoPreview(editingItem.photoUrl ? uploadAPI.getFullUrl(editingItem.photoUrl) : '');
             setShowForm(true);
         }
-    }, [editingItem]);
+    }, [editingItem, setShowForm]);
 
     // Memory cleanup for object URLs
     useEffect(() => {

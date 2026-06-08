@@ -26,7 +26,7 @@ export const SpecialCampsTab = ({ years, currentAY }: { years: AcademicYear[]; c
         try { 
             const r = await specialCampsAPI.getByAY(selectedAyId); 
             setCamps(r.data.data);
-        } catch { } 
+        } catch (e) { console.error(e); } 
     }, [selectedAyId]);
     
     useEffect(() => { load(); }, [load]);
@@ -35,7 +35,7 @@ export const SpecialCampsTab = ({ years, currentAY }: { years: AcademicYear[]; c
         if (!selectedAyId && years.length > 0) {
             setSelectedAyId(currentAY?.id ?? years[0].id);
         }
-    }, [currentAY, years, selectedAyId]);
+    }, [currentAY, years, selectedAyId, setSelectedAyId]);
     
     const handleCreate = async () => {
         try { 
@@ -44,7 +44,7 @@ export const SpecialCampsTab = ({ years, currentAY }: { years: AcademicYear[]; c
             setForm({ name: '', location: '', startDate: '', endDate: '', description: '', volunteerCap: 50 }); 
             flash('ok', 'Camp created.'); 
             load(); 
-        } catch (e: any) { 
+        } catch (err: unknown) { const e = err as { response?: { data?: { message?: string } } }; 
             flash('err', e.response?.data?.message ?? 'Error.'); 
         }
     };
@@ -78,7 +78,7 @@ export const SpecialCampsTab = ({ years, currentAY }: { years: AcademicYear[]; c
             flash('ok', 'Participants updated.');
             setManageCampId(null);
             load();
-        } catch (e: any) {
+        } catch (err: unknown) { const e = err as { response?: { data?: { message?: string } } };
             flash('err', e.response?.data?.message ?? 'Failed to update participants.');
         } finally {
             setSavingParticipants(false);
@@ -91,7 +91,7 @@ export const SpecialCampsTab = ({ years, currentAY }: { years: AcademicYear[]; c
             await specialCampsAPI.finalize(id); 
             flash('ok', 'Finalized.'); 
             load(); 
-        } catch (e: any) { 
+        } catch (err: unknown) { const e = err as { response?: { data?: { message?: string } } }; 
             flash('err', e.response?.data?.message ?? 'Error.'); 
         }
     };
@@ -102,7 +102,7 @@ export const SpecialCampsTab = ({ years, currentAY }: { years: AcademicYear[]; c
             await specialCampsAPI.delete(id); 
             flash('ok', 'Deleted.'); 
             load(); 
-        } catch (e: any) { 
+        } catch (err: unknown) { const e = err as { response?: { data?: { message?: string } } }; 
             flash('err', e.response?.data?.message ?? 'Error.'); 
         }
     };
@@ -115,7 +115,7 @@ export const SpecialCampsTab = ({ years, currentAY }: { years: AcademicYear[]; c
             setUnlockCampId(null);
             setUnlockPassword('');
             load();
-        } catch (e: any) {
+        } catch (err: unknown) { const e = err as { response?: { data?: { message?: string } } };
             flash('err', e.response?.data?.message ?? 'Invalid password or failed to unlock.');
         }
     };
@@ -125,7 +125,7 @@ export const SpecialCampsTab = ({ years, currentAY }: { years: AcademicYear[]; c
 
 
 
-    const sortParticipants = (participants: any[]) => {
+    const sortParticipants = (participants: Array<any>) => {
         const getVal = (p: any, key: string) => {
             if (key === 'snapName') return p.snapName || p.currentName || p.name || '';
             if (key === 'snapDepartment') return p.snapDepartment || p.currentDept || p.department || '';
@@ -171,7 +171,7 @@ export const SpecialCampsTab = ({ years, currentAY }: { years: AcademicYear[]; c
                 const cData = res.data.data;
                 setCamps(prev => prev.map(c => c.id === campId ? { ...c, participants: cData.participants, volunteerCap: cData.volunteerCap } : c));
                 setExpandedCampId(campId);
-            } catch (e) {
+            } catch (_e) {
                 flash('err', 'Failed to load participants.');
             }
         }
@@ -195,8 +195,8 @@ export const SpecialCampsTab = ({ years, currentAY }: { years: AcademicYear[]; c
             {showForm && (
                 <div className="mb-6 bg-white rounded-xl shadow p-6 border border-blue-100">
                     <div className="grid grid-cols-2 gap-4 mb-4">
-                        {[{ k: 'name', l: 'Camp Name' }, { k: 'location', l: 'Location' }].map(f => <div key={f.k}><label className="block text-sm text-gray-600 mb-1">{f.l}</label><input value={(form as any)[f.k]} onChange={e => setForm({ ...form, [f.k]: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" /></div>)}
-                        {[{ k: 'startDate', l: 'Start' }, { k: 'endDate', l: 'End' }].map(f => <div key={f.k}><label className="block text-sm text-gray-600 mb-1">{f.l}</label><input type="date" value={(form as any)[f.k]} onChange={e => setForm({ ...form, [f.k]: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" /></div>)}
+                        {[{ k: 'name', l: 'Camp Name' }, { k: 'location', l: 'Location' }].map(f => <div key={f.k}><label className="block text-sm text-gray-600 mb-1">{f.l}</label><input value={(form as Record<string, any>)[f.k]} onChange={e => setForm({ ...form, [f.k]: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" /></div>)}
+                        {[{ k: 'startDate', l: 'Start' }, { k: 'endDate', l: 'End' }].map(f => <div key={f.k}><label className="block text-sm text-gray-600 mb-1">{f.l}</label><input type="date" value={(form as Record<string, any>)[f.k]} onChange={e => setForm({ ...form, [f.k]: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" /></div>)}
                         <div><label className="block text-sm text-gray-600 mb-1">Volunteer Cap</label><input type="number" min="1" value={form.volunteerCap} onChange={e => setForm({ ...form, volunteerCap: Number(e.target.value) })} className="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" /></div>
                         <div><label className="block text-sm text-gray-600 mb-1">Description</label><input value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" /></div>
                     </div>
@@ -234,9 +234,9 @@ export const SpecialCampsTab = ({ years, currentAY }: { years: AcademicYear[]; c
                                 </button>
                             )}
                         </div>
-                        {expandedCampId === c.id && (c as any).participants && (
+                        {expandedCampId === c.id && (c as unknown as { participants: Array<any>, volunteerCap?: number }).participants && (
                             <div className="mt-4 border-t pt-4">
-                                <h4 className="font-semibold text-gray-700 mb-3">Selected Volunteers ({(c as any).participants.length} / {(c as any).volunteerCap ?? 50})</h4>
+                                <h4 className="font-semibold text-gray-700 mb-3">Selected Volunteers ({(c as unknown as { participants: Array<any>, volunteerCap?: number }).participants.length} / {(c as unknown as { participants: Array<any>, volunteerCap?: number }).volunteerCap ?? 50})</h4>
                                 <div className="overflow-x-auto border rounded-lg">
                                     <table className="w-full text-sm">
                                         <thead className="bg-gray-50">
@@ -248,7 +248,7 @@ export const SpecialCampsTab = ({ years, currentAY }: { years: AcademicYear[]; c
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y">
-                                            {sortParticipants((c as any).participants).map(p => (
+                                            {sortParticipants((c as unknown as { participants: Array<any>, volunteerCap?: number }).participants).map(p => (
                                                 <tr key={p.id} className="hover:bg-gray-50">
                                                     <td className="px-4 py-2">{p.snapName || p.currentName}</td>
                                                     <td className="px-4 py-2">{p.snapDepartment || p.currentDept}</td>
@@ -256,7 +256,7 @@ export const SpecialCampsTab = ({ years, currentAY }: { years: AcademicYear[]; c
                                                     <td className="px-4 py-2">{p.snapNssYear || p.nssYear || '-'}</td>
                                                 </tr>
                                             ))}
-                                            {(c as any).participants.length === 0 && (
+                                            {(c as unknown as { participants: Array<any>, volunteerCap?: number }).participants.length === 0 && (
                                                 <tr><td colSpan={4} className="px-4 py-4 text-center text-gray-500">No volunteers selected yet.</td></tr>
                                             )}
                                         </tbody>

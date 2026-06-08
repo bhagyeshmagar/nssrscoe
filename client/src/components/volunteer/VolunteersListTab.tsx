@@ -35,7 +35,7 @@ export const VolunteersListTab = () => {
                 <p className="text-center text-gray-500 py-8">No active volunteers found.</p>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {allVolunteers.map((volunteer: any) => (
+                    {allVolunteers.map((volunteer) => (
                         <div key={volunteer.id} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
                             <div className="flex items-center gap-3">
                                 {volunteer.profilePhotoUrl ? (
