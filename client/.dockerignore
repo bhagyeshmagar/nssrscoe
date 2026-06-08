@@ -1,0 +1,12 @@
+node_modules
+dist
+.env
+.env.*
+*.log
+coverage
+tests
+e2e
+playwright-report
+test-results
+blob-report
+.DS_Store

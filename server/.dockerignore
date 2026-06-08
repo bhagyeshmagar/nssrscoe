@@ -1,0 +1,9 @@
+node_modules
+dist
+.env
+.env.*
+*.log
+coverage
+tests
+src/__tests__
+.DS_Store
