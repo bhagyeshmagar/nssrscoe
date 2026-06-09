@@ -92,6 +92,49 @@ This sets up PostgreSQL, the Node server, and the Vite client in interconnected 
 
 ## 🏗️ Architecture & Features
 
+### System Architecture
+
+```mermaid
+graph TD
+    %% User Interfaces
+    subgraph Frontend [React Frontend - Vite]
+        UI[Public/Admin Dashboards]
+        State[Zustand State]
+        Router[React Router]
+        Axios[Axios HTTP Client]
+        
+        UI --> State
+        UI --> Router
+        Router --> Axios
+    end
+
+    %% Backend Services
+    subgraph Backend [Node.js + Express Backend]
+        API[Express REST API]
+        Auth[JWT Auth Middleware]
+        Controllers[Controllers]
+        Services[Business Logic & Email/Resend]
+        ORM[Drizzle ORM]
+        
+        Axios -- "HTTP/REST" --> API
+        API --> Auth
+        Auth --> Controllers
+        Controllers --> Services
+        Controllers --> ORM
+    end
+
+    %% Database Layer
+    subgraph Database [PostgreSQL Database]
+        DB[(nss_db)]
+        
+        ORM -- "SQL/TCP" --> DB
+    end
+    
+    %% Users
+    Client((User / Volunteer)) --> UI
+    Admin((Superadmin / Core)) --> UI
+```
+
 ### 1. Academic-Year Scoped Data
 The entire platform is designed around dynamic **Academic Years (AY)** (e.g., *2025-26*). 
 All major entities are strictly scoped to an Academic Year:
