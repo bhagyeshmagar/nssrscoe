@@ -1,5 +1,5 @@
  
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type { AcademicYear } from '../../services/api';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -63,10 +63,10 @@ export const StatCard = ({ title, count, color }: { title: string; count: number
 
 export function useFlash() {
     const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
-    const flash = (type: 'ok' | 'err', text: string) => {
+    const flash = useCallback((type: 'ok' | 'err', text: string) => {
         setMsg({ type, text });
         setTimeout(() => setMsg(null), 4000);
-    };
+    }, []);
     return { msg, flash };
 }
 

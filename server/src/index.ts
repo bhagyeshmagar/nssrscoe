@@ -37,6 +37,7 @@ if (!process.env.JWT_SECRET) {
 }
 
 const app: Express = express();
+app.set('trust proxy', 1);
 const port = process.env.PORT || 5000;
 
 // Security middleware
