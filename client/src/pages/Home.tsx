@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 import { settingsAPI, uploadAPI, eventsAPI } from '../services/api';
 import type { SiteSettings, EventData } from '../services/api';
@@ -8,12 +8,17 @@ import { EventsTray } from '../components/home/EventsTray';
 import { Info, Image, Users, FileText, Video, CalendarDays } from 'lucide-react';
 
 const Home = () => {
+    const navigate = useNavigate();
     const [settings, setSettings] = useState<SiteSettings | null>(null);
     const [loading, setLoading] = useState(true);
-    const [sliderImages, setSliderImages] = useState<{ url: string, description: string }[]>([]);
+    const [sliderImages, setSliderImages] = useState<{ url: string; description: string; eventId?: number }[]>([]);
     const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
     const [upcomingEvents, setUpcomingEvents] = useState<EventData[]>([]);
     const [pastEvents, setPastEvents] = useState<EventData[]>([]);
+    // Popup state for event-linked slides
+    const [showEventPopup, setShowEventPopup] = useState(false);
+    const [popupEventId, setPopupEventId] = useState<number | null>(null);
+    const [popupEventTitle, setPopupEventTitle] = useState('');
 
     useEffect(() => {
         const fetchSettings = async () => {
@@ -97,20 +102,102 @@ const Home = () => {
 
                 {sliderImages.length > 0 ? (
                     <AnimatePresence mode="popLayout">
-                        <motion.img
+                        <motion.div
                             key={currentSlideIndex}
-                            src={uploadAPI.getFullUrl(sliderImages[currentSlideIndex].url)}
-                            alt="Slider Background"
+                            className="absolute inset-0 w-full h-full"
                             initial={{ opacity: 0, scale: 1.05 }}
                             animate={{ opacity: 1, scale: 1 }}
                             exit={{ opacity: 0 }}
                             transition={{ duration: 1.5, ease: "easeInOut" }}
-                            className="absolute inset-0 w-full h-full object-cover"
-                        />
+                        >
+                            {/* Blurred background image */}
+                            <div 
+                                className="absolute inset-0 w-full h-full bg-cover bg-center"
+                                style={{ backgroundImage: `url(${uploadAPI.getFullUrl(sliderImages[currentSlideIndex].url)})` }}
+                            >
+                                <div className="absolute inset-0 backdrop-blur-xl bg-black/40"></div>
+                            </div>
+                            
+                            {/* Foreground uncropped image */}
+                            <img
+                                src={uploadAPI.getFullUrl(sliderImages[currentSlideIndex].url)}
+                                alt="Slider Content"
+                                className="absolute inset-0 w-full h-full object-contain drop-shadow-2xl"
+                            />
+                            {/* Clickable center zone — only if image is linked to an event */}
+                            {sliderImages[currentSlideIndex].eventId && (
+                                <button
+                                    onClick={() => {
+                                        const img = sliderImages[currentSlideIndex];
+                                        if (img.eventId) {
+                                            // Find title from events list
+                                            const allEvents = [...upcomingEvents, ...pastEvents];
+                                            const ev = allEvents.find(e => e.id === img.eventId);
+                                            setPopupEventId(img.eventId);
+                                            setPopupEventTitle(ev?.title ?? 'this event');
+                                            setShowEventPopup(true);
+                                        }
+                                    }}
+                                    className="absolute inset-0 w-full h-full flex items-center justify-center group z-10 cursor-pointer"
+                                    aria-label="View linked event"
+                                >
+                                    {/* Subtle center indicator */}
+                                    <span className="bg-black/40 text-white text-sm font-medium px-4 py-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 backdrop-blur-sm">
+                                        View Event →
+                                    </span>
+                                </button>
+                            )}
+                        </motion.div>
                     </AnimatePresence>
                 ) : null}
 
-                <div className="absolute inset-0 bg-black opacity-20"></div>
+                <div className="absolute inset-0 bg-black opacity-20 pointer-events-none"></div>
+
+                {/* Event Link Popup Modal */}
+                <AnimatePresence>
+                    {showEventPopup && popupEventId && (
+                        <motion.div
+                            className="absolute inset-0 z-30 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => setShowEventPopup(false)}
+                        >
+                            <motion.div
+                                className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full mx-4 text-center"
+                                initial={{ scale: 0.9, y: 20 }}
+                                animate={{ scale: 1, y: 0 }}
+                                exit={{ scale: 0.9, y: 20 }}
+                                onClick={e => e.stopPropagation()}
+                            >
+                                <div className="w-14 h-14 bg-nss-blue/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                                    <span className="text-2xl">🎯</span>
+                                </div>
+                                <h3 className="text-lg font-bold text-gray-800 mb-2">Related Event</h3>
+                                <p className="text-gray-500 text-sm mb-6">
+                                    This slide is linked to: <span className="font-semibold text-gray-700">{popupEventTitle}</span>
+                                </p>
+                                <div className="flex gap-3">
+                                    <button
+                                        onClick={() => setShowEventPopup(false)}
+                                        className="flex-1 border border-gray-300 text-gray-600 py-2 px-4 rounded-lg hover:bg-gray-50 transition font-medium"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setShowEventPopup(false);
+                                            navigate(`/events/${popupEventId}`);
+                                        }}
+                                        className="flex-1 bg-nss-blue text-white py-2 px-4 rounded-lg hover:bg-blue-900 transition font-medium"
+                                    >
+                                        Go to Event
+                                    </button>
+                                </div>
+                            </motion.div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
 
 
                 {/* Slider Controls */}

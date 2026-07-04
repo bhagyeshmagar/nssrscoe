@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { galleryAPI, uploadAPI } from '../../services/api';
+import ImageCropperModal from '../common/ImageCropperModal';
 
 export const GalleryTab = ({ gallery, onRefresh, showForm, setShowForm, editingItem, setEditingItem }: any) => {
     const [formData, setFormData] = useState<any>({ title: '', description: '', url: '', type: 'image' });
@@ -8,6 +9,10 @@ export const GalleryTab = ({ gallery, onRefresh, showForm, setShowForm, editingI
     const [uploading, setUploading] = useState(false);
     const [activeMediaTab, setActiveMediaTab] = useState<'images' | 'videos'>('images');
     const [uploadMediaType, setUploadMediaType] = useState<'image' | 'video'>('image');
+
+    // Image Cropper State
+    const [cropModalOpen, setCropModalOpen] = useState(false);
+    const [cropImageSrc, setCropImageSrc] = useState('');
 
     useEffect(() => {
         if (editingItem) {
@@ -30,9 +35,25 @@ export const GalleryTab = ({ gallery, onRefresh, showForm, setShowForm, editingI
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
-            setSelectedFile(file);
-            setFilePreview(URL.createObjectURL(file));
+            if (uploadMediaType === 'image') {
+                const reader = new FileReader();
+                reader.onload = () => {
+                    setCropImageSrc(reader.result as string);
+                    setCropModalOpen(true);
+                };
+                reader.readAsDataURL(file);
+                e.target.value = '';
+            } else {
+                setSelectedFile(file);
+                setFilePreview(URL.createObjectURL(file));
+            }
         }
+    };
+
+    const handleCropComplete = (croppedFile: File) => {
+        setSelectedFile(croppedFile);
+        setFilePreview(URL.createObjectURL(croppedFile));
+        setCropModalOpen(false);
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -259,6 +280,14 @@ export const GalleryTab = ({ gallery, onRefresh, showForm, setShowForm, editingI
                     )}
                 </div>
             )}
+
+            <ImageCropperModal
+                isOpen={cropModalOpen}
+                imageSrc={cropImageSrc}
+                aspectRatio={undefined}
+                onClose={() => setCropModalOpen(false)}
+                onCropComplete={handleCropComplete}
+            />
         </div>
     );
 };

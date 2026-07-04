@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { eventsAPI, uploadAPI } from '../services/api';
-import { Calendar, MapPin, ArrowRight } from 'lucide-react';
+import { Calendar, MapPin, ArrowRight, ExternalLink } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface Event {
@@ -11,6 +11,7 @@ interface Event {
     date: string;
     location: string;
     imageUrl?: string;
+    driveLink?: string;
     type: 'upcoming' | 'today' | 'past';
 }
 
@@ -65,11 +66,26 @@ const UpcomingEvents = () => {
                                             📅
                                         </div>
                                     )}
-                                    <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-bold text-nss-blue shadow">
-                                        UPCOMING
+                                    <div className="absolute top-4 right-4 flex flex-col gap-2 items-end">
+                                        <div className="bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-bold text-nss-blue shadow">
+                                            UPCOMING
+                                        </div>
+                                        {event.driveLink && (
+                                            <button 
+                                                onClick={(e) => {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    window.open(event.driveLink, '_blank', 'noopener,noreferrer');
+                                                }}
+                                                className="bg-white/90 backdrop-blur-sm p-2 rounded-full text-blue-600 hover:text-blue-800 shadow transition cursor-pointer"
+                                                title="Open Google Drive Link"
+                                            >
+                                                <ExternalLink className="w-4 h-4" />
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
-                                <div className="p-6">
+                                <div className="p-6 relative">
                                     <h3 className="text-xl font-bold text-gray-800 mb-2 group-hover:text-nss-blue transition">{event.title}</h3>
                                     <div className="flex items-center gap-2 text-gray-500 text-sm mb-2">
                                         <Calendar className="w-4 h-4" />

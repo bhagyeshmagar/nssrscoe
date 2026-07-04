@@ -589,6 +589,7 @@ export interface EventData {
     volunteersCount?: number;
     images?: EventImage[];
     reportUrl?: string;
+    driveLink?: string;
     academicYearId?: number;
 }
 

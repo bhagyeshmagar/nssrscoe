@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react';
+import ImageCropperModal from '../common/ImageCropperModal';
 import { settingsAPI, uploadAPI } from '../../services/api';
-import type { SiteSettings } from '../../services/api';
+import type { SiteSettings, EventData } from '../../services/api';
 
-export const SettingsTab = ({ settings, onRefresh }: { settings: SiteSettings | null, onRefresh: () => void }) => {
+type SliderImage = { url: string; description: string; eventId?: number };
+
+export const SettingsTab = ({ settings, events = [], onRefresh }: { settings: SiteSettings | null, events?: EventData[], onRefresh: () => void }) => {
     const [formData, setFormData] = useState<SiteSettings>({
         heroTitle: '',
         heroSubtitle: '',
@@ -25,9 +28,15 @@ export const SettingsTab = ({ settings, onRefresh }: { settings: SiteSettings | 
     const [saving, setSaving] = useState(false);
 
     // State for managing home slider images
-    const [sliderImages, setSliderImages] = useState<{ url: string, description: string }[]>([]);
+    const [sliderImages, setSliderImages] = useState<SliderImage[]>([]);
     const [uploadingImage, setUploadingImage] = useState(false);
     const [uploadingTeamPhoto, setUploadingTeamPhoto] = useState(false);
+    
+    // Image Cropper State
+    const [cropModalOpen, setCropModalOpen] = useState(false);
+    const [cropImageSrc, setCropImageSrc] = useState('');
+    const [cropCallback, setCropCallback] = useState<((file: File) => void)>(() => () => {});
+    const [cropAspect, setCropAspect] = useState<number | undefined>(undefined);
 
     useEffect(() => {
         if (settings) {
@@ -137,18 +146,27 @@ export const SettingsTab = ({ settings, onRefresh }: { settings: SiteSettings | 
                                         accept="image/*"
                                         className="hidden"
                                         disabled={uploadingTeamPhoto}
-                                        onChange={async (e) => {
+                                        onChange={(e) => {
                                             const file = e.target.files?.[0];
                                             if (file) {
-                                                setUploadingTeamPhoto(true);
-                                                try {
-                                                    const result = await uploadAPI.uploadFile(file);
-                                                    setFormData({ ...formData, aboutTeamPhoto: result.url });
-                                                } catch (err) {
-                                                    console.error('Error uploading team photo', err);
-                                                    alert('Error uploading image');
-                                                }
-                                                setUploadingTeamPhoto(false);
+                                                const reader = new FileReader();
+                                                reader.onload = () => {
+                                                    setCropImageSrc(reader.result as string);
+                                                    setCropAspect(undefined);
+                                                    setCropCallback(() => async (croppedFile: File) => {
+                                                        setUploadingTeamPhoto(true);
+                                                        try {
+                                                            const result = await uploadAPI.uploadFile(croppedFile);
+                                                            setFormData({ ...formData, aboutTeamPhoto: result.url });
+                                                        } catch (err) {
+                                                            console.error('Error uploading team photo', err);
+                                                            alert('Error uploading image');
+                                                        }
+                                                        setUploadingTeamPhoto(false);
+                                                    });
+                                                    setCropModalOpen(true);
+                                                };
+                                                reader.readAsDataURL(file);
                                                 e.target.value = '';
                                             }
                                         }}
@@ -186,35 +204,57 @@ export const SettingsTab = ({ settings, onRefresh }: { settings: SiteSettings | 
                 <div className="bg-white p-6 rounded-lg shadow">
                     <div className="flex justify-between items-center mb-4">
                         <h3 className="text-lg font-semibold text-nss-blue">Home Slider Images</h3>
-                        <span className="text-sm text-gray-500">{sliderImages.length} / 6 Images</span>
+                        <span className="text-sm text-gray-500">{sliderImages.length} image{sliderImages.length !== 1 ? 's' : ''} &mdash; newest shown first</span>
                     </div>
 
                     <div className="space-y-4">
                         {sliderImages.map((img, index) => (
                             <div key={index} className="flex flex-col md:flex-row gap-4 items-start border p-4 rounded bg-gray-50">
-                                <div className="w-full md:w-1/3">
+                                {/* Badge for first image */}
+                                <div className="w-full md:w-1/3 relative">
+                                    {index === 0 && (
+                                        <span className="absolute top-1 left-1 bg-nss-blue text-white text-xs px-2 py-0.5 rounded z-10">First Shown</span>
+                                    )}
                                     <img src={uploadAPI.getFullUrl(img.url)} alt={`Slide ${index + 1}`} className="w-full h-32 object-cover rounded border" />
                                 </div>
                                 <div className="flex-1 w-full space-y-2">
-                                    <label className="block text-sm font-medium text-gray-700">Brief Description</label>
-                                    <textarea
-                                        value={img.description}
-                                        onChange={e => {
-                                            const newImages = [...sliderImages];
-                                            newImages[index].description = e.target.value;
-                                            setSliderImages(newImages);
-                                        }}
-                                        className="w-full border rounded px-3 py-2"
-                                        rows={3}
-                                        placeholder="Enter brief description for this slide..."
-                                    />
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Brief Description</label>
+                                        <textarea
+                                            value={img.description}
+                                            onChange={e => {
+                                                const newImages = [...sliderImages];
+                                                newImages[index] = { ...newImages[index], description: e.target.value };
+                                                setSliderImages(newImages);
+                                            }}
+                                            className="w-full border rounded px-3 py-2"
+                                            rows={2}
+                                            placeholder="Enter brief description for this slide..."
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Link to Event <span className="font-normal text-gray-400">(optional — clicking the slide will prompt users to visit this event)</span></label>
+                                        <select
+                                            value={img.eventId ?? ''}
+                                            onChange={e => {
+                                                const newImages = [...sliderImages];
+                                                newImages[index] = { ...newImages[index], eventId: e.target.value ? Number(e.target.value) : undefined };
+                                                setSliderImages(newImages);
+                                            }}
+                                            className="w-full border rounded px-3 py-2 bg-white text-sm"
+                                        >
+                                            <option value="">— No event link —</option>
+                                            {events.map(ev => (
+                                                <option key={ev.id} value={ev.id}>
+                                                    [{ev.type === 'upcoming' ? 'Upcoming' : 'Past'}] {ev.title}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
                                     <div className="flex justify-end">
                                         <button
                                             type="button"
-                                            onClick={() => {
-                                                const newImages = sliderImages.filter((_, i) => i !== index);
-                                                setSliderImages(newImages);
-                                            }}
+                                            onClick={() => setSliderImages(sliderImages.filter((_, i) => i !== index))}
                                             className="text-red-500 hover:text-red-700 text-sm font-medium"
                                         >
                                             Remove Image
@@ -224,37 +264,45 @@ export const SettingsTab = ({ settings, onRefresh }: { settings: SiteSettings | 
                             </div>
                         ))}
 
-                        {sliderImages.length < 6 && (
-                            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                                <label className="cursor-pointer">
-                                    <span className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 transition inline-block">
-                                        {uploadingImage ? 'Uploading...' : '+ Add Slider Image'}
-                                    </span>
-                                    <input
-                                        type="file"
-                                        accept="image/*"
-                                        className="hidden"
-                                        disabled={uploadingImage}
-                                        onChange={async (e) => {
-                                            const file = e.target.files?.[0];
-                                            if (file) {
-                                                setUploadingImage(true);
-                                                try {
-                                                    const result = await uploadAPI.uploadFile(file);
-                                                    setSliderImages([...sliderImages, { url: result.url, description: '' }]);
-                                                } catch (err) {
-                                                    console.error('Error uploading slider image', err);
-                                                    alert('Error uploading image');
-                                                }
-                                                setUploadingImage(false);
-                                                e.target.value = ''; // Reset input
-                                            }
-                                        }}
-                                    />
-                                </label>
-                                <p className="text-sm text-gray-500 mt-2">Recommended size: 1920x1080px. You can add {6 - sliderImages.length} more images.</p>
-                            </div>
-                        )}
+                        {/* Upload — always visible, no limit */}
+                        <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                            <label className="cursor-pointer">
+                                <span className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 transition inline-block">
+                                    {uploadingImage ? 'Uploading...' : '+ Add Slider Image'}
+                                </span>
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    className="hidden"
+                                    disabled={uploadingImage}
+                                    onChange={(e) => {
+                                        const file = e.target.files?.[0];
+                                        if (file) {
+                                            const reader = new FileReader();
+                                            reader.onload = () => {
+                                                setCropImageSrc(reader.result as string);
+                                                setCropAspect(undefined);
+                                                setCropCallback(() => async (croppedFile: File) => {
+                                                    setUploadingImage(true);
+                                                    try {
+                                                        const result = await uploadAPI.uploadFile(croppedFile);
+                                                        setSliderImages([{ url: result.url, description: '', eventId: undefined }, ...sliderImages]);
+                                                    } catch (err) {
+                                                        console.error('Error uploading slider image', err);
+                                                        alert('Error uploading image');
+                                                    }
+                                                    setUploadingImage(false);
+                                                });
+                                                setCropModalOpen(true);
+                                            };
+                                            reader.readAsDataURL(file);
+                                            e.target.value = '';
+                                        }
+                                    }}
+                                />
+                            </label>
+                            <p className="text-sm text-gray-500 mt-2">Recommended size: 1920×1080px. No upload limit. New images appear first.</p>
+                        </div>
                     </div>
                 </div>
 
@@ -266,6 +314,17 @@ export const SettingsTab = ({ settings, onRefresh }: { settings: SiteSettings | 
                     {saving ? 'Saving...' : 'Save All Settings'}
                 </button>
             </form>
+
+            <ImageCropperModal
+                isOpen={cropModalOpen}
+                imageSrc={cropImageSrc}
+                aspectRatio={cropAspect}
+                onClose={() => setCropModalOpen(false)}
+                onCropComplete={(croppedFile) => {
+                    setCropModalOpen(false);
+                    cropCallback(croppedFile);
+                }}
+            />
         </div>
     );
 };

@@ -1,12 +1,17 @@
 import { useState, useEffect } from 'react';
 import { membersAPI, uploadAPI } from '../../services/api';
 import type { MemberData } from '../../services/api';
+import ImageCropperModal from '../common/ImageCropperModal';
 
 export const MembersTab = ({ members, onRefresh, showForm, setShowForm, editingItem, setEditingItem }: any) => {
     const [formData, setFormData] = useState<MemberData>({ name: '', role: '', photoUrl: '', year: '', order: 0 });
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [uploading, setUploading] = useState(false);
     const [photoPreview, setPhotoPreview] = useState<string>('');
+
+    // Image Cropper State
+    const [cropModalOpen, setCropModalOpen] = useState(false);
+    const [cropImageSrc, setCropImageSrc] = useState('');
 
     useEffect(() => {
         if (editingItem) {
@@ -29,8 +34,13 @@ export const MembersTab = ({ members, onRefresh, showForm, setShowForm, editingI
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
-            setSelectedFile(file);
-            setPhotoPreview(URL.createObjectURL(file));
+            const reader = new FileReader();
+            reader.onload = () => {
+                setCropImageSrc(reader.result as string);
+                setCropModalOpen(true);
+            };
+            reader.readAsDataURL(file);
+            e.target.value = '';
         }
     };
 
@@ -255,6 +265,18 @@ export const MembersTab = ({ members, onRefresh, showForm, setShowForm, editingI
                     </div>
                 )}
             </div>
+
+            <ImageCropperModal
+                isOpen={cropModalOpen}
+                imageSrc={cropImageSrc}
+                aspectRatio={undefined} // Free ratio crop
+                onClose={() => setCropModalOpen(false)}
+                onCropComplete={(croppedFile) => {
+                    setSelectedFile(croppedFile);
+                    setPhotoPreview(URL.createObjectURL(croppedFile));
+                    setCropModalOpen(false);
+                }}
+            />
         </div>
     );
 };

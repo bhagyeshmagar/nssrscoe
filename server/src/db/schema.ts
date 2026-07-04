@@ -272,6 +272,7 @@ export const events = pgTable('events', {
     imageUrl: text('image_url'),
     type: eventTypeEnum('type').default('upcoming'),
     reportUrl: text('report_url'),
+    driveLink: text('drive_link'),
     volunteersCount: integer('volunteers_count').default(0),
     academicYearId: integer('academic_year_id').references(() => academicYears.id),
     createdAt: timestamp('created_at').defaultNow(),

@@ -3,6 +3,7 @@ import { coreTeamAPI, volunteersAPI, uploadAPI } from '../../services/api';
 import type { AcademicYear, CoreTeamRole, CoreTeamAssignment, VolunteerWithProfile, AssignRoleData } from '../../services/api';
 import { useFlash } from './Shared';
 import { ExportDataModal } from '../common/ExportDataModal';
+import ImageCropperModal from '../common/ImageCropperModal';
 import { Download, Trash2 } from 'lucide-react';
 
 export const CoreTeamTab = ({ years, currentAY, isSuperadmin }: { years: AcademicYear[]; currentAY: AcademicYear | null; isSuperadmin: boolean }) => {
@@ -16,6 +17,10 @@ export const CoreTeamTab = ({ years, currentAY, isSuperadmin }: { years: Academi
     const [editingId, setEditingId] = useState<number | null>(null);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [uploading, setUploading] = useState(false);
+    
+    // Image Cropper State
+    const [cropModalOpen, setCropModalOpen] = useState(false);
+    const [cropImageSrc, setCropImageSrc] = useState('');
     const { msg, flash } = useFlash();
 
     const load = useCallback(async () => {
@@ -175,7 +180,18 @@ export const CoreTeamTab = ({ years, currentAY, isSuperadmin }: { years: Academi
                                 <div className="col-span-2"><label className="block text-sm text-gray-600 mb-1">Priority / Order</label>
                                     <input type="number" value={form.displayOrder} onChange={e => setForm({ ...form, displayOrder: parseInt(e.target.value) || 0 })} placeholder="0" className="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" title="Lower number appears first" /></div>
                                 <div className="col-span-2"><label className="block text-sm text-gray-600 mb-1">Profile Photo</label>
-                                    <input type="file" accept="image/*" onChange={e => setSelectedFile(e.target.files?.[0] || null)} className="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" /></div>
+                                    <input type="file" accept="image/*" onChange={e => {
+                                        const file = e.target.files?.[0];
+                                        if (file) {
+                                            const reader = new FileReader();
+                                            reader.onload = () => {
+                                                setCropImageSrc(reader.result as string);
+                                                setCropModalOpen(true);
+                                            };
+                                            reader.readAsDataURL(file);
+                                            e.target.value = '';
+                                        }
+                                    }} className="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" /></div>
                             </>
                         )}
                         {selectedRole && selectedRole.roleType !== 'institution' && (
@@ -245,6 +261,17 @@ export const CoreTeamTab = ({ years, currentAY, isSuperadmin }: { years: Academi
                     { key: 'department', label: 'Department' }
                 ]}
                 filename={`CoreTeam_Export_AY_${selectedAY?.label || 'All'}`}
+            />
+
+            <ImageCropperModal
+                isOpen={cropModalOpen}
+                imageSrc={cropImageSrc}
+                aspectRatio={undefined} // Free ratio crop
+                onClose={() => setCropModalOpen(false)}
+                onCropComplete={(croppedFile) => {
+                    setSelectedFile(croppedFile);
+                    setCropModalOpen(false);
+                }}
             />
         </div>
     );

@@ -1,16 +1,22 @@
 import { useState, useEffect } from 'react';
 import { eventsAPI, eventImagesAPI, uploadAPI } from '../../services/api';
 import type { EventData, EventImage, AcademicYear } from '../../services/api';
+import ImageCropperModal from '../common/ImageCropperModal';
 
 export const EventsTab = ({ events, onRefresh, showForm, setShowForm, editingItem, setEditingItem, years, currentAY }: { events: Array<any>, onRefresh: () => void, showForm: boolean, setShowForm: (val: boolean) => void, editingItem: any, setEditingItem: (val: any) => void, years: AcademicYear[], currentAY: AcademicYear | null }) => {
     const [formData, setFormData] = useState<EventData>({
-        id: 0, title: '', description: '', date: '', location: '', type: 'upcoming', volunteersCount: 0
+        id: 0, title: '', description: '', date: '', location: '', type: 'upcoming', volunteersCount: 0, driveLink: ''
     });
     const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
     const [masterIndex, setMasterIndex] = useState<number>(0);
     const [uploading, setUploading] = useState(false);
     const [existingImages, setExistingImages] = useState<EventImage[]>([]);
     const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+    
+    // Image Cropper State
+    const [cropModalOpen, setCropModalOpen] = useState(false);
+    const [cropImageSrc, setCropImageSrc] = useState('');
+    const [cropCallback, setCropCallback] = useState<((file: File) => void)>(() => () => {});
 
     const fetchEventImages = async (eventId: number) => {
         try {
@@ -30,7 +36,8 @@ export const EventsTab = ({ events, onRefresh, showForm, setShowForm, editingIte
                 date: editingItem.date?.split('T')[0] || '',
                 location: editingItem.location,
                 type: editingItem.type || 'upcoming',
-                volunteersCount: editingItem.volunteersCount || 0
+                volunteersCount: editingItem.volunteersCount || 0,
+                driveLink: editingItem.driveLink || ''
             });
             fetchEventImages(editingItem.id);
             setShowForm(true);
@@ -45,11 +52,20 @@ export const EventsTab = ({ events, onRefresh, showForm, setShowForm, editingIte
     }, [imagePreviews]);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const files = Array.from(e.target.files || []);
-        if (files.length > 0) {
-            setSelectedFiles(prev => [...prev, ...files]);
-            const newPreviews = files.map(file => URL.createObjectURL(file));
-            setImagePreviews(prev => [...prev, ...newPreviews]);
+        const file = e.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = () => {
+                setCropImageSrc(reader.result as string);
+                setCropCallback(() => (croppedFile: File) => {
+                    setSelectedFiles(prev => [...prev, croppedFile]);
+                    const preview = URL.createObjectURL(croppedFile);
+                    setImagePreviews(prev => [...prev, preview]);
+                });
+                setCropModalOpen(true);
+            };
+            reader.readAsDataURL(file);
+            e.target.value = '';
         }
     };
 
@@ -134,7 +150,7 @@ export const EventsTab = ({ events, onRefresh, showForm, setShowForm, editingIte
     const resetForm = () => {
         setShowForm(false);
         setEditingItem(null);
-        setFormData({ id: 0, title: '', description: '', date: '', location: '', type: 'upcoming', volunteersCount: 0 });
+        setFormData({ id: 0, title: '', description: '', date: '', location: '', type: 'upcoming', volunteersCount: 0, driveLink: '' });
         setSelectedFiles([]);
         setImagePreviews(prev => {
             prev.forEach(p => URL.revokeObjectURL(p));
@@ -166,6 +182,7 @@ export const EventsTab = ({ events, onRefresh, showForm, setShowForm, editingIte
                             <input type="text" placeholder="Title" required value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} className="border rounded px-3 py-2" />
                             <input type="date" required value={formData.date} onChange={e => setFormData({ ...formData, date: e.target.value })} className="border rounded px-3 py-2" />
                             <input type="text" placeholder="Location" required value={formData.location} onChange={e => setFormData({ ...formData, location: e.target.value })} className="border rounded px-3 py-2" />
+                            <input type="url" placeholder="Google Drive Link (Optional)" value={formData.driveLink} onChange={e => setFormData({ ...formData, driveLink: e.target.value })} className="border rounded px-3 py-2" />
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -181,11 +198,10 @@ export const EventsTab = ({ events, onRefresh, showForm, setShowForm, editingIte
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Event Images (Multiple)</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Add Event Image</label>
                                 <input
                                     type="file"
                                     accept="image/*"
-                                    multiple
                                     onChange={handleFileChange}
                                     className="border rounded px-3 py-2 w-full"
                                 />
@@ -293,6 +309,17 @@ export const EventsTab = ({ events, onRefresh, showForm, setShowForm, editingIte
                     </tbody>
                 </table>
             </div>
+
+            <ImageCropperModal
+                isOpen={cropModalOpen}
+                imageSrc={cropImageSrc}
+                aspectRatio={undefined}
+                onClose={() => setCropModalOpen(false)}
+                onCropComplete={(croppedFile) => {
+                    setCropModalOpen(false);
+                    cropCallback(croppedFile);
+                }}
+            />
         </div>
     );
 };

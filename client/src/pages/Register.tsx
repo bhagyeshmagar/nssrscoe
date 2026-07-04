@@ -18,13 +18,13 @@ const Register = () => {
     const [formData, setFormData] = useState({
         name: '', email: '', phone: '', department: '', year: '', eventId: ''
     });
-    
+
     const [events, setEvents] = useState<EventData[]>([]);
     const [visitorPassId, setVisitorPassId] = useState('');
     const [lookupId, setLookupId] = useState('');
-    
+
     // For looking up existing registrations
-    const [lookupResult, setLookupResult] = useState<{registration: EventRegistration, event: EventData} | null>(null);
+    const [lookupResult, setLookupResult] = useState<{ registration: EventRegistration, event: EventData } | null>(null);
     const [lookupError, setLookupError] = useState('');
     const [loading, setLoading] = useState(false);
 
@@ -60,7 +60,7 @@ const Register = () => {
             alert("Please select an event.");
             return;
         }
-        
+
         setLoading(true);
         try {
             const res = await registrationsAPI.create({
@@ -79,11 +79,11 @@ const Register = () => {
     const handleLookup = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!lookupId.trim()) return;
-        
+
         setLoading(true);
         setLookupError('');
         setLookupResult(null);
-        
+
         try {
             const res = await registrationsAPI.getByVisitorId(lookupId.trim());
             const resultData = res.data.data;
@@ -130,13 +130,13 @@ const Register = () => {
                     {/* Mode Toggle */}
                     <div className="flex justify-center mb-8">
                         <div className="bg-gray-100 p-1 rounded-lg inline-flex">
-                            <button 
+                            <button
                                 onClick={() => setViewMode('register')}
                                 className={`px-6 py-2 rounded-md font-medium transition ${viewMode === 'register' ? 'bg-white shadow text-nss-blue' : 'text-gray-600 hover:text-gray-900'}`}
                             >
                                 New Registration
                             </button>
-                            <button 
+                            <button
                                 onClick={() => setViewMode('lookup')}
                                 className={`px-6 py-2 rounded-md font-medium transition ${viewMode === 'lookup' ? 'bg-white shadow text-nss-blue' : 'text-gray-600 hover:text-gray-900'}`}
                             >
@@ -156,19 +156,19 @@ const Register = () => {
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                         <div className="space-y-2">
                                             <Label htmlFor="name">Full Name</Label>
-                                            <Input id="name" type="text" name="name" value={formData.name} onChange={handleChange} required placeholder="John Doe" />
+                                            <Input id="name" type="text" name="name" value={formData.name} onChange={handleChange} required placeholder="Name" />
                                         </div>
                                         <div className="space-y-2">
                                             <Label htmlFor="email">Email</Label>
-                                            <Input id="email" type="email" name="email" value={formData.email} onChange={handleChange} required placeholder="john@example.com" />
+                                            <Input id="email" type="email" name="email" value={formData.email} onChange={handleChange} required placeholder="Email" />
                                         </div>
                                         <div className="space-y-2">
                                             <Label htmlFor="phone">Phone</Label>
-                                            <Input id="phone" type="tel" name="phone" value={formData.phone} onChange={handleChange} required placeholder="1234567890" />
+                                            <Input id="phone" type="tel" name="phone" value={formData.phone} onChange={handleChange} required placeholder="Phone" />
                                         </div>
                                         <div className="space-y-2">
                                             <Label htmlFor="department">Department</Label>
-                                            <Input id="department" type="text" name="department" value={formData.department} onChange={handleChange} required placeholder="Comp / IT / EnTC" />
+                                            <Input id="department" type="text" name="department" value={formData.department} onChange={handleChange} required placeholder="Department" />
                                         </div>
                                         <div className="space-y-2">
                                             <Label htmlFor="year">Year</Label>
@@ -177,10 +177,10 @@ const Register = () => {
                                                     <SelectValue placeholder="Select Year" />
                                                 </SelectTrigger>
                                                 <SelectContent>
-                                                    <SelectItem value="FE">First Year (FE)</SelectItem>
-                                                    <SelectItem value="SE">Second Year (SE)</SelectItem>
-                                                    <SelectItem value="TE">Third Year (TE)</SelectItem>
-                                                    <SelectItem value="BE">Final Year (BE)</SelectItem>
+                                                    <SelectItem value="FY">First Year</SelectItem>
+                                                    <SelectItem value="SY">Second Year</SelectItem>
+                                                    <SelectItem value="TY">Third Year</SelectItem>
+                                                    <SelectItem value="BE">Final Year</SelectItem>
                                                 </SelectContent>
                                             </Select>
                                         </div>
@@ -202,8 +202,8 @@ const Register = () => {
                                         </div>
                                     </div>
 
-                                    <Button 
-                                        type="submit" 
+                                    <Button
+                                        type="submit"
                                         disabled={loading || events.length === 0}
                                         className="w-full bg-nss-blue hover:bg-blue-900 transition-colors py-6 text-lg"
                                     >
@@ -230,14 +230,14 @@ const Register = () => {
                                             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                                 <Hash className="text-gray-400 w-5 h-5" />
                                             </div>
-                                            <Input 
+                                            <Input
                                                 id="lookupId"
-                                                type="text" 
+                                                type="text"
                                                 value={lookupId}
-                                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setLookupId(e.target.value)} 
-                                                className="pl-10 py-6 text-lg" 
-                                                required 
-                                                placeholder="e.g. NSS-1234" 
+                                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setLookupId(e.target.value)}
+                                                className="pl-10 py-6 text-lg"
+                                                required
+                                                placeholder="e.g. NSS-1234"
                                             />
                                         </div>
                                         {lookupError && (
@@ -247,8 +247,8 @@ const Register = () => {
                                         )}
                                     </div>
 
-                                    <Button 
-                                        type="submit" 
+                                    <Button
+                                        type="submit"
                                         disabled={loading || !lookupId.trim()}
                                         className="w-full bg-nss-blue hover:bg-blue-900 transition-colors py-6 text-lg"
                                     >
@@ -273,7 +273,7 @@ const Register = () => {
                         </AlertDescription>
                     </Alert>
 
-                    <VisitorPassCard 
+                    <VisitorPassCard
                         ref={passRef}
                         visitorPassId={visitorPassId}
                         name={formData.name}
@@ -289,11 +289,11 @@ const Register = () => {
 
                     <Button
                         variant="link"
-                        onClick={() => { 
-                            setStep(1); 
+                        onClick={() => {
+                            setStep(1);
                             setFormData({ name: '', email: '', phone: '', department: '', year: '', eventId: events.length > 0 ? events[0].id.toString() : '' });
                             setLookupResult(null);
-                            setLookupId(''); 
+                            setLookupId('');
                         }}
                         className="mt-4 text-gray-500"
                     >

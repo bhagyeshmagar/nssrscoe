@@ -14,6 +14,7 @@ export const getEvents = async (req: Request, res: Response) => {
             location: events.location,
             type: sql<string>`CASE WHEN DATE(events.date) > CURRENT_DATE THEN 'upcoming' WHEN DATE(events.date) = CURRENT_DATE THEN 'today' ELSE 'past' END`.as('type'),
             reportUrl: events.reportUrl,
+            driveLink: events.driveLink,
             academicYearId: events.academicYearId,
             createdAt: events.createdAt,
             imageUrl: sql<string>`COALESCE(NULLIF(events.image_url, ''), (SELECT url FROM event_images WHERE event_id = events.id AND is_master = true LIMIT 1), (SELECT url FROM event_images WHERE event_id = events.id LIMIT 1))`,
@@ -39,12 +40,13 @@ export const createEvent = async (req: Request, res: Response) => {
             return res.status(403).json({ success: false, message: 'Current academic year is locked.' });
         }
 
-        const { title, description, location, reportUrl, date } = req.body;
+        const { title, description, location, reportUrl, driveLink, date } = req.body;
         const newEvent = await db.insert(events).values({
             title,
             description,
             location,
             reportUrl,
+            driveLink,
             academicYearId: currentAY?.id || null,
             date: new Date(req.body.date) // Ensure date is Date object
         }).returning();
@@ -58,12 +60,13 @@ export const createEvent = async (req: Request, res: Response) => {
 export const updateEvent = async (req: Request, res: Response) => {
     const { id } = req.params;
     try {
-        const { title, description, location, reportUrl, date } = req.body;
+        const { title, description, location, reportUrl, driveLink, date } = req.body;
         const updateData: any = {};
         if (title !== undefined) updateData.title = title;
         if (description !== undefined) updateData.description = description;
         if (location !== undefined) updateData.location = location;
         if (reportUrl !== undefined) updateData.reportUrl = reportUrl;
+        if (driveLink !== undefined) updateData.driveLink = driveLink;
         if (date !== undefined) updateData.date = new Date(date);
 
         const [eventToUpdate] = await db.select({ academicYearId: events.academicYearId }).from(events).where(eq(events.id, Number(id))).limit(1);

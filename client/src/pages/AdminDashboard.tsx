@@ -3,7 +3,7 @@ import {
     eventsAPI, galleryAPI, membersAPI, settingsAPI,
     academicYearsAPI, decodeToken
 } from '../services/api';
-import type { SiteSettings, AcademicYear } from '../services/api';
+import type { SiteSettings, AcademicYear, EventData } from '../services/api';
 
 import { AYStatusBadge } from '../components/admin/Shared';
 import { useAuthStore } from '../stores/authStore';
@@ -70,7 +70,7 @@ const AdminDashboard = () => {
     const [years, setYears] = useState<AcademicYear[]>([]);
     const [currentAY, setCurrentAY] = useState<AcademicYear | null>(null);
 
-    const [events, setEvents] = useState<unknown[]>([]);
+    const [events, setEvents] = useState<EventData[]>([]);
     const [gallery, setGallery] = useState<unknown[]>([]);
     const [members, setMembers] = useState<unknown[]>([]);
     const [settings, setSettings] = useState<SiteSettings | null>(null);
@@ -102,8 +102,8 @@ const AdminDashboard = () => {
         setLoading(true);
         try {
             switch (activeTab) {
-                case 'overview': { const [eR, gR, mR] = await Promise.all([eventsAPI.getAll(), galleryAPI.getAll(), membersAPI.getAll()]); setEvents((eR.data.data as unknown[]) || []); setGallery((gR.data.data as unknown[]) || []); setMembers((mR.data.data as unknown[]) || []); break; }
-                case 'events': { const r = await eventsAPI.getAll(); setEvents((r.data.data as unknown[]) || []); break; }
+                case 'overview': { const [eR, gR, mR] = await Promise.all([eventsAPI.getAll(), galleryAPI.getAll(), membersAPI.getAll()]); setEvents((eR.data.data as EventData[]) || []); setGallery((gR.data.data as unknown[]) || []); setMembers((mR.data.data as unknown[]) || []); break; }
+                case 'events': { const r = await eventsAPI.getAll(); setEvents((r.data.data as EventData[]) || []); break; }
                 case 'gallery': { const r = await galleryAPI.getAll(); setGallery((r.data.data as unknown[]) || []); break; }
                 case 'settings': { const r = await settingsAPI.get(); setSettings(r.data.data as SiteSettings); break; }
             }
@@ -183,7 +183,7 @@ const AdminDashboard = () => {
                             {activeTab === 'events' && <EventsTab events={events} onRefresh={fetchSiteData} showForm={showEventForm} setShowForm={setShowEventForm} editingItem={editingItem} setEditingItem={setEditingItem} years={years} currentAY={currentAY} />}
                             {activeTab === 'registrations' && <RegistrationsTab events={events} />}
                             {activeTab === 'gallery' && <GalleryTab gallery={gallery} onRefresh={fetchSiteData} showForm={showGalleryForm} setShowForm={setShowGalleryForm} editingItem={editingItem} setEditingItem={setEditingItem} />}
-                            {activeTab === 'settings' && <SettingsTab settings={settings} onRefresh={fetchSiteData} />}
+                            {activeTab === 'settings' && <SettingsTab settings={settings} events={events} onRefresh={fetchSiteData} />}
                             {activeTab === 'admins' && <AdminsTab />}
                             {activeTab === 'profile' && <ProfileTab />}
                         </Suspense>

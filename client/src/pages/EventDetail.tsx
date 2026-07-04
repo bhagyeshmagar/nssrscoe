@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { eventsAPI, eventImagesAPI, uploadAPI } from '../services/api';
-import { Calendar, MapPin, Download, Clock, Users, ChevronLeft, ArrowRight, ZoomIn, Share2 } from 'lucide-react';
+import { Calendar, MapPin, Download, Clock, Users, ChevronLeft, ArrowRight, ZoomIn, Share2, ExternalLink } from 'lucide-react';
 import { format } from 'date-fns';
 import { motion } from 'framer-motion';
 
@@ -17,6 +17,7 @@ interface Event {
     imageUrl?: string;
     type: 'upcoming' | 'today' | 'past';
     reportUrl?: string;
+    driveLink?: string;
     volunteersCount?: number;
 }
 
@@ -271,6 +272,25 @@ const EventDetail = () => {
                                             <div>
                                                 <p className="text-sm text-gray-500 font-medium uppercase tracking-wide">Volunteers</p>
                                                 <p className="text-gray-900 font-semibold text-lg leading-tight">{event.volunteersCount}</p>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {event.driveLink && (
+                                        <div className="flex items-start gap-4">
+                                            <div className="bg-purple-50 p-3 rounded-lg text-purple-600 shrink-0">
+                                                <ExternalLink className="w-6 h-6" />
+                                            </div>
+                                            <div>
+                                                <p className="text-sm text-gray-500 font-medium uppercase tracking-wide">Resources</p>
+                                                <a 
+                                                    href={event.driveLink} 
+                                                    target="_blank" 
+                                                    rel="noopener noreferrer"
+                                                    className="text-nss-blue font-semibold text-lg leading-tight hover:underline flex items-center gap-1"
+                                                >
+                                                    Google Drive <ExternalLink className="w-4 h-4" />
+                                                </a>
                                             </div>
                                         </div>
                                     )}
