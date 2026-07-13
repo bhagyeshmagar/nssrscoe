@@ -119,7 +119,7 @@ export default function ImageCropperModal({ isOpen, imageSrc, onClose, onCropCom
                                     <RotateCw className="w-4 h-4" /> Rotate 90°
                                 </button>
                                 <p className="text-sm text-gray-500 hidden sm:block">
-                                    {aspectRatio ? "Drag corners to resize." : "Drag borders to freely adjust."}
+                                    {aspectRatio ? "Drag corners to resize." : "Drag borders and corners to freely adjust crop area."}
                                 </p>
                             </div>
                             <div className="flex gap-3 w-full sm:w-auto justify-end">
