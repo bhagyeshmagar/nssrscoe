@@ -3,7 +3,9 @@ import { attendanceAPI, eventsAPI, volunteersAPI } from '../../services/api';
 import type { AcademicYear, VolunteerWithProfile } from '../../services/api';
 import { useFlash, useAYSelector } from './Shared';
 import { ExportDataModal } from '../common/ExportDataModal';
-import { Download } from 'lucide-react';
+import { FileSpreadsheet } from 'lucide-react';
+import * as XLSX from 'xlsx';
+import toast from 'react-hot-toast';
 
 export const AttendanceTab = ({ years, currentAY }: { years: AcademicYear[]; currentAY: AcademicYear | null }) => {
     const { selectedAyId, setSelectedAyId, selectedAY } = useAYSelector(years, currentAY);
@@ -12,6 +14,7 @@ export const AttendanceTab = ({ years, currentAY }: { years: AcademicYear[]; cur
     const [selectedEvent, setSelectedEvent] = useState<any | null>(null);
     const [attendanceMap, setAttendanceMap] = useState<Record<number, boolean>>({});
     const [showExportModal, setShowExportModal] = useState(false);
+    const [exportingId, setExportingId] = useState<number | null>(null);
     const { msg, flash } = useFlash();
 
     const load = useCallback(async () => {
@@ -68,6 +71,52 @@ export const AttendanceTab = ({ years, currentAY }: { years: AcademicYear[]; cur
         }
     };
 
+    const handleExportAttendance = async (event: any) => {
+        setExportingId(event.id);
+        try {
+            // Fetch the attendance records for this event
+            const [attRes, volRes] = await Promise.all([
+                attendanceAPI.getEventAttendance(selectedAyId, event.id),
+                volunteersAPI.getByAY(selectedAyId, { status: 'regular', isActive: true }),
+            ]);
+            const records: any[] = attRes.data.data?.records || [];
+            const vols: VolunteerWithProfile[] = volRes.data.data?.data || [];
+
+            // Build a map of volunteerId -> status
+            const statusMap: Record<number, string> = {};
+            records.forEach((r: any) => { statusMap[r.volunteerId] = r.status; });
+
+            const wsData = [
+                [`Event: ${event.title}`],
+                [`Date: ${new Date(event.date).toLocaleDateString()}`],
+                [`Location: ${event.location}`],
+                [],
+                ['Sr. No.', 'Name', 'Department', 'Attendance Status'],
+                ...vols.map((v, i) => [
+                    i + 1,
+                    v.name,
+                    v.department,
+                    statusMap[v.id]
+                        ? statusMap[v.id].charAt(0).toUpperCase() + statusMap[v.id].slice(1)
+                        : 'Absent',
+                ]),
+            ];
+
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.aoa_to_sheet(wsData);
+            ws['!cols'] = [{ wch: 8 }, { wch: 30 }, { wch: 35 }, { wch: 18 }];
+            XLSX.utils.book_append_sheet(wb, ws, 'Attendance');
+            const safeTitle = event.title.replace(/[^a-zA-Z0-9_\- ]/g, '').trim();
+            XLSX.writeFile(wb, `Attendance_${safeTitle}_${new Date(event.date).toISOString().slice(0, 10)}.xlsx`);
+            toast.success('Attendance exported!');
+        } catch (err) {
+            console.error(err);
+            toast.error('Failed to export attendance');
+        } finally {
+            setExportingId(null);
+        }
+    };
+
     const handleSave = async () => {
         if (!selectedEvent) return;
         const records = volunteersList.map(v => ({
@@ -91,11 +140,6 @@ export const AttendanceTab = ({ years, currentAY }: { years: AcademicYear[]; cur
                     <select value={selectedAyId || ''} onChange={e => setSelectedAyId(Number(e.target.value))} className="border rounded-lg px-3 py-2 text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500">
                         {years.map(y => <option key={y.id} value={y.id}>{y.label}</option>)}
                     </select>
-                    {selectedEvent && (
-                        <button onClick={() => setShowExportModal(true)} className="bg-green-600 text-white px-3 py-2 rounded-lg hover:bg-green-700 text-sm font-medium flex items-center">
-                            <Download className="w-4 h-4 mr-1" /> Export
-                        </button>
-                    )}
                 </div>
             </div>
             {msg && <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded text-blue-700 text-sm">{msg.text}</div>}
@@ -117,9 +161,20 @@ export const AttendanceTab = ({ years, currentAY }: { years: AcademicYear[]; cur
                                     <td className="px-4 py-3 font-medium">{e.title}</td>
                                     <td className="px-4 py-3 text-gray-500">{e.location}</td>
                                     <td className="px-4 py-3">
-                                        <button onClick={() => handleManage(e)} className="text-xs px-3 py-1.5 rounded bg-blue-100 text-blue-700 hover:bg-blue-200 font-medium">
-                                            Manage Attendance
-                                        </button>
+                                        <div className="flex items-center gap-2">
+                                            <button onClick={() => handleManage(e)} className="text-xs px-3 py-1.5 rounded bg-blue-100 text-blue-700 hover:bg-blue-200 font-medium">
+                                                Manage Attendance
+                                            </button>
+                                            <button
+                                                onClick={() => handleExportAttendance(e)}
+                                                disabled={exportingId === e.id}
+                                                className="flex items-center gap-1 text-xs px-3 py-1.5 rounded bg-emerald-100 text-emerald-700 hover:bg-emerald-200 font-medium disabled:opacity-50"
+                                                title="Export attendance as Excel"
+                                            >
+                                                <FileSpreadsheet className="w-3.5 h-3.5" />
+                                                {exportingId === e.id ? 'Exporting...' : 'Export'}
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                             ))}

@@ -9,10 +9,11 @@ import { AuthRequest } from '../middleware/auth';
 const createMeetingSchema = z.object({
     title: z.string().min(1),
     description: z.string().optional(),
-    meetingType: z.enum(['regular', 'core_team']),
+    meetingType: z.enum(['regular', 'core_team', 'special_camp']),
     scheduledDate: z.string().transform(str => new Date(str)),
     location: z.string().min(1),
-    sendEmail: z.boolean().optional().default(false)
+    sendEmail: z.boolean().optional().default(false),
+    specialCampId: z.number().optional(),
 });
 
 const markAttendanceSchema = z.object({
@@ -111,4 +112,10 @@ export const getAttendanceStats = async (req: AuthRequest, res: Response) => {
     const meetingId = parseInt(req.params.meetingId);
     const stats = await meetingService.getMeetingAttendanceStats(meetingId);
     ok(res, stats);
+};
+
+export const exportAttendance = async (req: AuthRequest, res: Response) => {
+    const meetingId = parseInt(req.params.meetingId);
+    const data = await meetingService.exportMeetingAttendance(meetingId);
+    ok(res, data);
 };

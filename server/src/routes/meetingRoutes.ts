@@ -32,5 +32,6 @@ router.post('/meetings/:meetingId/reopen', requireAdmin, catchAsync(meetingContr
 router.get('/meetings/:meetingId/attendance', requireAdmin, catchAsync(meetingController.getAttendance));
 router.post('/meetings/:meetingId/attendance/volunteers/:volunteerId', requireAdmin, catchAsync(meetingController.markAttendance));
 router.get('/meetings/:meetingId/attendance/stats', requireAdmin, catchAsync(meetingController.getAttendanceStats));
+router.get('/meetings/:meetingId/attendance/export', requireAdmin, catchAsync(meetingController.exportAttendance));
 
 export default router;

@@ -224,6 +224,7 @@ export const meetingsAPI = {
     getAttendance:    (meetingId: number) => api.get<{ attendance: MeetingAttendanceWithVolunteer[]; stats: MeetingAttendanceStats }>(`/meetings/${meetingId}/attendance`),
     markAttendance:   (meetingId: number, volunteerId: number, data: MarkMeetingAttendanceData) => api.post(`/meetings/${meetingId}/attendance/volunteers/${volunteerId}`, data),
     getStats:         (meetingId: number) => api.get<{ stats: MeetingAttendanceStats }>(`/meetings/${meetingId}/attendance/stats`),
+    exportAttendance: (meetingId: number) => api.get<MeetingAttendanceExportData>(`/meetings/${meetingId}/attendance/export`),
 };
 
 // ── Notifications ─────────────────────────────────────────────────────────────
@@ -620,23 +621,43 @@ export interface Meeting {
     academicYearId: number;
     title: string;
     description?: string;
-    meetingType: 'regular' | 'core_team';
+    meetingType: 'regular' | 'core_team' | 'special_camp';
     status: 'scheduled' | 'active' | 'ended';
     scheduledDate: string;
     location: string;
     startedAt?: string;
     endedAt?: string;
     durationMinutes?: number;
+    specialCampId?: number | null;
     createdAt: string;
 }
 
 export interface CreateMeetingData {
     title: string;
     description?: string;
-    meetingType: 'regular' | 'core_team';
+    meetingType: 'regular' | 'core_team' | 'special_camp';
     scheduledDate: string;
     location: string;
     sendEmail?: boolean;
+    specialCampId?: number;
+}
+
+export interface MeetingAttendanceExportRow {
+    srNo: number;
+    name: string;
+    department: string;
+    volunteerType: string;
+    attendance: string;
+    notes: string;
+}
+
+export interface MeetingAttendanceExportData {
+    meetingTitle: string;
+    meetingType: string;
+    scheduledDate: string;
+    location: string;
+    status: string;
+    rows: MeetingAttendanceExportRow[];
 }
 
 export interface MeetingAttendanceWithVolunteer {

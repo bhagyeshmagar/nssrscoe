@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
-import type { AcademicYear, Meeting } from '../../services/api';
-import { meetingsAPI } from '../../services/api';
+import type { AcademicYear, Meeting, SpecialCamp } from '../../services/api';
+import { meetingsAPI, specialCampsAPI } from '../../services/api';
 import { useAYSelector } from './Shared';
 import { ExportDataModal } from '../common/ExportDataModal';
 import { MeetingAttendanceModal } from './MeetingAttendanceModal';
-import { Download } from 'lucide-react';
+import { Download, FileSpreadsheet } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
+import * as XLSX from 'xlsx';
+import toast from 'react-hot-toast';
 
 export const MeetingsTab = ({ years, currentAY }: { years: AcademicYear[], currentAY: AcademicYear | null }) => {
     const userRole = useAuthStore(state => state.userRole);
@@ -17,15 +19,20 @@ export const MeetingsTab = ({ years, currentAY }: { years: AcademicYear[], curre
     const [showExportModal, setShowExportModal] = useState(false);
     const [editingMeeting, setEditingMeeting] = useState<Meeting | null>(null);
     const [attendanceModalOpen, setAttendanceModalOpen] = useState(false);
-    const [selectedMeetingForAttendance, setSelectedMeetingForAttendance] = useState<{ id: number, status: string } | null>(null);
+    const [selectedMeetingForAttendance, setSelectedMeetingForAttendance] = useState<{ id: number, status: string, meetingType: string } | null>(null);
+    const [exportingId, setExportingId] = useState<number | null>(null);
+
+    // Special camps for the current AY (used in camp picker)
+    const [specialCamps, setSpecialCamps] = useState<SpecialCamp[]>([]);
 
     const [formData, setFormData] = useState({
         title: '',
         description: '',
-        meetingType: 'regular' as 'regular' | 'core_team',
+        meetingType: 'regular' as 'regular' | 'core_team' | 'special_camp',
         scheduledDate: '',
         location: '',
         sendEmail: false,
+        specialCampId: undefined as number | undefined,
     });
 
     const loadMeetings = async () => {
@@ -33,34 +40,50 @@ export const MeetingsTab = ({ years, currentAY }: { years: AcademicYear[], curre
         setLoading(true);
         try {
             const res = await meetingsAPI.getByAY(selectedAyId);
-            const responseData = res.data.data;
-            setMeetings(responseData || []);
+            setMeetings(res.data.data || []);
         } catch (err) {
             console.error(err);
         }
         setLoading(false);
     };
 
-     
+    const loadSpecialCamps = async () => {
+        if (!selectedAyId) return;
+        try {
+            const res = await specialCampsAPI.getByAY(selectedAyId);
+            setSpecialCamps(res.data.data || []);
+        } catch (err) {
+            console.error('Failed to load special camps', err);
+        }
+    };
+
     useEffect(() => {
-         
         loadMeetings();
+        loadSpecialCamps();
     }, [selectedAyId]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (formData.meetingType === 'special_camp' && !formData.specialCampId) {
+            toast.error('Please select a Special Camp for this meeting.');
+            return;
+        }
         try {
+            const payload = {
+                ...formData,
+                specialCampId: formData.meetingType === 'special_camp' ? formData.specialCampId : undefined,
+            };
             if (editingMeeting) {
-                await meetingsAPI.update(editingMeeting.id, formData);
+                await meetingsAPI.update(editingMeeting.id, payload);
             } else {
-                await meetingsAPI.create(selectedAyId, formData);
+                await meetingsAPI.create(selectedAyId, payload);
             }
             setShowForm(false);
             setEditingMeeting(null);
             loadMeetings();
         } catch (err) {
             console.error(err);
-            alert('Failed to save meeting');
+            toast.error('Failed to save meeting');
         }
     };
 
@@ -72,6 +95,7 @@ export const MeetingsTab = ({ years, currentAY }: { years: AcademicYear[], curre
             scheduledDate: new Date(meeting.scheduledDate).toISOString().slice(0, 16),
             location: meeting.location,
             sendEmail: false,
+            specialCampId: meeting.specialCampId ?? undefined,
         });
         setEditingMeeting(meeting);
         setShowForm(true);
@@ -84,7 +108,7 @@ export const MeetingsTab = ({ years, currentAY }: { years: AcademicYear[], curre
             loadMeetings();
         } catch (err) {
             console.error(err);
-            alert('Failed to delete meeting');
+            toast.error('Failed to delete meeting');
         }
     };
 
@@ -96,8 +120,66 @@ export const MeetingsTab = ({ years, currentAY }: { years: AcademicYear[], curre
             loadMeetings();
         } catch (err) {
             console.error(err);
-            alert(`Failed to ${action} meeting`);
+            toast.error(`Failed to ${action} meeting`);
         }
+    };
+
+    const handleExportAttendance = async (meeting: Meeting) => {
+        setExportingId(meeting.id);
+        try {
+            const res = await meetingsAPI.exportAttendance(meeting.id);
+            const exportData = res.data.data;
+
+            const wsData = [
+                [`Meeting: ${exportData.meetingTitle}`],
+                [`Type: ${exportData.meetingType.replace('_', ' ').toUpperCase()}`],
+                [`Date: ${new Date(exportData.scheduledDate).toLocaleString()}`],
+                [`Location: ${exportData.location}`],
+                [`Status: ${exportData.status}`],
+                [],
+                ['Sr. No.', 'Name', 'Department', 'Volunteer Type', 'Attendance', 'Notes'],
+                ...exportData.rows.map(r => [
+                    r.srNo,
+                    r.name,
+                    r.department,
+                    r.volunteerType.charAt(0).toUpperCase() + r.volunteerType.slice(1),
+                    r.attendance.replace('_', ' ').toUpperCase(),
+                    r.notes,
+                ]),
+            ];
+
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+            // Style: make header row bold by setting column widths
+            ws['!cols'] = [
+                { wch: 8 }, { wch: 30 }, { wch: 35 }, { wch: 15 }, { wch: 15 }, { wch: 30 },
+            ];
+
+            XLSX.utils.book_append_sheet(wb, ws, 'Attendance');
+            const safeTitle = exportData.meetingTitle.replace(/[^a-zA-Z0-9_\- ]/g, '').trim();
+            XLSX.writeFile(wb, `Attendance_${safeTitle}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+            toast.success('Attendance exported successfully!');
+        } catch (err) {
+            console.error(err);
+            toast.error('Failed to export attendance');
+        } finally {
+            setExportingId(null);
+        }
+    };
+
+    const getMeetingTypeLabel = (type: string) => {
+        if (type === 'regular') return 'Regular';
+        if (type === 'core_team') return 'Core Team';
+        if (type === 'special_camp') return 'Special Camp';
+        return type;
+    };
+
+    const getMeetingTypeBadgeClass = (type: string) => {
+        if (type === 'regular') return 'bg-blue-100 text-blue-800';
+        if (type === 'core_team') return 'bg-purple-100 text-purple-800';
+        if (type === 'special_camp') return 'bg-amber-100 text-amber-800';
+        return 'bg-gray-100 text-gray-800';
     };
 
     return (
@@ -123,7 +205,7 @@ export const MeetingsTab = ({ years, currentAY }: { years: AcademicYear[], curre
                     <button
                         onClick={() => {
                             setEditingMeeting(null);
-                            setFormData({ title: '', description: '', meetingType: 'regular', scheduledDate: '', location: '', sendEmail: false });
+                            setFormData({ title: '', description: '', meetingType: 'regular', scheduledDate: '', location: '', sendEmail: false, specialCampId: undefined });
                             setShowForm(true);
                         }}
                         className="bg-blue-600 text-white px-4 py-2 rounded shadow hover:bg-blue-700 text-sm font-medium"
@@ -143,11 +225,46 @@ export const MeetingsTab = ({ years, currentAY }: { years: AcademicYear[], curre
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
-                            <select value={formData.meetingType} onChange={e => setFormData({ ...formData, meetingType: e.target.value as 'regular' | 'core_team' })} className="w-full border rounded px-3 py-2 text-sm">
+                            <select
+                                value={formData.meetingType}
+                                onChange={e => setFormData({ ...formData, meetingType: e.target.value as 'regular' | 'core_team' | 'special_camp', specialCampId: undefined })}
+                                className="w-full border rounded px-3 py-2 text-sm"
+                            >
                                 <option value="regular">Regular Meeting</option>
                                 <option value="core_team">Core Team Meeting</option>
+                                <option value="special_camp">Special Camp Meeting</option>
                             </select>
                         </div>
+
+                        {/* Camp picker — shown only when special_camp is selected */}
+                        {formData.meetingType === 'special_camp' && (
+                            <div className="md:col-span-2">
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Select Special Camp <span className="text-red-500">*</span>
+                                </label>
+                                {specialCamps.length === 0 ? (
+                                    <p className="text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+                                        No special camps found for this Academic Year. Please create one first.
+                                    </p>
+                                ) : (
+                                    <select
+                                        required
+                                        value={formData.specialCampId ?? ''}
+                                        onChange={e => setFormData({ ...formData, specialCampId: Number(e.target.value) })}
+                                        className="w-full border rounded px-3 py-2 text-sm"
+                                    >
+                                        <option value="" disabled>Select a camp...</option>
+                                        {specialCamps.map(camp => (
+                                            <option key={camp.id} value={camp.id}>
+                                                {camp.name} — {camp.location}{camp.isFinalized ? ' ✓ Finalized' : ''}
+                                            </option>
+                                        ))}
+                                    </select>
+                                )}
+                                <p className="text-xs text-gray-500 mt-1">Only volunteers enrolled in this camp will receive notifications and be listed in attendance.</p>
+                            </div>
+                        )}
+
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">Scheduled Date & Time</label>
                             <input type="datetime-local" required value={formData.scheduledDate} onChange={e => setFormData({ ...formData, scheduledDate: e.target.value })} className="w-full border rounded px-3 py-2 text-sm" />
@@ -199,8 +316,8 @@ export const MeetingsTab = ({ years, currentAY }: { years: AcademicYear[], curre
                                     <tr key={meeting.id} className="border-b hover:bg-gray-50">
                                         <td className="px-4 py-3 font-medium text-gray-900">{meeting.title}</td>
                                         <td className="px-4 py-3">
-                                            <span className={`px-2 py-1 rounded text-xs font-medium ${meeting.meetingType === 'regular' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'}`}>
-                                                {meeting.meetingType === 'regular' ? 'Regular' : 'Core Team'}
+                                            <span className={`px-2 py-1 rounded text-xs font-medium ${getMeetingTypeBadgeClass(meeting.meetingType)}`}>
+                                                {getMeetingTypeLabel(meeting.meetingType)}
                                             </span>
                                         </td>
                                         <td className="px-4 py-3">{new Date(meeting.scheduledDate).toLocaleString()}</td>
@@ -211,7 +328,7 @@ export const MeetingsTab = ({ years, currentAY }: { years: AcademicYear[], curre
                                             </span>
                                         </td>
                                         <td className="px-4 py-3 text-right">
-                                            <div className="flex items-center justify-end gap-2">
+                                            <div className="flex items-center justify-end gap-2 flex-wrap">
                                                 {meeting.status === 'scheduled' && (
                                                     <button onClick={() => handleAction(meeting.id, 'start')} className="text-green-600 hover:underline">Start</button>
                                                 )}
@@ -221,8 +338,20 @@ export const MeetingsTab = ({ years, currentAY }: { years: AcademicYear[], curre
                                                 {meeting.status === 'ended' && isSuperadmin && (
                                                     <button onClick={() => handleAction(meeting.id, 'reopen')} className="text-yellow-600 hover:underline text-xs">Reopen</button>
                                                 )}
+                                                {/* Per-meeting attendance export — shown for ended meetings */}
+                                                {meeting.status === 'ended' && (
+                                                    <button
+                                                        onClick={() => handleExportAttendance(meeting)}
+                                                        disabled={exportingId === meeting.id}
+                                                        className="flex items-center gap-1 text-emerald-600 hover:underline text-xs disabled:opacity-50"
+                                                        title="Export attendance as Excel"
+                                                    >
+                                                        <FileSpreadsheet className="w-3.5 h-3.5" />
+                                                        {exportingId === meeting.id ? 'Exporting...' : 'Export'}
+                                                    </button>
+                                                )}
                                                 <button onClick={() => {
-                                                    setSelectedMeetingForAttendance({ id: meeting.id, status: meeting.status });
+                                                    setSelectedMeetingForAttendance({ id: meeting.id, status: meeting.status, meetingType: meeting.meetingType });
                                                     setAttendanceModalOpen(true);
                                                 }} className="text-blue-600 hover:underline font-semibold">Attendance</button>
                                                 {(meeting.status !== 'ended' || isSuperadmin) && (
@@ -240,7 +369,7 @@ export const MeetingsTab = ({ years, currentAY }: { years: AcademicYear[], curre
                     </table>
                 </div>
             )}
-            <ExportDataModal 
+            <ExportDataModal
                 isOpen={showExportModal}
                 onClose={() => setShowExportModal(false)}
                 data={meetings}
@@ -260,6 +389,7 @@ export const MeetingsTab = ({ years, currentAY }: { years: AcademicYear[], curre
                     onClose={() => setAttendanceModalOpen(false)}
                     meetingId={selectedMeetingForAttendance.id}
                     meetingStatus={selectedMeetingForAttendance.status}
+                    meetingType={selectedMeetingForAttendance.meetingType}
                 />
             )}
         </div>

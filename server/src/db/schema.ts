@@ -420,13 +420,14 @@ export const meetings = pgTable('meetings', {
     academicYearId: integer('academic_year_id').notNull().references(() => academicYears.id),
     title: varchar('title', { length: 255 }).notNull(),
     description: text('description'),
-    meetingType: varchar('meeting_type', { length: 50 }).notNull(), // 'regular' | 'core_team'
+    meetingType: varchar('meeting_type', { length: 50 }).notNull(), // 'regular' | 'core_team' | 'special_camp'
     status: varchar('status', { length: 50 }).default('scheduled').notNull(), // 'scheduled' | 'active' | 'ended'
     scheduledDate: timestamp('scheduled_date').notNull(),
     location: varchar('location', { length: 255 }).notNull(),
     startedAt: timestamp('started_at'),
     endedAt: timestamp('ended_at'),
     durationMinutes: integer('duration_minutes'),
+    specialCampId: integer('special_camp_id').references(() => specialCamps.id, { onDelete: 'set null' }),
     createdById: integer('created_by_id').references(() => admins.id),
     createdAt: timestamp('created_at').defaultNow(),
 });

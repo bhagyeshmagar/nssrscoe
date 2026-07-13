@@ -9,11 +9,12 @@ import { X, Search } from 'lucide-react';
 interface MeetingAttendanceModalProps {
     meetingId: number;
     meetingStatus: string;
+    meetingType?: string;
     isOpen: boolean;
     onClose: () => void;
 }
 
-export const MeetingAttendanceModal = ({ meetingId, meetingStatus, isOpen, onClose }: MeetingAttendanceModalProps) => {
+export const MeetingAttendanceModal = ({ meetingId, meetingStatus, meetingType, isOpen, onClose }: MeetingAttendanceModalProps) => {
     const [attendanceList, setAttendanceList] = useState<MeetingAttendanceWithVolunteer[]>([]);
     const [stats, setStats] = useState<MeetingAttendanceStats | null>(null);
     const [loading, setLoading] = useState(false);
@@ -81,7 +82,18 @@ export const MeetingAttendanceModal = ({ meetingId, meetingStatus, isOpen, onClo
             <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
                 <div className="p-6 border-b flex justify-between items-center bg-gray-50 rounded-t-xl">
                     <div>
-                        <h2 className="text-xl font-bold text-nss-blue">Meeting Attendance</h2>
+                        <div className="flex items-center gap-3">
+                            <h2 className="text-xl font-bold text-nss-blue">Meeting Attendance</h2>
+                            {meetingType && (
+                                <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
+                                    meetingType === 'regular' ? 'bg-blue-100 text-blue-700' :
+                                    meetingType === 'core_team' ? 'bg-purple-100 text-purple-700' :
+                                    'bg-amber-100 text-amber-700'
+                                }`}>
+                                    {meetingType === 'regular' ? 'Regular' : meetingType === 'core_team' ? 'Core Team' : 'Special Camp'}
+                                </span>
+                            )}
+                        </div>
                         {!canEdit && (
                             <p className="text-sm text-red-500 mt-1">
                                 Read-only: Meeting is not active.

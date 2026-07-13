@@ -80,15 +80,15 @@ export default function ImageCropperModal({ isOpen, imageSrc, onClose, onCropCom
                     exit={{ scale: 0.95, opacity: 0 }}
                     className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[90vh]"
                 >
-                    <div className="p-4 border-b flex justify-between items-center bg-gray-50">
+                    <div className="p-4 border-b flex justify-between items-center bg-gray-50 flex-shrink-0">
                         <h2 className="text-xl font-semibold text-gray-800">Crop Image</h2>
                         <button onClick={onClose} className="p-2 text-gray-500 hover:text-gray-800 hover:bg-gray-200 rounded-full transition-colors">
                             <X className="w-5 h-5" />
                         </button>
                     </div>
 
-                    <div className="relative flex-grow bg-gray-900 min-h-[400px] sm:min-h-[500px] flex items-center justify-center">
-                        <div className="w-full h-full max-h-[60vh]">
+                    <div className="relative flex-1 w-full bg-gray-900 min-h-[400px] sm:min-h-[500px] max-h-[60vh] flex items-center justify-center overflow-hidden">
+                        <div className="w-full h-full absolute inset-0">
                             <Cropper
                                 src={imageSrc}
                                 style={{ height: '100%', width: '100%' }}
@@ -109,20 +109,20 @@ export default function ImageCropperModal({ isOpen, imageSrc, onClose, onCropCom
                         </div>
                     </div>
 
-                    <div className="p-6 bg-white space-y-6">
-                        <div className="flex justify-between items-center pt-2">
-                            <div className="flex items-center gap-4">
+                    <div className="p-4 sm:p-6 bg-white flex-shrink-0">
+                        <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+                            <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-start">
                                 <button
                                     onClick={handleRotate}
-                                    className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors border border-gray-200"
+                                    className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors border border-gray-200 whitespace-nowrap"
                                 >
                                     <RotateCw className="w-4 h-4" /> Rotate 90°
                                 </button>
                                 <p className="text-sm text-gray-500 hidden sm:block">
-                                    {aspectRatio ? "Drag corners to resize within constraint." : "Drag borders and corners to freely adjust crop area."}
+                                    {aspectRatio ? "Drag corners to resize." : "Drag borders to freely adjust."}
                                 </p>
                             </div>
-                            <div className="flex gap-3">
+                            <div className="flex gap-3 w-full sm:w-auto justify-end">
                                 <button
                                     onClick={onClose}
                                     className="px-5 py-2.5 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl font-medium transition-colors"
@@ -132,7 +132,7 @@ export default function ImageCropperModal({ isOpen, imageSrc, onClose, onCropCom
                                 <button
                                     onClick={handleConfirm}
                                     disabled={isProcessing}
-                                    className="px-5 py-2.5 bg-nss-blue text-white rounded-xl font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center gap-2 shadow-lg shadow-blue-500/30"
+                                    className="px-5 py-2.5 bg-nss-blue text-white rounded-xl font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center gap-2 shadow-lg shadow-blue-500/30 whitespace-nowrap"
                                 >
                                     {isProcessing ? (
                                         <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
