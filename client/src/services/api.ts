@@ -2,8 +2,13 @@ import axios from 'axios';
 import type { AxiosInstance, AxiosResponse, AxiosRequestConfig } from 'axios';
 import { useAuthStore } from '../stores/authStore';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-const UPLOAD_BASE_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
+let rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+rawApiUrl = rawApiUrl.replace(/\/+$/, ''); // trim trailing slashes
+if (!rawApiUrl.endsWith('/api')) {
+    rawApiUrl = `${rawApiUrl}/api`;
+}
+const API_BASE_URL = rawApiUrl;
+const UPLOAD_BASE_URL = API_BASE_URL.replace(/\/api$/, '');
 
 export interface ApiResponse<T> {
     success: boolean;
