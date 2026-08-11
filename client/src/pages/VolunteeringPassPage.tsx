@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { registrationsAPI, uploadAPI } from '../services/api';
+import { registrationsAPI } from '../services/api';
 import { Download, CheckCircle, XCircle, Clock, Calendar, MapPin, Hash, User } from 'lucide-react';
 import { format } from 'date-fns';
 import html2canvas from 'html2canvas';
