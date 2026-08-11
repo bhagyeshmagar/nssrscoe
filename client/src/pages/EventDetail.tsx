@@ -37,7 +37,6 @@ const EventDetail = () => {
     
     // Modal state
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [isRegistered, setIsRegistered] = useState(false);
 
     // Lightbox state
     const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -81,13 +80,6 @@ const EventDetail = () => {
             </div>
         );
     }
-
-    const handleRegisterSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        setTimeout(() => {
-            setIsRegistered(true);
-        }, 1500);
-    };
 
     const bannerImage = eventImages.find(img => img.isMaster)?.url || event?.imageUrl || eventImages[0]?.url;
 
@@ -327,10 +319,8 @@ const EventDetail = () => {
             <EventRegistrationModal
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
+                eventId={event.id}
                 eventTitle={event.title}
-                isRegistered={isRegistered}
-                onSubmit={handleRegisterSubmit}
-                onReset={() => setIsRegistered(false)}
             />
 
             {/* Lightbox Modal */}

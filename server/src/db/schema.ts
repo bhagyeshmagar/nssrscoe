@@ -17,6 +17,7 @@ import { relations } from 'drizzle-orm';
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const eventTypeEnum = pgEnum('event_type', ['upcoming', 'past']);
+export const registrationStatusEnum = pgEnum('registration_status', ['pending', 'approved', 'rejected']);
 export const mediaTypeEnum = pgEnum('media_type', ['image', 'video']);
 
 export const departmentEnum = pgEnum('department', [
@@ -296,6 +297,10 @@ export const eventRegistrations = pgTable('event_registrations', {
     department: varchar('department', { length: 100 }).notNull(),
     year: varchar('year', { length: 20 }).notNull(),
     visitorPassId: varchar('visitor_pass_id', { length: 50 }).unique(),
+    /** Admin approval workflow: pending → approved | rejected */
+    status: registrationStatusEnum('status').default('pending').notNull(),
+    approvedAt: timestamp('approved_at'),
+    approvedById: integer('approved_by_id').references(() => admins.id),
     createdAt: timestamp('created_at').defaultNow(),
 });
 

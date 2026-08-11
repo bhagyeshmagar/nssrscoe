@@ -13,7 +13,7 @@ import uploadRoutes from './routes/uploadRoutes';
 import eventImagesRoutes from './routes/eventImagesRoutes';
 import registrationRoutes from './routes/registrationRoutes';
 import { errorHandler } from './middleware/errorHandler';
-import { initSocket } from './services/socketService';
+import { initSocket } from './services/socketService'; 
 import { startCronJobs } from './services/cronService';
 
 // New AY-scoped route imports

@@ -26,6 +26,7 @@ const Volunteering = lazy(() => import('./pages/Volunteering'));
 const UpcomingEvents = lazy(() => import('./pages/UpcomingEvents'));
 const PastEvents = lazy(() => import('./pages/PastEvents'));
 const EventDetail = lazy(() => import('./pages/EventDetail'));
+const VolunteeringPassPage = lazy(() => import('./pages/VolunteeringPassPage'));
 
 // Loading fallback component
 const PageLoader = () => (
@@ -60,6 +61,7 @@ function App() {
               <Route path="/events/upcoming" element={<UpcomingEvents />} />
               <Route path="/events/past" element={<PastEvents />} />
               <Route path="/events/:id" element={<EventDetail />} />
+              <Route path="/events/pass/:visitorId" element={<VolunteeringPassPage />} />
 
               <Route path="/events/reports" element={<Reports />} />
               <Route path="/events/calendar" element={<Calendar />} />

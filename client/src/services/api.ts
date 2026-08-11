@@ -277,10 +277,12 @@ export const membersAPI = {
 };
 
 export const registrationsAPI = {
-    create:         (data: Omit<EventRegistration, 'id' | 'createdAt' | 'visitorPassId'>) =>
-        api.post<{ visitorPassId: string; id: number }>('/registrations', data),
-    getByVisitorId: (visitorId: string) => api.get<RegistrationWithEvent>(`/registrations/visitor/${visitorId}`),
-    getByEventId:   (eventId: number)   => api.get<EventRegistration[]>(`/registrations/event/${eventId}`),
+    create:         (data: Omit<EventRegistration, 'id' | 'createdAt' | 'visitorPassId' | 'status' | 'approvedAt' | 'approvedById'>) =>
+        api.post('/registrations', data),
+    getByVisitorId: (visitorId: string) => api.get(`/registrations/visitor/${visitorId}`),
+    getByEventId:   (eventId: number)   => api.get(`/registrations/event/${eventId}`),
+    approve:        (id: number)        => api.patch(`/registrations/${id}/approve`),
+    reject:         (id: number)        => api.patch(`/registrations/${id}/reject`),
 };
 
 export const settingsAPI = {
@@ -616,7 +618,11 @@ export interface SiteSettings {
 export interface EventRegistration {
     id: number; eventId: number; name: string; email: string;
     phone: string; department: string; year: string;
-    visitorPassId?: string; createdAt?: string;
+    visitorPassId?: string;
+    status?: 'pending' | 'approved' | 'rejected';
+    approvedAt?: string;
+    approvedById?: number;
+    createdAt?: string;
 }
 export interface RegistrationWithEvent { registration: EventRegistration; event: EventData; }
 
