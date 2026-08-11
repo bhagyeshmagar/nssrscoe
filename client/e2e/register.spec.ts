@@ -24,15 +24,15 @@ test.describe('Event Registration Flow', () => {
 
         // Verify the form fields are visible
         const nameInput = page.getByLabel(/Full Name/i);
-        const emailInput = page.getByLabel(/^Email$/i); // Label is exact "Email"
-        const phoneInput = page.getByLabel(/^Phone$/i); // Label is exact "Phone"
+        const emailInput = page.getByLabel(/Email Address/i);
+        const phoneInput = page.getByLabel(/Phone Number/i);
         
         await expect(nameInput).toBeVisible();
         await expect(emailInput).toBeVisible();
         await expect(phoneInput).toBeVisible();
 
         // The default view should be 'Register'
-        const submitBtn = page.getByRole('button', { name: /Register & Get Pass/i });
+        const submitBtn = page.getByRole('button', { name: /Submit Registration/i });
         await expect(submitBtn).toBeVisible();
 
         // Click the Check Pass button to toggle modes
@@ -40,7 +40,7 @@ test.describe('Event Registration Flow', () => {
         await lookupToggleBtn.click();
 
         // Verify that the view changed to Lookup mode
-        const lookupHeader = page.getByRole('heading', { name: 'Lookup Pass' });
+        const lookupHeader = page.getByRole('heading', { name: 'Check Your Pass' });
         await expect(lookupHeader).toBeVisible();
 
         const passIdInput = page.getByPlaceholder(/e.g. NSS-1234/i);
