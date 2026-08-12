@@ -1,5 +1,9 @@
 import { Resend } from 'resend';
 import nodemailer from 'nodemailer';
+import dns from 'dns';
+
+// Force IPv4 resolution to prevent ENETUNREACH errors on IPv6-disabled hosts (like Render)
+dns.setDefaultResultOrder('ipv4first');
 
 // ─── Resend (if API key is set) ───────────────────────────────────────────────
 const resendApiKey = process.env.RESEND_API_KEY;
