@@ -17,7 +17,9 @@ const fromEmail = process.env.EMAIL_FROM || 'onboarding@resend.dev';
 const gmailTransporter =
     process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD
         ? nodemailer.createTransport({
-              service: 'gmail',
+              host: 'smtp.gmail.com',
+              port: 465,
+              secure: true,
               auth: {
                   user: process.env.GMAIL_USER,
                   pass: process.env.GMAIL_APP_PASSWORD,
