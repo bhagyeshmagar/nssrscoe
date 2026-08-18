@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { authenticateToken, requireAdmin } from '../middleware/auth';
+import { authenticateToken, requireAdmin, requireSuperAdmin } from '../middleware/auth';
 import { requireAYUnlocked } from '../middleware/ayLock';
 import * as campCtrl from '../controllers/specialCampController';
 
@@ -14,11 +14,11 @@ const router = Router();
 
 router.get('/:campId',                              campCtrl.getCamp);
 router.put('/:campId',                              authenticateToken, requireAdmin, campCtrl.updateCamp);
-router.delete('/:campId',                           authenticateToken, requireAdmin, campCtrl.deleteCamp);
+router.delete('/:campId',                           authenticateToken, requireSuperAdmin, campCtrl.deleteCamp);
 router.post('/:campId/participants',                authenticateToken, requireAdmin, campCtrl.addParticipant);
 router.delete('/:campId/participants/:participantId', authenticateToken, requireAdmin, campCtrl.removeParticipant);
 router.put('/:campId/participants/bulk',            authenticateToken, requireAdmin, campCtrl.setParticipantsBulk);
-router.post('/:campId/finalize',                    authenticateToken, requireAdmin, campCtrl.finalizeCamp);
-router.post('/:campId/unlock',                      authenticateToken, requireAdmin, campCtrl.unlockCamp);
+router.post('/:campId/finalize',                    authenticateToken, requireSuperAdmin, campCtrl.finalizeCamp);
+router.post('/:campId/unlock',                      authenticateToken, requireSuperAdmin, campCtrl.unlockCamp);
 
 export default router;

@@ -1,5 +1,4 @@
- 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type { AcademicYear } from '../../services/api';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -24,7 +23,7 @@ export const AYStatusBadge = ({ ay }: { ay: AcademicYear }) => {
 };
 
 export const CapBar = ({ regular, cap }: { regular: number; cap: number }) => {
-    const pct = Math.min(100, Math.round((regular / cap) * 100));
+    const pct = cap > 0 ? Math.min(100, Math.round((regular / cap) * 100)) : 0;
     const colour = pct >= 100 ? 'bg-red-500' : pct >= 90 ? 'bg-yellow-500' : 'bg-emerald-500';
     return (
         <div>
@@ -63,10 +62,20 @@ export const StatCard = ({ title, count, color }: { title: string; count: number
 
 export function useFlash() {
     const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
+    const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    
     const flash = useCallback((type: 'ok' | 'err', text: string) => {
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
         setMsg({ type, text });
-        setTimeout(() => setMsg(null), 4000);
+        timeoutRef.current = setTimeout(() => setMsg(null), 4000);
     }, []);
+
+    useEffect(() => {
+        return () => {
+            if (timeoutRef.current) clearTimeout(timeoutRef.current);
+        };
+    }, []);
+
     return { msg, flash };
 }
 
@@ -75,7 +84,6 @@ export function useAYSelector(years: AcademicYear[], currentAY: AcademicYear | n
     
     useEffect(() => {
         if (!selectedAyId && years.length > 0) {
-             
             setSelectedAyId(currentAY?.id ?? years[0].id);
         }
     }, [currentAY, years, selectedAyId]);
@@ -84,3 +92,46 @@ export function useAYSelector(years: AcademicYear[], currentAY: AcademicYear | n
 
     return { selectedAyId, setSelectedAyId, selectedAY };
 }
+
+export const PasswordPromptModal = ({ isOpen, onSubmit, onClose, targetLabel }: { isOpen: boolean, onSubmit: (pwd: string) => Promise<boolean>, onClose: () => void, targetLabel: string }) => {
+    const [pwd, setPwd] = useState('');
+    const [loading, setLoading] = useState(false);
+    if (!isOpen) return null;
+
+    const handleSubmit = async () => {
+        if (!pwd.trim() || loading) return;
+        setLoading(true);
+        const success = await onSubmit(pwd);
+        setLoading(false);
+        if (success) {
+            setPwd('');
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden">
+                <div className="p-4 border-b bg-gray-50">
+                    <h3 className="font-bold text-gray-800">Superadmin Required</h3>
+                    <p className="text-sm text-gray-500 mt-1">Unlock {targetLabel}</p>
+                </div>
+                <div className="p-4">
+                    <input 
+                        type="password" 
+                        value={pwd} 
+                        onChange={e => setPwd(e.target.value)} 
+                        className="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-red-500" 
+                        placeholder="Enter superadmin password" 
+                        autoFocus 
+                        disabled={loading}
+                        onKeyDown={e => e.key === 'Enter' && handleSubmit()}
+                    />
+                </div>
+                <div className="p-4 bg-gray-50 flex justify-end gap-2 border-t">
+                    <button onClick={() => { onClose(); setPwd(''); }} disabled={loading} className="px-4 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-200 disabled:opacity-50">Cancel</button>
+                    <button onClick={handleSubmit} disabled={!pwd.trim() || loading} className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 text-sm font-medium disabled:opacity-50">{loading ? 'Unlocking...' : 'Unlock'}</button>
+                </div>
+            </div>
+        </div>
+    );
+};

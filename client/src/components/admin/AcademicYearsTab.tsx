@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { academicYearsAPI, uploadAPI } from '../../services/api';
 import type { AcademicYear } from '../../services/api';
-import { AYStatusBadge, useFlash } from './Shared';
+import { AYStatusBadge, useFlash, PasswordPromptModal } from './Shared';
 
 export const AcademicYearsTab = ({ years, onRefresh, isSuperadmin }: { years: AcademicYear[]; onRefresh: () => void; isSuperadmin: boolean }) => {
     const [form, setForm] = useState({ label: '', startDate: '', endDate: '', volunteerCap: '100' });
     const [showForm, setShowForm] = useState(false);
     const { msg, flash } = useFlash();
     const [busy, setBusy] = useState<number | null>(null);
+    const [unlockAy, setUnlockAy] = useState<AcademicYear | null>(null);
 
     const handleCreate = async () => {
         try {
@@ -17,15 +18,16 @@ export const AcademicYearsTab = ({ years, onRefresh, isSuperadmin }: { years: Ac
         } catch (e: any) { flash('err', e.response?.data?.message ?? 'Error.'); }
     };
     
-    const act = async (fn: () => Promise<any>, id: number) => {
+    const act = async (fn: () => Promise<unknown>, id: number) => {
         setBusy(id); 
         try { 
             await fn(); 
             onRefresh(); 
         } catch (e: any) { 
             flash('err', e.response?.data?.message ?? 'Error.'); 
-        } 
-        setBusy(null);
+        } finally {
+            setBusy(null);
+        }
     };
 
     const handleUploadReport = async (ayId: number, type: 'regularActivityReportUrl' | 'specialCampReportUrl', file: File) => {
@@ -35,8 +37,11 @@ export const AcademicYearsTab = ({ years, onRefresh, isSuperadmin }: { years: Ac
             await academicYearsAPI.update(ayId, { [type]: url });
             onRefresh();
             flash('ok', 'Report uploaded successfully.');
-        } catch (e: any) { flash('err', e.response?.data?.message ?? 'Upload failed.'); }
-        setBusy(null);
+        } catch (e: any) { 
+            flash('err', e.response?.data?.message ?? 'Upload failed.'); 
+        } finally {
+            setBusy(null);
+        }
     };
 
     return (
@@ -85,7 +90,7 @@ export const AcademicYearsTab = ({ years, onRefresh, isSuperadmin }: { years: Ac
                                     <button disabled={busy === ay.id} onClick={() => { if (confirm(`Archive AY ${ay.label}?`)) act(() => academicYearsAPI.archive(ay.id), ay.id); }} className="text-xs bg-gray-500 text-white px-3 py-1.5 rounded-lg hover:bg-gray-600 disabled:opacity-50">Archive</button>
                                 )}
                                 {isSuperadmin && ay.isLocked && !ay.isArchived && (
-                                    <button disabled={busy === ay.id} onClick={() => { const pwd = prompt(`Superadmin Password required to unlock AY ${ay.label}:`); if (pwd) act(() => academicYearsAPI.unlock(ay.id, pwd), ay.id); }} className="text-xs border border-red-500 text-red-600 px-3 py-1.5 rounded-lg hover:bg-red-50 disabled:opacity-50">🔓 Unlock</button>
+                                    <button disabled={busy === ay.id} onClick={() => setUnlockAy(ay)} className="text-xs border border-red-500 text-red-600 px-3 py-1.5 rounded-lg hover:bg-red-50 disabled:opacity-50">🔓 Unlock</button>
                                 )}
                                 {isSuperadmin && ay.isArchived && (
                                     <button disabled={busy === ay.id} onClick={() => { if (confirm(`Unarchive AY ${ay.label}?`)) act(() => academicYearsAPI.unarchive(ay.id), ay.id); }} className="text-xs bg-purple-600 text-white px-3 py-1.5 rounded-lg hover:bg-purple-700 disabled:opacity-50">Unarchive</button>
@@ -105,20 +110,39 @@ export const AcademicYearsTab = ({ years, onRefresh, isSuperadmin }: { years: Ac
                                         <span className="text-sm font-medium text-gray-700">Regular Activity Report</span>
                                         {ay.regularActivityReportUrl && <a href={uploadAPI.getFullUrl(ay.regularActivityReportUrl)} target="_blank" rel="noreferrer" className="text-xs text-blue-600 hover:underline flex items-center gap-1">📄 View</a>}
                                     </div>
-                                    <input type="file" accept=".pdf,.docx,.doc" onChange={e => { if (e.target.files?.[0]) handleUploadReport(ay.id, 'regularActivityReportUrl', e.target.files[0]); }} className="text-xs text-gray-500 w-full file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
+                                    <input disabled={busy === ay.id} type="file" accept=".pdf,.docx,.doc" onChange={e => { if (e.target.files?.[0]) handleUploadReport(ay.id, 'regularActivityReportUrl', e.target.files[0]); }} className="text-xs text-gray-500 w-full file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 disabled:opacity-50" />
                                 </div>
                                 <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">
                                     <div className="flex justify-between items-center mb-2">
                                         <span className="text-sm font-medium text-gray-700">Special Camp Report</span>
                                         {ay.specialCampReportUrl && <a href={uploadAPI.getFullUrl(ay.specialCampReportUrl)} target="_blank" rel="noreferrer" className="text-xs text-blue-600 hover:underline flex items-center gap-1">📄 View</a>}
                                     </div>
-                                    <input type="file" accept=".pdf,.docx,.doc" onChange={e => { if (e.target.files?.[0]) handleUploadReport(ay.id, 'specialCampReportUrl', e.target.files[0]); }} className="text-xs text-gray-500 w-full file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
+                                    <input disabled={busy === ay.id} type="file" accept=".pdf,.docx,.doc" onChange={e => { if (e.target.files?.[0]) handleUploadReport(ay.id, 'specialCampReportUrl', e.target.files[0]); }} className="text-xs text-gray-500 w-full file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 disabled:opacity-50" />
                                 </div>
                             </div>
                         </div>
                     </div>
                 ))}
             </div>
+
+            <PasswordPromptModal 
+                isOpen={!!unlockAy} 
+                targetLabel={`AY ${unlockAy?.label || ''}`}
+                onClose={() => setUnlockAy(null)} 
+                onSubmit={async (pwd) => {
+                    if (!unlockAy) return false;
+                    try {
+                        await academicYearsAPI.unlock(unlockAy.id, pwd);
+                        onRefresh();
+                        flash('ok', 'Academic year unlocked successfully.');
+                        setUnlockAy(null);
+                        return true;
+                    } catch (e: any) {
+                        flash('err', e.response?.data?.message ?? 'Invalid superadmin password.');
+                        return false;
+                    }
+                }} 
+            />
         </div>
     );
 };

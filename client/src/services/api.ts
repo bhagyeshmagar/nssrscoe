@@ -249,9 +249,9 @@ export const coreTeamDashboardAPI = {
 export const adminsAPI = {
     getMe:   () => api.get('/admins/me'),
     updateMe: (data: Record<string, unknown>) => api.put('/admins/me', data),
-    getAll:  () => api.get('/admins'),
-    create:  (data: Record<string, unknown>) => api.post('/admins', data),
-    update:  (id: number, data: Record<string, unknown>) => api.put(`/admins/${id}`, data),
+    getAll:  () => api.get<AdminData[]>('/admins'),
+    create:  (data: Record<string, unknown>) => api.post<AdminData>('/admins', data),
+    update:  (id: number, data: Record<string, unknown>) => api.put<AdminData>(`/admins/${id}`, data),
     delete:  (id: number) => api.delete(`/admins/${id}`),
 };
 
@@ -262,11 +262,24 @@ export const eventsAPI = {
     delete:  (id: number)                    => api.delete(`/events/${id}`),
 };
 
+export interface GalleryData {
+    title?: string;
+    description?: string;
+    url: string;
+    type: 'image' | 'video';
+    eventId?: number | null;
+    status?: 'pending' | 'approved' | 'rejected';
+    rejectionReason?: string | null;
+}
+
 export const galleryAPI = {
-    getAll:  () => api.get('/gallery'),
-    create:  (data: GalleryData) => api.post('/gallery', data),
-    update:  (id: number, data: Partial<GalleryData>) => api.put(`/gallery/${id}`, data),
-    delete:  (id: number) => api.delete(`/gallery/${id}`),
+    getAll: () => api.get('/gallery'),
+    getAdminAll: () => api.get('/gallery/admin'),
+    create: (data: GalleryData) => api.post('/gallery', data),
+    update: (id: number, data: Partial<GalleryData>) => api.put(`/gallery/${id}`, data),
+    delete: (id: number) => api.delete(`/gallery/${id}`),
+    approve: (id: number) => api.put(`/gallery/${id}/approve`, {}),
+    reject: (id: number, reason: string) => api.put(`/gallery/${id}/reject`, { reason })
 };
 
 export const membersAPI = {
@@ -319,6 +332,13 @@ export const eventImagesAPI = {
 };
 
 // ── Types ─────────────────────────────────────────────────────────────────────
+
+export interface AdminData {
+    id: number;
+    username: string;
+    isSuperadmin: boolean;
+    createdAt?: string;
+}
 
 export interface AcademicYear {
     id: number;
@@ -456,6 +476,7 @@ export interface CoreTeamRole {
     name: string;
     code: string;
     roleType: 'institution' | 'student';
+    category?: string;
     isUniquePerAy: boolean;
     displayOrder: number;
 }
@@ -603,7 +624,8 @@ export interface EventData {
 
 export interface EventImageData { url: string; isMaster?: boolean; caption?: string; }
 export interface EventImage extends EventImageData { id: number; eventId: number; createdAt: string; }
-export interface GalleryData { title?: string; url: string; type?: 'image' | 'video'; eventId?: number | null; }
+
+export interface GalleryItem extends GalleryData { id: number; createdAt?: string; }
 export interface MemberData { id?: number; name: string; role: string; photoUrl?: string; year?: string; order?: number; category?: string; }
 export interface SiteSettings {
     heroTitle?: string; heroSubtitle?: string; heroCta?: string;
@@ -611,6 +633,8 @@ export interface SiteSettings {
     statVolunteersCount?: string; statVolunteersLabel?: string;
     statImpactCount?: string; statImpactLabel?: string;
     aboutMission?: string; aboutHistory?: string; aboutText?: string; aboutTeamPhoto?: string;
+    aboutDirectorMessage?: string; aboutDirectorName?: string; aboutDirectorPhoto?: string;
+    aboutPoMessage?: string; aboutPoName?: string; aboutPoPhoto?: string;
     contactEmail?: string; contactPhone?: string; contactAddress?: string;
     socialInstagram?: string; socialFacebook?: string; socialTwitter?: string; socialYoutube?: string;
     homeSliderImages?: string;
@@ -656,6 +680,7 @@ export interface CreateMeetingData {
 export interface MeetingAttendanceExportRow {
     srNo: number;
     name: string;
+    prnNo: string;
     department: string;
     volunteerType: string;
     attendance: string;
@@ -675,6 +700,7 @@ export interface MeetingAttendanceWithVolunteer {
     volunteer: {
         id: number;
         name: string;
+        prnNo?: string | null;
         department: string;
         status: string;
     };

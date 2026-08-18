@@ -5,7 +5,7 @@ import { CapBar, useFlash, useAYSelector, DEPT_LIST } from './Shared';
 import { ExportDataModal } from '../common/ExportDataModal';
 import { Download } from 'lucide-react';
 
-export const AYVolunteersTab = ({ years, currentAY }: { years: AcademicYear[]; currentAY: AcademicYear | null }) => {
+export const AYVolunteersTab = ({ years, currentAY, isSuperadmin }: { years: AcademicYear[]; currentAY: AcademicYear | null; isSuperadmin?: boolean }) => {
     const { selectedAyId, setSelectedAyId, selectedAY } = useAYSelector(years, currentAY);
     const [vols, setVols] = useState<VolunteerWithProfile[]>([]);
     const [stats, setStats] = useState<AYStats | null>(null);
@@ -15,9 +15,14 @@ export const AYVolunteersTab = ({ years, currentAY }: { years: AcademicYear[]; c
     const [totalPages, setTotalPages] = useState(1);
     const [showForm, setShowForm] = useState(false);
     const [viewProfileId, setViewProfileId] = useState<number | null>(null);
-    const [showExportModal, setShowExportModal] = useState(false);
-    const [form, setForm] = useState<CreateVolunteerData>({ name: '', email: '', password: '12345678', department: 'Computer Engineering' as Department });
+    const [exportStatus, setExportStatus] = useState<'idle' | 'loading' | 'ready'>('idle');
+    const [exportData, setExportData] = useState<VolunteerWithProfile[]>([]);
+    
+    const generatePassword = () => Math.random().toString(36).slice(-8);
+    const [form, setForm] = useState<CreateVolunteerData>({ name: '', email: '', password: generatePassword(), department: 'Computer Engineering' as Department });
     const { msg, flash } = useFlash();
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [actionId, setActionId] = useState<number | null>(null);
     const [attendance, setAttendance] = useState<VolunteerAttendanceRecord[]>([]);
     const [loadingAttendance, setLoadingAttendance] = useState(false);
 
@@ -38,7 +43,10 @@ export const AYVolunteersTab = ({ years, currentAY }: { years: AcademicYear[]; c
             setVols(vRes.data.data?.data || []);
             setTotalPages(vRes.data.meta?.totalPages || 1);
             setStats(sRes.data.data);
-        } catch (e) { console.error(e); }
+        } catch (e: any) {
+            console.error(e);
+            flash('err', e.response?.data?.message || 'Failed to load volunteers.');
+        }
     }, [selectedAyId, filter, page]);
 
     useEffect(() => { load(); }, [load]);
@@ -76,34 +84,89 @@ export const AYVolunteersTab = ({ years, currentAY }: { years: AcademicYear[]; c
     }, [currentAY, years, selectedAyId]);
 
     const handleCreate = async () => {
+        if (isSubmitting) return;
+        setIsSubmitting(true);
         try { 
-            await volunteersAPI.create(selectedAyId, form); 
+            await volunteersAPI.create(selectedAyId!, form); 
             setShowForm(false); 
-            setForm({ name: '', email: '', password: '12345678', department: 'Computer Engineering' as Department }); 
+            setForm({ name: '', email: '', password: generatePassword(), department: 'Computer Engineering' as Department }); 
             flash('ok', 'Volunteer added.'); 
             load(); 
         } catch (e: any) { 
             flash('err', e.response?.data?.message ?? 'Error.'); 
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
     const handleDelete = async (id: number) => {
         if (!confirm('Delete?')) return;
+        setActionId(id);
         try { 
-            await volunteersAPI.delete(selectedAyId, id); 
+            await volunteersAPI.delete(selectedAyId!, id); 
             flash('ok', 'Deleted.'); 
             load(); 
         } catch (e: any) { 
             flash('err', e.response?.data?.message ?? 'Error.'); 
+        } finally {
+            setActionId(null);
         }
     };
 
     const handleStatusChange = async (id: number, s: 'regular' | 'backup') => {
+        setActionId(id);
         try { 
             await volunteersAPI.changeStatus(selectedAyId!, id, s); 
             load(); 
         } catch (e: any) { 
             flash('err', e.response?.data?.message ?? 'Error.'); 
+        } finally {
+            setActionId(null);
+        }
+    };
+
+    const handleExportClick = async () => {
+        if (!selectedAyId) return;
+        setExportStatus('loading');
+        try {
+            let allVols: VolunteerWithProfile[] = [];
+            let currentExportPage = 1;
+            let exportTotalPages = 1;
+
+            const fetchPage = (p: number) => volunteersAPI.getByAY(selectedAyId, { 
+                ...(filter.dept && { department: filter.dept }), 
+                ...(filter.status && { status: filter.status }), 
+                ...(filter.search && { search: filter.search }),
+                ...(filter.sortBy === 'department' && { sortBy: 'department' }),
+                page: p,
+                limit: 1000
+            });
+
+            const firstRes = await fetchPage(currentExportPage);
+            if (firstRes.data) {
+                allVols = allVols.concat(firstRes.data.data?.data || []);
+                exportTotalPages = firstRes.data.meta?.totalPages || 1;
+            }
+
+            const MAX_PAGES = 100; // Safety cap
+            while (currentExportPage < exportTotalPages && currentExportPage < MAX_PAGES) {
+                currentExportPage++;
+                const res = await fetchPage(currentExportPage);
+                if (res.data) {
+                    allVols = allVols.concat(res.data.data?.data || []);
+                }
+            }
+
+            if (exportTotalPages > MAX_PAGES) {
+                flash('err', `Export truncated to first ${MAX_PAGES * 1000} records.`);
+            }
+
+            setExportData(allVols);
+            setExportStatus('ready');
+        } catch (e: any) {
+            console.error(e);
+            flash('err', 'Failed to prepare export data.');
+            setExportStatus('idle');
         }
     };
 
@@ -115,10 +178,10 @@ export const AYVolunteersTab = ({ years, currentAY }: { years: AcademicYear[]; c
                     <select value={selectedAyId || ''} onChange={e => setSelectedAyId(Number(e.target.value))} className="border rounded-lg px-3 py-2 text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500">
                         {years.map(y => <option key={y.id} value={y.id}>{y.label} {y.isCurrent ? '(Active)' : y.isLocked ? '[Locked]' : ''}</option>)}
                     </select>
-                    <button onClick={() => setShowExportModal(true)} className="bg-green-600 text-white px-3 py-2 rounded-lg hover:bg-green-700 text-sm font-medium flex items-center">
-                        <Download className="w-4 h-4 mr-1" /> Export
+                    <button onClick={handleExportClick} disabled={exportStatus === 'loading'} className="bg-green-600 text-white px-3 py-2 rounded-lg hover:bg-green-700 text-sm font-medium flex items-center disabled:opacity-50">
+                        <Download className="w-4 h-4 mr-1" /> {exportStatus === 'loading' ? 'Preparing...' : 'Export'}
                     </button>
-                    {selectedAY && !selectedAY.isLocked && <button onClick={() => setShowForm(!showForm)} className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm font-medium">+ Add</button>}
+                    {selectedAY && !selectedAY.isLocked && <button onClick={() => setShowForm(!showForm)} disabled={isSubmitting} className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm font-medium disabled:opacity-50">+ Add</button>}
                 </div>
             </div>
 
@@ -155,8 +218,8 @@ export const AYVolunteersTab = ({ years, currentAY }: { years: AcademicYear[]; c
                             </select></div>
                     </div>
                     <div className="flex gap-3">
-                        <button onClick={handleCreate} className="bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700 text-sm font-medium">Add</button>
-                        <button onClick={() => setShowForm(false)} className="border px-5 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
+                        <button onClick={handleCreate} disabled={isSubmitting} className="bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700 text-sm font-medium disabled:opacity-50">{isSubmitting ? 'Adding...' : 'Add'}</button>
+                        <button onClick={() => setShowForm(false)} disabled={isSubmitting} className="border px-5 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50">Cancel</button>
                     </div>
                 </div>
             )}
@@ -199,11 +262,11 @@ export const AYVolunteersTab = ({ years, currentAY }: { years: AcademicYear[]; c
                                 <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded-full text-xs ${v.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>{v.isActive ? 'Active' : 'Inactive'}</span></td>
                                 <td className="px-4 py-3">
                                     <div className="flex gap-1 flex-wrap">
-                                        <button onClick={() => setViewProfileId(v.id)} className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-700 hover:bg-blue-200">View</button>
+                                        <button onClick={() => setViewProfileId(v.id)} disabled={actionId === v.id} className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-700 hover:bg-blue-200 disabled:opacity-50">View</button>
                                         {selectedAY && !selectedAY.isLocked && (
                                             <>
-                                                <button onClick={() => handleStatusChange(v.id, v.status === 'regular' ? 'backup' : 'regular')} className="text-xs px-2 py-1 rounded bg-yellow-100 text-yellow-700 hover:bg-yellow-200">→ {v.status === 'regular' ? 'Backup' : 'Regular'}</button>
-                                                <button onClick={() => handleDelete(v.id)} className="text-xs px-2 py-1 rounded bg-red-100 text-red-700 hover:bg-red-200">Del</button>
+                                                <button onClick={() => handleStatusChange(v.id, v.status === 'regular' ? 'backup' : 'regular')} disabled={actionId === v.id} className="text-xs px-2 py-1 rounded bg-yellow-100 text-yellow-700 hover:bg-yellow-200 disabled:opacity-50">→ {v.status === 'regular' ? 'Backup' : 'Regular'}</button>
+                                                <button onClick={() => handleDelete(v.id)} disabled={actionId === v.id} className="text-xs px-2 py-1 rounded bg-red-100 text-red-700 hover:bg-red-200 disabled:opacity-50">Del</button>
                                             </>
                                         )}
                                     </div>
@@ -234,7 +297,8 @@ export const AYVolunteersTab = ({ years, currentAY }: { years: AcademicYear[]; c
                             <VolunteerProfileModal 
                                 vol={vols.find(v => v.id === viewProfileId)} 
                                 attendance={attendance} 
-                                loadingAttendance={loadingAttendance} 
+                                loadingAttendance={loadingAttendance}
+                                isSuperadmin={isSuperadmin}
                             />
                         </div>
                     </div>
@@ -242,9 +306,9 @@ export const AYVolunteersTab = ({ years, currentAY }: { years: AcademicYear[]; c
             )}
 
             <ExportDataModal 
-                isOpen={showExportModal}
-                onClose={() => setShowExportModal(false)}
-                data={vols.map(v => ({
+                isOpen={exportStatus === 'ready'}
+                onClose={() => setExportStatus('idle')}
+                data={exportData.map(v => ({
                     id: v.id,
                     name: v.name,
                     email: v.email,
@@ -276,9 +340,11 @@ export const AYVolunteersTab = ({ years, currentAY }: { years: AcademicYear[]; c
                     { key: 'nssYear', label: 'NSS Year' },
                     { key: 'cgpa', label: 'CGPA' },
                     { key: 'eligibilityNo', label: 'Eligibility No' },
-                    { key: 'religion', label: 'Religion' },
-                    { key: 'caste', label: 'Caste' },
-                    { key: 'casteCategory', label: 'Caste Category' },
+                    ...(isSuperadmin ? [
+                        { key: 'religion', label: 'Religion' },
+                        { key: 'caste', label: 'Caste' },
+                        { key: 'casteCategory', label: 'Caste Category' }
+                    ] : []),
                     { key: 'phoneNo', label: 'Phone Number' }
                 ]}
                 filename={`Volunteers_Export_AY_${selectedAY?.label || 'All'}`}
@@ -287,8 +353,8 @@ export const AYVolunteersTab = ({ years, currentAY }: { years: AcademicYear[]; c
     );
 };
 
-const VolunteerProfileModal = ({ vol, attendance, loadingAttendance }: { vol: any, attendance: any[], loadingAttendance: boolean }) => {
-    if (!vol) return <p>Loading...</p>;
+const VolunteerProfileModal = ({ vol, attendance, loadingAttendance, isSuperadmin }: { vol?: VolunteerWithProfile, attendance: VolunteerAttendanceRecord[], loadingAttendance: boolean, isSuperadmin?: boolean }) => {
+    if (!vol) return <div className="py-8 text-center text-gray-500 font-medium">Volunteer not found or deleted.</div>;
     const p = vol.profile || {};
     const presentAttendance = attendance.filter(a => a.status === 'present');
     
@@ -327,8 +393,12 @@ const VolunteerProfileModal = ({ vol, attendance, loadingAttendance }: { vol: an
                 <h5 className="font-bold text-gray-800 mb-3 border-b pb-1">Personal Details</h5>
                 {renderField('Phone Number', p.phoneNo)}
                 {renderField('Email ID', p.emailId)}
-                {renderField('Caste Category', p.casteCategory)}
-                {renderField('Religion / Caste', `${p.religion || '-'} / ${p.caste || '-'}`)}
+                {isSuperadmin && (
+                    <>
+                        {renderField('Caste Category', p.casteCategory)}
+                        {renderField('Religion / Caste', `${p.religion || '-'} / ${p.caste || '-'}`)}
+                    </>
+                )}
             </div>
             {p.experienceText && (
                 <div className="col-span-full mt-4 bg-blue-50/50 border border-blue-100 p-4 rounded-lg">
@@ -372,4 +442,3 @@ const VolunteerProfileModal = ({ vol, attendance, loadingAttendance }: { vol: an
         </div>
     );
 };
-

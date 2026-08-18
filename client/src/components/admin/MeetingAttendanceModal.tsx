@@ -18,11 +18,13 @@ export const MeetingAttendanceModal = ({ meetingId, meetingStatus, meetingType, 
     const [attendanceList, setAttendanceList] = useState<MeetingAttendanceWithVolunteer[]>([]);
     const [stats, setStats] = useState<MeetingAttendanceStats | null>(null);
     const [loading, setLoading] = useState(false);
+    const [markingId, setMarkingId] = useState<number | null>(null);
     
     // Filters
     const [searchTerm, setSearchTerm] = useState('');
     const [deptFilter, setDeptFilter] = useState('');
     const [typeFilter, setTypeFilter] = useState(''); // 'regular' | 'backup'
+    const [sortBy, setSortBy] = useState<'name' | 'department'>('department');
 
     const { token } = useAuthStore();
     const isSuperadmin = token ? decodeToken(token)?.isSuperadmin : false;
@@ -56,6 +58,7 @@ export const MeetingAttendanceModal = ({ meetingId, meetingStatus, meetingType, 
             return;
         }
         
+        setMarkingId(volunteerId);
         try {
             await meetingsAPI.markAttendance(meetingId, volunteerId, { status });
             toast.success('Attendance marked');
@@ -63,6 +66,8 @@ export const MeetingAttendanceModal = ({ meetingId, meetingStatus, meetingType, 
         } catch (error) {
             console.error('Failed to mark attendance', error);
             toast.error('Failed to mark attendance');
+        } finally {
+            setMarkingId(null);
         }
     };
 
@@ -71,6 +76,13 @@ export const MeetingAttendanceModal = ({ meetingId, meetingStatus, meetingType, 
         const matchDept = deptFilter ? item.volunteer.department === deptFilter : true;
         const matchType = typeFilter ? item.volunteer.status === typeFilter : true;
         return matchSearch && matchDept && matchType;
+    });
+
+    const sortedList = [...filteredList].sort((a, b) => {
+        if (sortBy === 'name') {
+            return a.volunteer.name.localeCompare(b.volunteer.name);
+        }
+        return a.volunteer.department.localeCompare(b.volunteer.department) || a.volunteer.name.localeCompare(b.volunteer.name);
     });
 
     const departments = Array.from(new Set(attendanceList.map(item => item.volunteer.department)));
@@ -158,6 +170,14 @@ export const MeetingAttendanceModal = ({ meetingId, meetingStatus, meetingType, 
                         <option value="regular">Regular</option>
                         <option value="backup">Backup</option>
                     </select>
+                    <select 
+                        value={sortBy} 
+                        onChange={e => setSortBy(e.target.value as 'name' | 'department')}
+                        className="border rounded-lg px-4 py-2 bg-white"
+                    >
+                        <option value="department">Sort by: Department</option>
+                        <option value="name">Sort by: Name</option>
+                    </select>
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-6">
@@ -167,6 +187,7 @@ export const MeetingAttendanceModal = ({ meetingId, meetingStatus, meetingType, 
                         <table className="w-full text-left">
                             <thead className="bg-gray-50 sticky top-0">
                                 <tr>
+                                    <th className="p-3 text-sm font-semibold text-gray-600">PRN No.</th>
                                     <th className="p-3 text-sm font-semibold text-gray-600">Volunteer</th>
                                     <th className="p-3 text-sm font-semibold text-gray-600">Department</th>
                                     <th className="p-3 text-sm font-semibold text-gray-600">Type</th>
@@ -175,8 +196,9 @@ export const MeetingAttendanceModal = ({ meetingId, meetingStatus, meetingType, 
                                 </tr>
                             </thead>
                             <tbody className="divide-y text-sm">
-                                {filteredList.map(({ volunteer, attendance }) => (
+                                {sortedList.map(({ volunteer, attendance }) => (
                                     <tr key={volunteer.id} className="hover:bg-gray-50 transition">
+                                        <td className="p-3 text-gray-500">{volunteer.prnNo || 'N/A'}</td>
                                         <td className="p-3 font-medium text-gray-800">{volunteer.name}</td>
                                         <td className="p-3 text-gray-600">{volunteer.department}</td>
                                         <td className="p-3">
@@ -196,23 +218,23 @@ export const MeetingAttendanceModal = ({ meetingId, meetingStatus, meetingType, 
                                         <td className="p-3">
                                             <div className="flex gap-2">
                                                 <button
-                                                    disabled={!canEdit}
+                                                    disabled={!canEdit || markingId === volunteer.id}
                                                     onClick={() => handleMark(volunteer.id, 'present')}
-                                                    className={`px-3 py-1 text-xs rounded transition ${attendance?.status === 'present' ? 'bg-green-600 text-white' : 'bg-gray-100 hover:bg-green-100 text-gray-600'} ${!canEdit && 'opacity-50 cursor-not-allowed'}`}
+                                                    className={`px-3 py-1 text-xs rounded transition ${attendance?.status === 'present' ? 'bg-green-600 text-white' : 'bg-gray-100 hover:bg-green-100 text-gray-600'} ${(!canEdit || markingId === volunteer.id) && 'opacity-50 cursor-not-allowed'}`}
                                                 >
                                                     P
                                                 </button>
                                                 <button
-                                                    disabled={!canEdit}
+                                                    disabled={!canEdit || markingId === volunteer.id}
                                                     onClick={() => handleMark(volunteer.id, 'absent')}
-                                                    className={`px-3 py-1 text-xs rounded transition ${attendance?.status === 'absent' ? 'bg-red-600 text-white' : 'bg-gray-100 hover:bg-red-100 text-gray-600'} ${!canEdit && 'opacity-50 cursor-not-allowed'}`}
+                                                    className={`px-3 py-1 text-xs rounded transition ${attendance?.status === 'absent' ? 'bg-red-600 text-white' : 'bg-gray-100 hover:bg-red-100 text-gray-600'} ${(!canEdit || markingId === volunteer.id) && 'opacity-50 cursor-not-allowed'}`}
                                                 >
                                                     A
                                                 </button>
                                                 <button
-                                                    disabled={!canEdit}
+                                                    disabled={!canEdit || markingId === volunteer.id}
                                                     onClick={() => handleMark(volunteer.id, 'late')}
-                                                    className={`px-3 py-1 text-xs rounded transition ${attendance?.status === 'late' ? 'bg-orange-500 text-white' : 'bg-gray-100 hover:bg-orange-100 text-gray-600'} ${!canEdit && 'opacity-50 cursor-not-allowed'}`}
+                                                    className={`px-3 py-1 text-xs rounded transition ${attendance?.status === 'late' ? 'bg-orange-500 text-white' : 'bg-gray-100 hover:bg-orange-100 text-gray-600'} ${(!canEdit || markingId === volunteer.id) && 'opacity-50 cursor-not-allowed'}`}
                                                 >
                                                     L
                                                 </button>

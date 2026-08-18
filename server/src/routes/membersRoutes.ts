@@ -1,12 +1,12 @@
 import { Router } from 'express';
 import { getMembers, createMember, updateMember, deleteMember } from '../controllers/membersController';
-import { authenticateToken } from '../middleware/auth';
+import { requireSuperAdmin } from '../middleware/auth';
 
 const router = Router();
 
 router.get('/', getMembers);
-router.post('/', authenticateToken, createMember);
-router.put('/:id', authenticateToken, updateMember);
-router.delete('/:id', authenticateToken, deleteMember);
+router.post('/', requireSuperAdmin, createMember);
+router.put('/:id', requireSuperAdmin, updateMember);
+router.delete('/:id', requireSuperAdmin, deleteMember);
 
 export default router;

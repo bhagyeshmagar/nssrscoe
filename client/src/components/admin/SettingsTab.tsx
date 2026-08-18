@@ -1,11 +1,15 @@
 import { useState, useEffect } from 'react';
 import ImageCropperModal from '../common/ImageCropperModal';
-import { settingsAPI, uploadAPI } from '../../services/api';
+import { settingsAPI, uploadAPI, decodeToken } from '../../services/api';
 import type { SiteSettings, EventData } from '../../services/api';
+import { useAuthStore } from '../../stores/authStore';
+import toast from 'react-hot-toast';
 
-type SliderImage = { url: string; description: string; eventId?: number };
+type SliderImage = { id: string; url: string; description: string; eventId?: number };
 
 export const SettingsTab = ({ settings, events = [], onRefresh }: { settings: SiteSettings | null, events?: EventData[], onRefresh: () => void }) => {
+    const { token } = useAuthStore();
+    const isSuperadmin = token ? decodeToken(token)?.isSuperadmin : false;
     const [formData, setFormData] = useState<SiteSettings>({
         heroTitle: '',
         heroSubtitle: '',
@@ -19,6 +23,12 @@ export const SettingsTab = ({ settings, events = [], onRefresh }: { settings: Si
         aboutMission: '',
         aboutHistory: '',
         aboutTeamPhoto: '',
+        aboutDirectorMessage: '',
+        aboutDirectorName: '',
+        aboutDirectorPhoto: '',
+        aboutPoMessage: '',
+        aboutPoName: '',
+        aboutPoPhoto: '',
         homeSliderImages: '[]',
         socialInstagram: '',
         socialFacebook: '',
@@ -31,6 +41,8 @@ export const SettingsTab = ({ settings, events = [], onRefresh }: { settings: Si
     const [sliderImages, setSliderImages] = useState<SliderImage[]>([]);
     const [uploadingImage, setUploadingImage] = useState(false);
     const [uploadingTeamPhoto, setUploadingTeamPhoto] = useState(false);
+    const [uploadingDirectorPhoto, setUploadingDirectorPhoto] = useState(false);
+    const [uploadingPoPhoto, setUploadingPoPhoto] = useState(false);
     
     // Image Cropper State
     const [cropModalOpen, setCropModalOpen] = useState(false);
@@ -47,7 +59,10 @@ export const SettingsTab = ({ settings, events = [], onRefresh }: { settings: Si
             });
             try {
                 if (settings.homeSliderImages) {
-                    setSliderImages(JSON.parse(settings.homeSliderImages));
+                    const parsed = JSON.parse(settings.homeSliderImages);
+                    if (Array.isArray(parsed)) {
+                        setSliderImages(parsed.map((img: any) => ({ ...img, id: img.id || crypto.randomUUID() })));
+                    }
                 }
             } catch (e) {
                 console.error('Failed to parse homeSliderImages', e);
@@ -64,14 +79,18 @@ export const SettingsTab = ({ settings, events = [], onRefresh }: { settings: Si
                 homeSliderImages: JSON.stringify(sliderImages)
             };
             await settingsAPI.update(dataToSave);
-            alert('Settings saved successfully!');
+            toast.success('Settings saved successfully!');
             onRefresh();
         } catch (error) {
             console.error('Error saving settings:', error);
-            alert('Error saving settings');
+            toast.error('Error saving settings');
         }
         setSaving(false);
     };
+
+    if (!isSuperadmin) {
+        return <div className="p-6 text-center text-gray-500">You do not have permission to edit site settings.</div>;
+    }
 
     return (
         <div>
@@ -160,7 +179,7 @@ export const SettingsTab = ({ settings, events = [], onRefresh }: { settings: Si
                                                             setFormData({ ...formData, aboutTeamPhoto: result.url });
                                                         } catch (err) {
                                                             console.error('Error uploading team photo', err);
-                                                            alert('Error uploading image');
+                                                            toast.error('Error uploading image');
                                                         }
                                                         setUploadingTeamPhoto(false);
                                                     });
@@ -172,6 +191,124 @@ export const SettingsTab = ({ settings, events = [], onRefresh }: { settings: Si
                                         }}
                                     />
                                 </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Leadership Section */}
+                <div className="bg-white p-6 rounded-lg shadow">
+                    <h3 className="text-lg font-semibold mb-4 text-nss-blue">Leadership Messages</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        {/* Director's Info */}
+                        <div className="space-y-4">
+                            <h4 className="font-semibold text-gray-800 border-b pb-2">Director's Info</h4>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Director's Name</label>
+                                <input type="text" value={formData.aboutDirectorName || ''} onChange={e => setFormData({ ...formData, aboutDirectorName: e.target.value })} className="w-full border rounded px-3 py-2" placeholder="Dr. XYZ" />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Director's Message</label>
+                                <textarea value={formData.aboutDirectorMessage || ''} onChange={e => setFormData({ ...formData, aboutDirectorMessage: e.target.value })} className="w-full border rounded px-3 py-2" rows={5} placeholder="Message from the Director..." />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Director's Photo</label>
+                                <div className="flex items-center gap-4">
+                                    {formData.aboutDirectorPhoto && (
+                                        <img src={uploadAPI.getFullUrl(formData.aboutDirectorPhoto)} alt="Director" className="h-20 w-20 object-cover rounded-full shadow" />
+                                    )}
+                                    <label className="cursor-pointer">
+                                        <span className="bg-gray-100 border border-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-200 transition inline-block">
+                                            {uploadingDirectorPhoto ? 'Uploading...' : (formData.aboutDirectorPhoto ? 'Change Photo' : 'Upload Photo')}
+                                        </span>
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            className="hidden"
+                                            disabled={uploadingDirectorPhoto}
+                                            onChange={(e) => {
+                                                const file = e.target.files?.[0];
+                                                if (file) {
+                                                    const reader = new FileReader();
+                                                    reader.onload = () => {
+                                                        setCropImageSrc(reader.result as string);
+                                                        setCropAspect(1);
+                                                        setCropCallback(() => async (croppedFile: File) => {
+                                                            setUploadingDirectorPhoto(true);
+                                                            try {
+                                                                const result = await uploadAPI.uploadFile(croppedFile);
+                                                                setFormData({ ...formData, aboutDirectorPhoto: result.url });
+                                                            } catch (err) {
+                                                                console.error('Error uploading director photo', err);
+                                                                toast.error('Error uploading image');
+                                                            }
+                                                            setUploadingDirectorPhoto(false);
+                                                        });
+                                                        setCropModalOpen(true);
+                                                    };
+                                                    reader.readAsDataURL(file);
+                                                    e.target.value = '';
+                                                }
+                                            }}
+                                        />
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* NSS PO's Info */}
+                        <div className="space-y-4">
+                            <h4 className="font-semibold text-gray-800 border-b pb-2">NSS PO's Info</h4>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">NSS PO's Name</label>
+                                <input type="text" value={formData.aboutPoName || ''} onChange={e => setFormData({ ...formData, aboutPoName: e.target.value })} className="w-full border rounded px-3 py-2" placeholder="Prof. ABC" />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">NSS PO's Message</label>
+                                <textarea value={formData.aboutPoMessage || ''} onChange={e => setFormData({ ...formData, aboutPoMessage: e.target.value })} className="w-full border rounded px-3 py-2" rows={5} placeholder="Message from the NSS PO..." />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">NSS PO's Photo</label>
+                                <div className="flex items-center gap-4">
+                                    {formData.aboutPoPhoto && (
+                                        <img src={uploadAPI.getFullUrl(formData.aboutPoPhoto)} alt="NSS PO" className="h-20 w-20 object-cover rounded-full shadow" />
+                                    )}
+                                    <label className="cursor-pointer">
+                                        <span className="bg-gray-100 border border-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-200 transition inline-block">
+                                            {uploadingPoPhoto ? 'Uploading...' : (formData.aboutPoPhoto ? 'Change Photo' : 'Upload Photo')}
+                                        </span>
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            className="hidden"
+                                            disabled={uploadingPoPhoto}
+                                            onChange={(e) => {
+                                                const file = e.target.files?.[0];
+                                                if (file) {
+                                                    const reader = new FileReader();
+                                                    reader.onload = () => {
+                                                        setCropImageSrc(reader.result as string);
+                                                        setCropAspect(1);
+                                                        setCropCallback(() => async (croppedFile: File) => {
+                                                            setUploadingPoPhoto(true);
+                                                            try {
+                                                                const result = await uploadAPI.uploadFile(croppedFile);
+                                                                setFormData({ ...formData, aboutPoPhoto: result.url });
+                                                            } catch (err) {
+                                                                console.error('Error uploading PO photo', err);
+                                                                toast.error('Error uploading image');
+                                                            }
+                                                            setUploadingPoPhoto(false);
+                                                        });
+                                                        setCropModalOpen(true);
+                                                    };
+                                                    reader.readAsDataURL(file);
+                                                    e.target.value = '';
+                                                }
+                                            }}
+                                        />
+                                    </label>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -209,7 +346,7 @@ export const SettingsTab = ({ settings, events = [], onRefresh }: { settings: Si
 
                     <div className="space-y-4">
                         {sliderImages.map((img, index) => (
-                            <div key={index} className="flex flex-col md:flex-row gap-4 items-start border p-4 rounded bg-gray-50">
+                            <div key={img.id} className="flex flex-col md:flex-row gap-4 items-start border p-4 rounded bg-gray-50">
                                 {/* Badge for first image */}
                                 <div className="w-full md:w-1/3 relative">
                                     {index === 0 && (
@@ -223,9 +360,7 @@ export const SettingsTab = ({ settings, events = [], onRefresh }: { settings: Si
                                         <textarea
                                             value={img.description}
                                             onChange={e => {
-                                                const newImages = [...sliderImages];
-                                                newImages[index] = { ...newImages[index], description: e.target.value };
-                                                setSliderImages(newImages);
+                                                setSliderImages(sliderImages.map(s => s.id === img.id ? { ...s, description: e.target.value } : s));
                                             }}
                                             className="w-full border rounded px-3 py-2"
                                             rows={2}
@@ -237,9 +372,8 @@ export const SettingsTab = ({ settings, events = [], onRefresh }: { settings: Si
                                         <select
                                             value={img.eventId ?? ''}
                                             onChange={e => {
-                                                const newImages = [...sliderImages];
-                                                newImages[index] = { ...newImages[index], eventId: e.target.value ? Number(e.target.value) : undefined };
-                                                setSliderImages(newImages);
+                                                const eventId = e.target.value ? Number(e.target.value) : undefined;
+                                                setSliderImages(sliderImages.map(s => s.id === img.id ? { ...s, eventId } : s));
                                             }}
                                             className="w-full border rounded px-3 py-2 bg-white text-sm"
                                         >
@@ -254,7 +388,11 @@ export const SettingsTab = ({ settings, events = [], onRefresh }: { settings: Si
                                     <div className="flex justify-end">
                                         <button
                                             type="button"
-                                            onClick={() => setSliderImages(sliderImages.filter((_, i) => i !== index))}
+                                            onClick={() => {
+                                                if (window.confirm('Are you sure you want to remove this slider image?')) {
+                                                    setSliderImages(sliderImages.filter(s => s.id !== img.id));
+                                                }
+                                            }}
                                             className="text-red-500 hover:text-red-700 text-sm font-medium"
                                         >
                                             Remove Image
@@ -286,10 +424,10 @@ export const SettingsTab = ({ settings, events = [], onRefresh }: { settings: Si
                                                     setUploadingImage(true);
                                                     try {
                                                         const result = await uploadAPI.uploadFile(croppedFile);
-                                                        setSliderImages([{ url: result.url, description: '', eventId: undefined }, ...sliderImages]);
+                                                        setSliderImages([{ id: crypto.randomUUID(), url: result.url, description: '', eventId: undefined }, ...sliderImages]);
                                                     } catch (err) {
                                                         console.error('Error uploading slider image', err);
-                                                        alert('Error uploading image');
+                                                        toast.error('Error uploading image');
                                                     }
                                                     setUploadingImage(false);
                                                 });
@@ -308,7 +446,7 @@ export const SettingsTab = ({ settings, events = [], onRefresh }: { settings: Si
 
                 <button
                     type="submit"
-                    disabled={saving}
+                    disabled={saving || uploadingImage || uploadingTeamPhoto || uploadingDirectorPhoto || uploadingPoPhoto}
                     className="bg-nss-blue text-white px-6 py-3 rounded-lg hover:bg-blue-900 transition disabled:opacity-50"
                 >
                     {saving ? 'Saving...' : 'Save All Settings'}

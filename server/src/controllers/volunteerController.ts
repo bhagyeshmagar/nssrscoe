@@ -21,6 +21,18 @@ export const listVolunteersByAY = async (req: Request, res: Response) => {
             page: page ? parseInt(page as string) : undefined,
             limit: limit ? parseInt(limit as string) : undefined,
         });
+
+        const authReq = req as AuthRequest;
+        if (authReq.user!.role !== 'superadmin') {
+            data.data.forEach((v: any) => {
+                if (v.profile) {
+                    delete v.profile.caste;
+                    delete v.profile.casteCategory;
+                    delete v.profile.religion;
+                }
+            });
+        }
+
         ok(res, data);
     } catch (err) { handleError(res, err); }
 };
@@ -37,6 +49,14 @@ export const createVolunteer = async (req: Request, res: Response) => {
 export const getVolunteer = async (req: Request, res: Response) => {
     try {
         const data = await volService.getVolunteerById(Number(req.params.id));
+        
+        const authReq = req as AuthRequest;
+        if (authReq.user!.role !== 'superadmin' && data.profile) {
+            delete (data.profile as any).caste;
+            delete (data.profile as any).casteCategory;
+            delete (data.profile as any).religion;
+        }
+
         ok(res, data);
     } catch (err) { handleError(res, err); }
 };

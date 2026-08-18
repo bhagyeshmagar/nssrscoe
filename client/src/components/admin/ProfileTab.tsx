@@ -5,6 +5,7 @@ import { useFlash } from './Shared';
 export const ProfileTab = () => {
     const [form, setForm] = useState({ username: '', password: '' });
     const [loading, setLoading] = useState(true);
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const { msg, flash } = useFlash();
 
     const loadProfile = useCallback(async () => {
@@ -12,7 +13,8 @@ export const ProfileTab = () => {
             setLoading(true);
             const { data } = await adminsAPI.getMe();
             setForm({ username: data.data.username, password: '' });
-        } catch {
+        } catch (err) {
+            console.error("Failed to load profile", err);
             flash('err', 'Failed to load profile');
         } finally {
             setLoading(false);
@@ -23,12 +25,25 @@ export const ProfileTab = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        
+        if (form.password && form.password.length < 6) {
+            flash('err', 'Password must be at least 6 characters');
+            return;
+        }
+
+        if (form.password && !confirm('Are you sure you want to change your password? You will need to use it on your next login.')) {
+            return;
+        }
+
+        setIsSubmitting(true);
         try {
             await adminsAPI.updateMe(form);
             flash('ok', 'Profile updated successfully');
             setForm(prev => ({ ...prev, password: '' }));
         } catch (err: any) {
             flash('err', err.response?.data?.message || 'Error updating profile');
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -37,7 +52,11 @@ export const ProfileTab = () => {
     return (
         <div>
             <h2 className="text-2xl font-bold text-gray-800 mb-6">My Profile</h2>
-            {msg && <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded text-blue-700 text-sm">{msg.text}</div>}
+            {msg && (
+                <div className={`mb-4 p-3 rounded-lg text-sm border ${msg.type === 'ok' ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700'}`}>
+                    {msg.text}
+                </div>
+            )}
 
             <div className="bg-white rounded-xl shadow p-6 border border-gray-100 max-w-lg">
                 <form onSubmit={handleSubmit} className="space-y-4">
@@ -49,7 +68,9 @@ export const ProfileTab = () => {
                         <label className="block text-sm text-gray-600 mb-1">New Password (Leave blank to keep current)</label>
                         <input type="password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
                     </div>
-                    <button type="submit" className="bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700 text-sm font-medium">Update Profile</button>
+                    <button type="submit" disabled={isSubmitting} className="bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700 text-sm font-medium disabled:opacity-50">
+                        {isSubmitting ? 'Updating...' : 'Update Profile'}
+                    </button>
                 </form>
             </div>
         </div>

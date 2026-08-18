@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { AcademicYear, Meeting, SpecialCamp } from '../../services/api';
-import { meetingsAPI, specialCampsAPI } from '../../services/api';
+import { meetingsAPI, specialCampsAPI, decodeToken } from '../../services/api';
 import { useAYSelector } from './Shared';
 import { ExportDataModal } from '../common/ExportDataModal';
 import { MeetingAttendanceModal } from './MeetingAttendanceModal';
@@ -10,8 +10,8 @@ import * as XLSX from 'xlsx';
 import toast from 'react-hot-toast';
 
 export const MeetingsTab = ({ years, currentAY }: { years: AcademicYear[], currentAY: AcademicYear | null }) => {
-    const userRole = useAuthStore(state => state.userRole);
-    const isSuperadmin = userRole === 'superadmin';
+    const { token } = useAuthStore();
+    const isSuperadmin = token ? decodeToken(token)?.isSuperadmin : false;
     const { selectedAyId, setSelectedAyId } = useAYSelector(years, currentAY);
     const [meetings, setMeetings] = useState<Meeting[]>([]);
     const [loading, setLoading] = useState(false);
@@ -21,6 +21,8 @@ export const MeetingsTab = ({ years, currentAY }: { years: AcademicYear[], curre
     const [attendanceModalOpen, setAttendanceModalOpen] = useState(false);
     const [selectedMeetingForAttendance, setSelectedMeetingForAttendance] = useState<{ id: number, status: string, meetingType: string } | null>(null);
     const [exportingId, setExportingId] = useState<number | null>(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [actionId, setActionId] = useState<number | null>(null);
 
     // Special camps for the current AY (used in camp picker)
     const [specialCamps, setSpecialCamps] = useState<SpecialCamp[]>([]);
@@ -43,6 +45,7 @@ export const MeetingsTab = ({ years, currentAY }: { years: AcademicYear[], curre
             setMeetings(res.data.data || []);
         } catch (err) {
             console.error(err);
+            toast.error('Failed to load meetings');
         }
         setLoading(false);
     };
@@ -54,6 +57,7 @@ export const MeetingsTab = ({ years, currentAY }: { years: AcademicYear[], curre
             setSpecialCamps(res.data.data || []);
         } catch (err) {
             console.error('Failed to load special camps', err);
+            toast.error('Failed to load special camps');
         }
     };
 
@@ -69,6 +73,7 @@ export const MeetingsTab = ({ years, currentAY }: { years: AcademicYear[], curre
             return;
         }
         try {
+            setIsSubmitting(true);
             const payload = {
                 ...formData,
                 specialCampId: formData.meetingType === 'special_camp' ? formData.specialCampId : undefined,
@@ -81,9 +86,12 @@ export const MeetingsTab = ({ years, currentAY }: { years: AcademicYear[], curre
             setShowForm(false);
             setEditingMeeting(null);
             loadMeetings();
+            toast.success(editingMeeting ? 'Meeting updated' : 'Meeting created');
         } catch (err) {
             console.error(err);
             toast.error('Failed to save meeting');
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -104,23 +112,31 @@ export const MeetingsTab = ({ years, currentAY }: { years: AcademicYear[], curre
     const handleDelete = async (id: number) => {
         if (!confirm('Are you sure you want to delete this meeting?')) return;
         try {
+            setActionId(id);
             await meetingsAPI.delete(id);
+            toast.success('Meeting deleted');
             loadMeetings();
         } catch (err) {
             console.error(err);
             toast.error('Failed to delete meeting');
+        } finally {
+            setActionId(null);
         }
     };
 
     const handleAction = async (id: number, action: 'start' | 'end' | 'reopen') => {
         try {
+            setActionId(id);
             if (action === 'start') await meetingsAPI.start(id);
             if (action === 'end') await meetingsAPI.end(id);
             if (action === 'reopen') await meetingsAPI.reopen(id);
+            toast.success(`Meeting ${action}ed successfully`);
             loadMeetings();
         } catch (err) {
             console.error(err);
             toast.error(`Failed to ${action} meeting`);
+        } finally {
+            setActionId(null);
         }
     };
 
@@ -285,7 +301,7 @@ export const MeetingsTab = ({ years, currentAY }: { years: AcademicYear[], curre
                         )}
                         <div className="md:col-span-2 flex justify-end gap-2 mt-2">
                             <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2 border rounded text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
-                            <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700">Save Meeting</button>
+                            <button type="submit" disabled={isSubmitting} className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:opacity-50">{isSubmitting ? 'Saving...' : 'Save Meeting'}</button>
                         </div>
                     </form>
                 </div>
@@ -330,13 +346,13 @@ export const MeetingsTab = ({ years, currentAY }: { years: AcademicYear[], curre
                                         <td className="px-4 py-3 text-right">
                                             <div className="flex items-center justify-end gap-2 flex-wrap">
                                                 {meeting.status === 'scheduled' && (
-                                                    <button onClick={() => handleAction(meeting.id, 'start')} className="text-green-600 hover:underline">Start</button>
+                                                    <button onClick={() => handleAction(meeting.id, 'start')} disabled={actionId === meeting.id} className="text-green-600 hover:underline disabled:opacity-50">Start</button>
                                                 )}
                                                 {meeting.status === 'active' && (
-                                                    <button onClick={() => handleAction(meeting.id, 'end')} className="text-red-600 hover:underline">End</button>
+                                                    <button onClick={() => handleAction(meeting.id, 'end')} disabled={actionId === meeting.id} className="text-red-600 hover:underline disabled:opacity-50">End</button>
                                                 )}
                                                 {meeting.status === 'ended' && isSuperadmin && (
-                                                    <button onClick={() => handleAction(meeting.id, 'reopen')} className="text-yellow-600 hover:underline text-xs">Reopen</button>
+                                                    <button onClick={() => handleAction(meeting.id, 'reopen')} disabled={actionId === meeting.id} className="text-yellow-600 hover:underline disabled:opacity-50">Reopen</button>
                                                 )}
                                                 {/* Per-meeting attendance export — shown for ended meetings */}
                                                 {meeting.status === 'ended' && (
@@ -355,10 +371,10 @@ export const MeetingsTab = ({ years, currentAY }: { years: AcademicYear[], curre
                                                     setAttendanceModalOpen(true);
                                                 }} className="text-blue-600 hover:underline font-semibold">Attendance</button>
                                                 {(meeting.status !== 'ended' || isSuperadmin) && (
-                                                    <button onClick={() => handleEdit(meeting)} className="text-blue-600 hover:underline">Edit</button>
+                                                    <button onClick={() => handleEdit(meeting)} disabled={actionId === meeting.id} className="text-blue-600 hover:underline disabled:opacity-50">Edit</button>
                                                 )}
                                                 {isSuperadmin && (
-                                                    <button onClick={() => handleDelete(meeting.id)} className="text-red-600 hover:underline">Delete</button>
+                                                    <button onClick={() => handleDelete(meeting.id)} disabled={actionId === meeting.id} className="text-red-600 hover:underline disabled:opacity-50">Delete</button>
                                                 )}
                                             </div>
                                         </td>

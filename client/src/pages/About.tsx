@@ -56,6 +56,41 @@ const About = () => {
                     )}
                 </div>
             </div>
+
+            {/* Leadership Messages */}
+            {(settings?.aboutDirectorMessage || settings?.aboutPoMessage) && (
+                <div className="mt-16 grid grid-cols-1 md:grid-cols-2 gap-12">
+                    {settings?.aboutDirectorMessage && (
+                        <div className="bg-white p-6 rounded-lg shadow-md border border-gray-100">
+                            <div className="flex items-center gap-4 mb-4">
+                                {settings?.aboutDirectorPhoto && (
+                                    <img src={uploadAPI.getFullUrl(settings.aboutDirectorPhoto)} alt="Director" className="w-16 h-16 rounded-full object-cover border border-gray-200" />
+                                )}
+                                <div>
+                                    <h3 className="text-xl font-bold text-nss-blue">{settings?.aboutDirectorName || "Director"}</h3>
+                                    <p className="text-sm text-gray-500">Director's Message</p>
+                                </div>
+                            </div>
+                            <p className="text-gray-700 italic">"{settings.aboutDirectorMessage}"</p>
+                        </div>
+                    )}
+
+                    {settings?.aboutPoMessage && (
+                        <div className="bg-white p-6 rounded-lg shadow-md border border-gray-100">
+                            <div className="flex items-center gap-4 mb-4">
+                                {settings?.aboutPoPhoto && (
+                                    <img src={uploadAPI.getFullUrl(settings.aboutPoPhoto)} alt="NSS PO" className="w-16 h-16 rounded-full object-cover border border-gray-200" />
+                                )}
+                                <div>
+                                    <h3 className="text-xl font-bold text-nss-blue">{settings?.aboutPoName || "NSS PO"}</h3>
+                                    <p className="text-sm text-gray-500">NSS Programme Officer</p>
+                                </div>
+                            </div>
+                            <p className="text-gray-700 italic">"{settings.aboutPoMessage}"</p>
+                        </div>
+                    )}
+                </div>
+            )}
         </div>
     )
 }

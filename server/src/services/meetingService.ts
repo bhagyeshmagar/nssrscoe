@@ -1,6 +1,6 @@
 import { eq, and, desc, count } from 'drizzle-orm';
 import { db } from '../db';
-import { meetings, meetingAttendance, volunteers, coreTeamAssignments, specialCampParticipants, admins } from '../db/schema';
+import { meetings, meetingAttendance, volunteers, volunteerProfiles, coreTeamAssignments, specialCampParticipants, admins } from '../db/schema';
 import { NotFoundError, ConflictError } from '../lib/errors';
 import { logAudit } from './auditService';
 import { createBulkNotifications } from './notificationService';
@@ -168,7 +168,7 @@ export const deleteMeeting = async (id: number, adminId: number) => {
 export const getMeetingAttendance = async (meetingId: number) => {
     const meeting = await getMeeting(meetingId);
 
-    let baseVolunteers: { id: number; name: string; department: string; status: 'regular' | 'backup' }[] = [];
+    let baseVolunteers: { id: number; name: string; department: string; status: 'regular' | 'backup'; prnNo?: string | null }[] = [];
 
     if (meeting.meetingType === 'core_team') {
         baseVolunteers = await db.select({
@@ -176,9 +176,11 @@ export const getMeetingAttendance = async (meetingId: number) => {
             name: volunteers.name,
             department: volunteers.department,
             status: volunteers.status,
+            prnNo: volunteerProfiles.prnNo,
         })
         .from(volunteers)
         .innerJoin(coreTeamAssignments, eq(volunteers.id, coreTeamAssignments.volunteerId))
+        .leftJoin(volunteerProfiles, eq(volunteers.id, volunteerProfiles.volunteerId))
         .where(eq(volunteers.academicYearId, meeting.academicYearId));
     } else if (meeting.meetingType === 'special_camp' && meeting.specialCampId) {
         baseVolunteers = await db.select({
@@ -186,9 +188,11 @@ export const getMeetingAttendance = async (meetingId: number) => {
             name: volunteers.name,
             department: volunteers.department,
             status: volunteers.status,
+            prnNo: volunteerProfiles.prnNo,
         })
         .from(volunteers)
         .innerJoin(specialCampParticipants, eq(volunteers.id, specialCampParticipants.volunteerId))
+        .leftJoin(volunteerProfiles, eq(volunteers.id, volunteerProfiles.volunteerId))
         .where(eq(specialCampParticipants.specialCampId, meeting.specialCampId));
     } else {
         baseVolunteers = await db.select({
@@ -196,8 +200,10 @@ export const getMeetingAttendance = async (meetingId: number) => {
             name: volunteers.name,
             department: volunteers.department,
             status: volunteers.status,
+            prnNo: volunteerProfiles.prnNo,
         })
         .from(volunteers)
+        .leftJoin(volunteerProfiles, eq(volunteers.id, volunteerProfiles.volunteerId))
         .where(eq(volunteers.academicYearId, meeting.academicYearId));
     }
 
@@ -223,6 +229,7 @@ export const exportMeetingAttendance = async (meetingId: number) => {
         rows: attendanceList.map((item, i) => ({
             srNo: i + 1,
             name: item.volunteer.name,
+            prnNo: item.volunteer.prnNo || 'N/A',
             department: item.volunteer.department,
             volunteerType: item.volunteer.status,
             attendance: item.attendance?.status ?? 'not_marked',

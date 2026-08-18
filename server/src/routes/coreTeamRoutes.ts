@@ -6,7 +6,7 @@ import * as ctCtrl from '../controllers/coreTeamController';
 // ── AY-scoped core team router (mergeParams: true, mounted under /:ayId) ──────
 export const ayCoreTeamRouter = Router({ mergeParams: true });
 
-ayCoreTeamRouter.get('/',    ctCtrl.getCoreTeam);
+ayCoreTeamRouter.get('/', authenticateToken, requireAdmin, ctCtrl.getCoreTeam);
 ayCoreTeamRouter.post('/',   authenticateToken, requireSuperAdmin, requireAYUnlocked, ctCtrl.assignRole);
 ayCoreTeamRouter.put('/:id', authenticateToken, requireSuperAdmin, requireAYUnlocked, ctCtrl.updateAssignment);
 ayCoreTeamRouter.delete('/:id', authenticateToken, requireSuperAdmin, requireAYUnlocked, ctCtrl.removeAssignment);

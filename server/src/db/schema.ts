@@ -315,6 +315,10 @@ export const gallery = pgTable('gallery', {
     url: text('url').notNull(),
     type: mediaTypeEnum('type').default('image'),
     eventId: integer('event_id').references(() => events.id),
+    status: text('status', { enum: ['pending', 'approved', 'rejected'] }).notNull().default('pending'),
+    submittedById: integer('submitted_by_id').references(() => admins.id),
+    reviewedById: integer('reviewed_by_id').references(() => admins.id),
+    rejectionReason: text('rejection_reason'),
     createdAt: timestamp('created_at').defaultNow(),
 });
 

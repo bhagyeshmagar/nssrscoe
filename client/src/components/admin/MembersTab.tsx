@@ -1,9 +1,48 @@
 import { useState, useEffect } from 'react';
-import { membersAPI, uploadAPI } from '../../services/api';
+import { membersAPI, uploadAPI, decodeToken } from '../../services/api';
 import type { MemberData } from '../../services/api';
 import ImageCropperModal from '../common/ImageCropperModal';
+import toast from 'react-hot-toast';
+import { useAuthStore } from '../../stores/authStore';
 
-export const MembersTab = ({ members, onRefresh, showForm, setShowForm, editingItem, setEditingItem }: any) => {
+const predefinedRoles = [
+    'Institute Officer',
+    'Principal',
+    'NSS Program Officer',
+    'NSS Representatives - Boys Representative',
+    'NSS Representatives - Girls Representative',
+    'Department Coordinator - Computer Engineering',
+    'Department Coordinator - Computer Science and Business Systems',
+    'Department Coordinator - Information Technology',
+    'Department Coordinator - Electronics and telecommunication',
+    'Department Coordinator - Electrical Engineering',
+    'Department Coordinator - Automation and Robotics',
+    'Department Coordinator - Mechanical engineering',
+    'Department Coordinator - Civil Engineering',
+    'Department Coordinator - Bachelor of Computer Applications department',
+    'Portfolio Lead - Technical team Lead',
+    'Portfolio Lead - Event Management team Lead',
+    'Portfolio Lead - Social Media team Lead',
+    'Portfolio Lead - Cultural team Lead',
+    'Portfolio Lead - Graphics team Lead',
+    'Portfolio Lead - Documentation team Lead',
+    'Portfolio Lead - PR team Lead',
+    'Portfolio Lead - Hospitality team Lead',
+    'Portfolio Lead - Decoration team lead'
+];
+
+interface MembersTabProps {
+    members: (MemberData & { id: number })[];
+    onRefresh: () => void;
+    showForm: boolean;
+    setShowForm: (val: boolean) => void;
+    editingItem: (MemberData & { id: number }) | null;
+    setEditingItem: (val: (MemberData & { id: number }) | null) => void;
+}
+
+export const MembersTab = ({ members, onRefresh, showForm, setShowForm, editingItem, setEditingItem }: MembersTabProps) => {
+    const { token } = useAuthStore();
+    const isSuperadmin = token ? decodeToken(token)?.isSuperadmin : false;
     const [formData, setFormData] = useState<MemberData>({ name: '', role: '', photoUrl: '', year: '', order: 0 });
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [uploading, setUploading] = useState(false);
@@ -12,12 +51,15 @@ export const MembersTab = ({ members, onRefresh, showForm, setShowForm, editingI
     // Image Cropper State
     const [cropModalOpen, setCropModalOpen] = useState(false);
     const [cropImageSrc, setCropImageSrc] = useState('');
+    const [actionId, setActionId] = useState<number | null>(null);
+    const [isCustomRole, setIsCustomRole] = useState(false);
 
     useEffect(() => {
         if (editingItem) {
              
             setFormData({ name: editingItem.name, role: editingItem.role, photoUrl: editingItem.photoUrl || '', year: editingItem.year || '', order: editingItem.order || 0 });
             setPhotoPreview(editingItem.photoUrl ? uploadAPI.getFullUrl(editingItem.photoUrl) : '');
+            setIsCustomRole(![...predefinedRoles, ''].includes(editingItem.role));
             setShowForm(true);
         }
     }, [editingItem, setShowForm]);
@@ -62,19 +104,30 @@ export const MembersTab = ({ members, onRefresh, showForm, setShowForm, editingI
             } else {
                 await membersAPI.create(memberData);
             }
+            toast.success(editingItem ? 'Member updated' : 'Member created');
             resetForm();
             onRefresh();
         } catch (error) {
             console.error('Error saving member:', error);
-            alert('Error saving member');
+            toast.error('Error saving member');
+        } finally {
+            setUploading(false);
         }
-        setUploading(false);
     };
 
     const handleDelete = async (id: number) => {
         if (confirm('Are you sure you want to delete this member?')) {
-            await membersAPI.delete(id);
-            onRefresh();
+            try {
+                setActionId(id);
+                await membersAPI.delete(id);
+                toast.success('Member deleted');
+                onRefresh();
+            } catch (err) {
+                console.error('Error deleting member:', err);
+                toast.error('Failed to delete member');
+            } finally {
+                setActionId(null);
+            }
         }
     };
 
@@ -82,6 +135,7 @@ export const MembersTab = ({ members, onRefresh, showForm, setShowForm, editingI
         setShowForm(false);
         setEditingItem(null);
         setFormData({ name: '', role: '', photoUrl: '', year: '', order: 0 });
+        setIsCustomRole(false);
         setSelectedFile(null);
         if (photoPreview && photoPreview.startsWith('blob:')) {
             URL.revokeObjectURL(photoPreview);
@@ -93,12 +147,14 @@ export const MembersTab = ({ members, onRefresh, showForm, setShowForm, editingI
         <div>
             <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-bold text-gray-800">Manage Team Members</h2>
-                <button
-                    onClick={() => { resetForm(); setShowForm(true); }}
-                    className="bg-nss-blue text-white px-4 py-2 rounded hover:bg-blue-900 transition"
-                >
-                    + Add Member
-                </button>
+                {isSuperadmin && (
+                    <button
+                        onClick={() => { resetForm(); setShowForm(true); }}
+                        className="bg-nss-blue text-white px-4 py-2 rounded hover:bg-blue-900 transition"
+                    >
+                        + Add Member
+                    </button>
+                )}
             </div>
 
             {showForm && (
@@ -109,36 +165,17 @@ export const MembersTab = ({ members, onRefresh, showForm, setShowForm, editingI
                             <input type="text" placeholder="Name" required value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} className="border rounded px-3 py-2" />
                             <div>
                             <select
-                                required
-                                value={
-                                    [
-                                        'Institute Officer',
-                                        'Principal',
-                                        'NSS Program Officer',
-                                        'NSS Representatives - Boys Representative',
-                                        'NSS Representatives - Girls Representative',
-                                        'Department Coordinator - Computer Engineering',
-                                        'Department Coordinator - Computer Science and Business Systems',
-                                        'Department Coordinator - Information Technology',
-                                        'Department Coordinator - Electronics and telecommunication',
-                                        'Department Coordinator - Electrical Engineering',
-                                        'Department Coordinator - Automation and Robotics',
-                                        'Department Coordinator - Mechanical engineering',
-                                        'Department Coordinator - Civil Engineering',
-                                        'Department Coordinator - Bachelor of Computer Applications department',
-                                        'Portfolio Lead - Technical team Lead',
-                                        'Portfolio Lead - Event Management team Lead',
-                                        'Portfolio Lead - Social Media team Lead',
-                                        'Portfolio Lead - Cultural team Lead',
-                                        'Portfolio Lead - Graphics team Lead',
-                                        'Portfolio Lead - Documentation team Lead',
-                                        'Portfolio Lead - PR team Lead',
-                                        'Portfolio Lead - Hospitality team Lead',
-                                        'Portfolio Lead - Decoration team lead',
-                                        ''
-                                    ].includes(formData.role) ? formData.role : 'other'
-                                }
-                                onChange={e => setFormData({ ...formData, role: e.target.value === 'other' ? 'other' : e.target.value })}
+                                required={!isCustomRole}
+                                value={isCustomRole ? 'other' : formData.role}
+                                onChange={e => {
+                                    if (e.target.value === 'other') {
+                                        setIsCustomRole(true);
+                                        setFormData({ ...formData, role: '' });
+                                    } else {
+                                        setIsCustomRole(false);
+                                        setFormData({ ...formData, role: e.target.value });
+                                    }
+                                }}
                                 className="border rounded px-3 py-2 bg-white w-full"
                             >
                                 <option value="" disabled>Select Role</option>
@@ -174,41 +211,16 @@ export const MembersTab = ({ members, onRefresh, showForm, setShowForm, editingI
                                 </optgroup>
                                 <option value="other">Other (Custom Institute Officer)</option>
                             </select>
-                            {formData.role === 'other' || (![
-                                    'Institute Officer',
-                                    'Principal',
-                                    'NSS Program Officer',
-                                    'NSS Representatives - Boys Representative',
-                                    'NSS Representatives - Girls Representative',
-                                    'Department Coordinator - Computer Engineering',
-                                    'Department Coordinator - Computer Science and Business Systems',
-                                    'Department Coordinator - Information Technology',
-                                    'Department Coordinator - Electronics and telecommunication',
-                                    'Department Coordinator - Electrical Engineering',
-                                    'Department Coordinator - Automation and Robotics',
-                                    'Department Coordinator - Mechanical engineering',
-                                    'Department Coordinator - Civil Engineering',
-                                    'Department Coordinator - Bachelor of Computer Applications department',
-                                    'Portfolio Lead - Technical team Lead',
-                                    'Portfolio Lead - Event Management team Lead',
-                                    'Portfolio Lead - Social Media team Lead',
-                                    'Portfolio Lead - Cultural team Lead',
-                                    'Portfolio Lead - Graphics team Lead',
-                                    'Portfolio Lead - Documentation team Lead',
-                                    'Portfolio Lead - PR team Lead',
-                                    'Portfolio Lead - Hospitality team Lead',
-                                    'Portfolio Lead - Decoration team lead',
-                                    ''
-                                ].includes(formData.role)) ? (
+                            {isCustomRole && (
                                 <input 
                                     type="text" 
                                     placeholder="Enter Custom Role" 
                                     required 
-                                    value={formData.role === 'other' ? '' : formData.role} 
+                                    value={formData.role} 
                                     onChange={e => setFormData({ ...formData, role: e.target.value })} 
                                     className="border rounded px-3 py-2 mt-2 w-full" 
                                 />
-                            ) : null}
+                            )}
                             </div>
                             <input type="text" placeholder="Year (e.g., 2024-25)" value={formData.year} onChange={e => setFormData({ ...formData, year: e.target.value })} className="border rounded px-3 py-2" />
                             <input type="number" placeholder="Priority / Order" value={formData.order} onChange={e => setFormData({ ...formData, order: parseInt(e.target.value) || 0 })} className="border rounded px-3 py-2" title="Lower number appears first" />
@@ -241,7 +253,7 @@ export const MembersTab = ({ members, onRefresh, showForm, setShowForm, editingI
             )}
 
             <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                {members.map((member: any) => (
+                {members.map(member => (
                     <div key={member.id} className="bg-white p-6 rounded-lg shadow text-center relative group">
                         <div className="w-20 h-20 bg-gray-200 rounded-full mx-auto mb-4 overflow-hidden">
                             {member.photoUrl ? (
@@ -253,10 +265,12 @@ export const MembersTab = ({ members, onRefresh, showForm, setShowForm, editingI
                         <h3 className="font-bold text-lg">{member.name}</h3>
                         <p className="text-nss-blue font-medium">{member.role}</p>
                         {member.year && <p className="text-gray-500 text-sm">{member.year}</p>}
-                        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition flex gap-1">
-                            <button onClick={() => setEditingItem(member)} className="bg-blue-500 text-white px-2 py-1 rounded text-xs">Edit</button>
-                            <button onClick={() => handleDelete(member.id)} className="bg-red-500 text-white px-2 py-1 rounded text-xs">Delete</button>
-                        </div>
+                        {isSuperadmin && (
+                            <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition flex gap-1">
+                                <button onClick={() => setEditingItem(member)} disabled={actionId === member.id} className="bg-blue-500 text-white px-2 py-1 rounded text-xs disabled:opacity-50">Edit</button>
+                                <button onClick={() => handleDelete(member.id)} disabled={actionId === member.id} className="bg-red-500 text-white px-2 py-1 rounded text-xs disabled:opacity-50">Delete</button>
+                            </div>
+                        )}
                     </div>
                 ))}
                 {members.length === 0 && (

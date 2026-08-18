@@ -16,7 +16,8 @@ export const CoreTeamTab = ({ years, currentAY, isSuperadmin }: { years: Academi
     const [form, setForm] = useState<Omit<AssignRoleData, 'coreTeamRoleId'> & { coreTeamRoleId: number | string }>({ coreTeamRoleId: 0, volunteerId: 0, displayName: '', displayPhotoUrl: '', department: '', customRoleName: '', customCategory: '', displayOrder: 0 });
     const [editingId, setEditingId] = useState<number | null>(null);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
-    const [uploading, setUploading] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [actionId, setActionId] = useState<number | null>(null);
     
     // Image Cropper State
     const [cropModalOpen, setCropModalOpen] = useState(false);
@@ -34,7 +35,10 @@ export const CoreTeamTab = ({ years, currentAY, isSuperadmin }: { years: Academi
             setAssignments(aRes.data.data);
             setRoles(rRes.data.data);
             setVols(vRes.data.data?.data || []);
-        } catch (e) { console.error(e); }
+        } catch (e: any) { 
+            console.error(e); 
+            flash('err', e.response?.data?.message || 'Failed to load core team data.');
+        }
     }, [selectedAyId]);
 
     useEffect(() => { load(); }, [load]);
@@ -54,6 +58,7 @@ export const CoreTeamTab = ({ years, currentAY, isSuperadmin }: { years: Academi
 
     const handleDeleteRole = async () => {
         if (!selectedRole || !confirm(`Are you sure you want to permanently delete the role "${selectedRole.name}"? This cannot be undone.`)) return;
+        setIsSubmitting(true);
         try {
             await coreTeamAPI.deleteRole(selectedRole.id);
             flash('ok', 'Role deleted successfully.');
@@ -61,12 +66,18 @@ export const CoreTeamTab = ({ years, currentAY, isSuperadmin }: { years: Academi
             load();
         } catch (e: any) {
             flash('err', e.response?.data?.message ?? 'Failed to delete role.');
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
     const handleAssign = async () => {
+        if (!isInstitution && !form.volunteerId) {
+            flash('err', 'Please select a volunteer.');
+            return;
+        }
         try {
-            setUploading(true);
+            setIsSubmitting(true);
             const payload: any = { coreTeamRoleId: form.coreTeamRoleId, displayOrder: form.displayOrder };
             
             if (typeof form.coreTeamRoleId === 'string' && form.coreTeamRoleId.startsWith('custom-')) {
@@ -99,18 +110,21 @@ export const CoreTeamTab = ({ years, currentAY, isSuperadmin }: { years: Academi
         } catch (e: any) { 
             flash('err', e.response?.data?.message ?? 'Operation failed.'); 
         } finally {
-            setUploading(false);
+            setIsSubmitting(false);
         }
     };
 
     const handleRemove = async (id: number) => {
         if (!confirm('Remove?')) return;
+        setActionId(id);
         try { 
             await coreTeamAPI.removeAssignment(selectedAyId, id); 
             flash('ok', 'Removed.'); 
             load(); 
         } catch (e: any) { 
             flash('err', e.response?.data?.message ?? 'Error.'); 
+        } finally {
+            setActionId(null);
         }
     };
 
@@ -154,7 +168,7 @@ export const CoreTeamTab = ({ years, currentAY, isSuperadmin }: { years: Academi
                             <select value={form.coreTeamRoleId} onChange={e => { const val = e.target.value; setForm({ ...form, coreTeamRoleId: isNaN(Number(val)) ? val : Number(val) }); }} className="w-full border rounded-lg px-3 py-2 text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500" disabled={!!editingId}>
                                 <option value={0}>Select...</option>
                                 {['Institute Officers', 'NSS Program Officer', 'NSS Representatives', 'Department Coordinators', 'Portfolio Leads'].map(category => {
-                                    const categoryRoles = roles.filter(r => (r as any).category === category);
+                                    const categoryRoles = roles.filter(r => r.category === category);
                                     return (
                                         <optgroup key={category} label={category}>
                                             {categoryRoles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
@@ -173,7 +187,7 @@ export const CoreTeamTab = ({ years, currentAY, isSuperadmin }: { years: Academi
                             <div className="col-span-2"><label className="block text-sm text-gray-600 mb-1">Custom Role Name</label>
                                 <input value={form.customRoleName || ''} onChange={e => setForm({ ...form, customRoleName: e.target.value })} placeholder={`E.g., Custom ${form.coreTeamRoleId.replace('custom-', '')}`} className="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" /></div>
                         )}
-                        {(selectedRole?.roleType === 'institution' || (typeof form.coreTeamRoleId === 'string' && (form.coreTeamRoleId.includes('Institute Officers') || form.coreTeamRoleId.includes('NSS Program Officer')))) && (
+                        {isInstitution && (
                             <>
                                 <div className="col-span-2"><label className="block text-sm text-gray-600 mb-1">Display Name</label>
                                     <input value={form.displayName} onChange={e => setForm({ ...form, displayName: e.target.value })} placeholder="Prof. Dr. Name" className="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" /></div>
@@ -212,10 +226,10 @@ export const CoreTeamTab = ({ years, currentAY, isSuperadmin }: { years: Academi
                         )}
                     </div>
                     <div className="flex gap-3">
-                        <button onClick={handleAssign} disabled={uploading} className="bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700 text-sm font-medium disabled:opacity-50">
-                            {uploading ? (editingId ? 'Updating...' : 'Assigning...') : (editingId ? 'Update' : 'Assign')}
+                        <button onClick={handleAssign} disabled={isSubmitting} className="bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700 text-sm font-medium disabled:opacity-50">
+                            {isSubmitting ? (editingId ? 'Updating...' : 'Assigning...') : (editingId ? 'Update' : 'Assign')}
                         </button>
-                        <button onClick={() => { setShowForm(false); setEditingId(null); }} className="border px-5 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
+                        <button onClick={() => { setShowForm(false); setEditingId(null); }} disabled={isSubmitting} className="border px-5 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50">Cancel</button>
                     </div>
                 </div>
             )}
@@ -234,8 +248,8 @@ export const CoreTeamTab = ({ years, currentAY, isSuperadmin }: { years: Academi
                                 <td className="px-4 py-3">
                                     {selectedAY && !selectedAY.isLocked && isSuperadmin && (
                                         <div className="flex gap-2">
-                                            <button onClick={() => handleEdit(a)} className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-700 hover:bg-blue-200">Edit</button>
-                                            <button onClick={() => handleRemove(a.id)} className="text-xs px-2 py-1 rounded bg-red-100 text-red-700 hover:bg-red-200">Remove</button>
+                                            <button onClick={() => handleEdit(a)} disabled={actionId === a.id} className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-700 hover:bg-blue-200 disabled:opacity-50">Edit</button>
+                                            <button onClick={() => handleRemove(a.id)} disabled={actionId === a.id} className="text-xs px-2 py-1 rounded bg-red-100 text-red-700 hover:bg-red-200 disabled:opacity-50">Remove</button>
                                         </div>
                                     )}
                                 </td>

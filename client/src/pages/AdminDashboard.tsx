@@ -3,7 +3,7 @@ import {
     eventsAPI, galleryAPI, membersAPI, settingsAPI,
     academicYearsAPI, decodeToken
 } from '../services/api';
-import type { SiteSettings, AcademicYear, EventData } from '../services/api';
+import type { SiteSettings, AcademicYear, EventData, GalleryItem, MemberData } from '../services/api';
 
 import { AYStatusBadge } from '../components/admin/Shared';
 import { useAuthStore } from '../stores/authStore';
@@ -71,13 +71,13 @@ const AdminDashboard = () => {
     const [currentAY, setCurrentAY] = useState<AcademicYear | null>(null);
 
     const [events, setEvents] = useState<EventData[]>([]);
-    const [gallery, setGallery] = useState<unknown[]>([]);
-    const [members, setMembers] = useState<unknown[]>([]);
+    const [gallery, setGallery] = useState<GalleryItem[]>([]);
+    const [members, setMembers] = useState<MemberData[]>([]);
     const [settings, setSettings] = useState<SiteSettings | null>(null);
 
     const [showEventForm, setShowEventForm] = useState(false);
     const [showGalleryForm, setShowGalleryForm] = useState(false);
-    const [editingItem, setEditingItem] = useState<unknown>(null);
+    const [editingItem, setEditingItem] = useState<any>(null);
     const tabGroups = getTabGroups(isSuperadmin);
 
     const loadYears = useCallback(async () => {
@@ -102,9 +102,10 @@ const AdminDashboard = () => {
         setLoading(true);
         try {
             switch (activeTab) {
-                case 'overview': { const [eR, gR, mR] = await Promise.all([eventsAPI.getAll(), galleryAPI.getAll(), membersAPI.getAll()]); setEvents((eR.data.data as EventData[]) || []); setGallery((gR.data.data as unknown[]) || []); setMembers((mR.data.data as unknown[]) || []); break; }
+                case 'overview': { const [eR, gR, mR] = await Promise.all([eventsAPI.getAll(), galleryAPI.getAdminAll(), membersAPI.getAll()]); setEvents((eR.data.data as EventData[]) || []); setGallery((gR.data.data as GalleryItem[]) || []); setMembers((mR.data.data as MemberData[]) || []); break; }
                 case 'events': { const r = await eventsAPI.getAll(); setEvents((r.data.data as EventData[]) || []); break; }
-                case 'gallery': { const r = await galleryAPI.getAll(); setGallery((r.data.data as unknown[]) || []); break; }
+                case 'gallery': { const r = await galleryAPI.getAdminAll(); setGallery((r.data.data as GalleryItem[]) || []); break; }
+                case 'members': { const r = await membersAPI.getAll(); setMembers((r.data.data as MemberData[]) || []); break; }
                 case 'settings': { const r = await settingsAPI.get(); setSettings(r.data.data as SiteSettings); break; }
             }
         } catch (e) { console.error('fetchSiteData:', e); }
@@ -170,19 +171,19 @@ const AdminDashboard = () => {
                         <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600" /></div>
                     ) : (
                         <Suspense fallback={<div className="flex justify-center items-center h-64 text-gray-500 font-medium animate-pulse">Loading component...</div>}>
-                            {activeTab === 'overview' && <OverviewTab events={events} gallery={gallery} members={members} />}
+                            {activeTab === 'overview' && <OverviewTab events={events} gallery={gallery} members={members} currentAY={currentAY} />}
                             {activeTab === 'academic-years' && <AcademicYearsTab years={years} onRefresh={loadYears} isSuperadmin={isSuperadmin} />}
                             {activeTab === 'activity-calendar' && <ActivityCalendarTab events={events} years={years} currentAY={currentAY} />}
-                            {activeTab === 'volunteers' && <AYVolunteersTab years={years} currentAY={currentAY} />}
+                            {activeTab === 'volunteers' && <AYVolunteersTab years={years} currentAY={currentAY} isSuperadmin={isSuperadmin} />}
                             { activeTab === 'core-team' && <CoreTeamTab years={years} currentAY={currentAY} isSuperadmin={isSuperadmin} />}
                             {activeTab === 'attendance' && <AttendanceTab years={years} currentAY={currentAY} />}
                             {activeTab === 'meetings' && <MeetingsTab years={years} currentAY={currentAY} />}
                             {activeTab === 'special-camps' && <SpecialCampsTab years={years} currentAY={currentAY} />}
                             {activeTab === 'audit-logs' && <AuditLogTab />}
                             {activeTab === 'archive' && <ArchiveTab years={years} />}
-                            {activeTab === 'events' && <EventsTab events={events} onRefresh={fetchSiteData} showForm={showEventForm} setShowForm={setShowEventForm} editingItem={editingItem} setEditingItem={setEditingItem} years={years} currentAY={currentAY} />}
+                            {activeTab === 'events' && <EventsTab events={events} onRefresh={fetchSiteData} showForm={showEventForm} setShowForm={setShowEventForm} editingItem={editingItem} setEditingItem={setEditingItem} years={years} currentAY={currentAY} isSuperadmin={isSuperadmin} />}
                             {activeTab === 'registrations' && <RegistrationsTab events={events} />}
-                            {activeTab === 'gallery' && <GalleryTab gallery={gallery} onRefresh={fetchSiteData} showForm={showGalleryForm} setShowForm={setShowGalleryForm} editingItem={editingItem} setEditingItem={setEditingItem} />}
+                            {activeTab === 'gallery' && <GalleryTab gallery={gallery} onRefresh={fetchSiteData} showForm={showGalleryForm} setShowForm={setShowGalleryForm} editingItem={editingItem} setEditingItem={setEditingItem} isSuperadmin={isSuperadmin} />}
                             {activeTab === 'settings' && <SettingsTab settings={settings} events={events} onRefresh={fetchSiteData} />}
                             {activeTab === 'admins' && <AdminsTab />}
                             {activeTab === 'profile' && <ProfileTab />}

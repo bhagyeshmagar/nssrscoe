@@ -1,14 +1,64 @@
 import { useState, useEffect } from 'react';
 import { galleryAPI, uploadAPI } from '../../services/api';
+import type { GalleryData } from '../../services/api';
 import ImageCropperModal from '../common/ImageCropperModal';
+import { useFlash } from './Shared';
 
-export const GalleryTab = ({ gallery, onRefresh, showForm, setShowForm, editingItem, setEditingItem }: any) => {
-    const [formData, setFormData] = useState<any>({ title: '', description: '', url: '', type: 'image' });
+export type GalleryItem = GalleryData & { id: number; createdAt?: string; };
+
+const statusBadge = (status?: string) => {
+    if (status === 'pending') return <span className="absolute top-1 left-1 bg-yellow-500 text-white text-xs px-1.5 py-0.5 rounded z-10 shadow">Pending</span>;
+    if (status === 'rejected') return <span className="absolute top-1 left-1 bg-red-600 text-white text-xs px-1.5 py-0.5 rounded z-10 shadow">Rejected</span>;
+    return null;
+};
+
+const PendingGalleryApprovals = ({ items, onApprove, onReject, actionId }: { items: GalleryItem[]; onApprove: (id: number) => void; onReject: (id: number, reason: string) => void; actionId: number | null }) => {
+    const pending = items.filter(i => i.status === 'pending');
+    if (pending.length === 0) return null;
+    return (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6 shadow-sm">
+            <h3 className="font-semibold text-yellow-800 mb-3">Pending Approval ({pending.length})</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {pending.map(item => (
+                    <div key={item.id} className="bg-white rounded-lg border shadow-sm p-3 flex flex-col">
+                        <div className="relative aspect-video bg-gray-100 rounded overflow-hidden mb-2">
+                            {item.type === 'video' ? (
+                                <video src={uploadAPI.getFullUrl(item.url)} controls className="w-full h-full object-cover" />
+                            ) : (
+                                <img src={uploadAPI.getFullUrl(item.url)} className="w-full h-full object-cover" />
+                            )}
+                        </div>
+                        <p className="text-sm font-medium text-gray-800 truncate" title={item.title || item.description}>{item.title || item.description || 'Untitled'}</p>
+                        <p className="text-xs text-gray-500 mb-3">{item.type.toUpperCase()}</p>
+                        <div className="flex gap-2 mt-auto">
+                            <button onClick={() => onApprove(item.id)} disabled={actionId === item.id} className="flex-1 bg-green-600 text-white text-xs py-1.5 rounded hover:bg-green-700 font-medium disabled:opacity-50">Approve</button>
+                            <button onClick={() => { const reason = prompt('Rejection reason (optional):') || ''; onReject(item.id, reason); }} disabled={actionId === item.id} className="flex-1 bg-red-600 text-white text-xs py-1.5 rounded hover:bg-red-700 font-medium disabled:opacity-50">Reject</button>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+};
+
+export const GalleryTab = ({ gallery, onRefresh, showForm, setShowForm, editingItem, setEditingItem, isSuperadmin }: {
+    gallery: GalleryItem[];
+    onRefresh: () => void;
+    showForm: boolean;
+    setShowForm: (val: boolean) => void;
+    editingItem: GalleryItem | null;
+    setEditingItem: (i: GalleryItem | null) => void;
+    isSuperadmin?: boolean;
+}) => {
+    const { msg, flash } = useFlash();
+    const [formData, setFormData] = useState<Partial<GalleryData>>({ title: '', description: '', url: '', type: 'image' });
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [filePreview, setFilePreview] = useState<string>('');
     const [uploading, setUploading] = useState(false);
     const [activeMediaTab, setActiveMediaTab] = useState<'images' | 'videos'>('images');
     const [uploadMediaType, setUploadMediaType] = useState<'image' | 'video'>('image');
+    
+    const [actionId, setActionId] = useState<number | null>(null);
 
     // Image Cropper State
     const [cropModalOpen, setCropModalOpen] = useState(false);
@@ -18,7 +68,7 @@ export const GalleryTab = ({ gallery, onRefresh, showForm, setShowForm, editingI
         if (editingItem) {
             setFormData({ title: editingItem.title, description: editingItem.description || '', url: editingItem.url, type: editingItem.type });
             setFilePreview(uploadAPI.getFullUrl(editingItem.url));
-            setUploadMediaType(editingItem.type);
+            setUploadMediaType(editingItem.type || 'image');
             setShowForm(true);
         }
     }, [editingItem]);
@@ -68,31 +118,67 @@ export const GalleryTab = ({ gallery, onRefresh, showForm, setShowForm, editingI
             }
 
             if (!url) {
-                alert('Please select a file to upload');
+                flash('err', 'Please select a file to upload');
                 setUploading(false);
                 return;
             }
 
-            const galleryData = { ...formData, url, type: uploadMediaType };
+            const galleryData = { ...formData, url, type: uploadMediaType } as GalleryData;
 
             if (editingItem) {
                 await galleryAPI.update(editingItem.id, galleryData);
+                flash('ok', 'Gallery item updated');
             } else {
                 await galleryAPI.create(galleryData);
+                flash('ok', 'Gallery item added');
             }
             resetForm();
             onRefresh();
         } catch (error) {
             console.error('Error saving gallery item:', error);
-            alert('Error saving gallery item');
+            flash('err', 'Failed to save gallery item');
         }
         setUploading(false);
     };
 
     const handleDelete = async (id: number) => {
         if (confirm('Are you sure you want to delete this item?')) {
-            await galleryAPI.delete(id);
+            setActionId(id);
+            try {
+                await galleryAPI.delete(id);
+                flash('ok', 'Gallery item deleted');
+                onRefresh();
+            } catch (error) {
+                console.error('Error deleting gallery item:', error);
+                flash('err', 'Failed to delete gallery item');
+            }
+            setActionId(null);
+        }
+    };
+
+    const handleApprove = async (id: number) => {
+        setActionId(id);
+        try {
+            await galleryAPI.approve(id);
+            flash('ok', 'Item approved and published.');
             onRefresh();
+        } catch (e: any) {
+            flash('err', e.response?.data?.message || 'Failed to approve item');
+        } finally {
+            setActionId(null);
+        }
+    };
+
+    const handleReject = async (id: number, reason: string) => {
+        setActionId(id);
+        try {
+            await galleryAPI.reject(id, reason);
+            flash('ok', 'Item rejected.');
+            onRefresh();
+        } catch (e: any) {
+            flash('err', e.response?.data?.message || 'Failed to reject item');
+        } finally {
+            setActionId(null);
         }
     };
 
@@ -107,35 +193,40 @@ export const GalleryTab = ({ gallery, onRefresh, showForm, setShowForm, editingI
         setFilePreview('');
     };
 
-    const openUploadForm = (type: 'image' | 'video') => {
-        resetForm();
-        setUploadMediaType(type);
-        setFormData({ ...formData, type });
-        setShowForm(true);
-    };
-
-    const images = gallery.filter((item: any) => item.type !== 'video');
-    const videos = gallery.filter((item: any) => item.type === 'video');
+    const images = gallery.filter((item: GalleryItem) => item.type !== 'video');
+    const videos = gallery.filter((item: GalleryItem) => item.type === 'video');
 
     return (
         <div>
             <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-gray-800">Manage Gallery</h2>
+                <h2 className="text-2xl font-bold text-gray-800">Gallery Management</h2>
                 <div className="flex gap-2">
                     <button
-                        onClick={() => openUploadForm('image')}
-                        className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition flex items-center gap-1"
+                        onClick={() => {
+                            resetForm();
+                            setUploadMediaType('image');
+                            setShowForm(true);
+                        }}
+                        className="bg-nss-blue text-white px-4 py-2 rounded hover:bg-blue-700"
                     >
-                        📷 Add Image
+                        Add Image
                     </button>
                     <button
-                        onClick={() => openUploadForm('video')}
-                        className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition flex items-center gap-1"
+                        onClick={() => {
+                            resetForm();
+                            setUploadMediaType('video');
+                            setShowForm(true);
+                        }}
+                        className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
                     >
-                        🎥 Add Video
+                        Add Video
                     </button>
                 </div>
             </div>
+
+            {msg && <div className={`mb-4 p-3 rounded-lg text-sm border ${msg.type === 'ok' ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700'}`}>{msg.text}</div>}
+
+            {isSuperadmin && <PendingGalleryApprovals items={gallery} onApprove={handleApprove} onReject={handleReject} actionId={actionId} />}
 
             {showForm && (
                 <div className="bg-white p-6 rounded-lg shadow mb-6 border-l-4 border-l-nss-blue">
@@ -230,14 +321,15 @@ export const GalleryTab = ({ gallery, onRefresh, showForm, setShowForm, editingI
 
             {activeMediaTab === 'images' && (
                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                    {images.map((item: any) => (
+                    {images.map((item) => (
                         <div key={item.id} className="relative group">
+                            {statusBadge(item.status)}
                             <div className="aspect-square bg-gray-200 rounded-lg overflow-hidden">
                                 <img src={uploadAPI.getFullUrl(item.url)} alt={item.title || 'Gallery'} className="w-full h-full object-cover" />
                             </div>
                             <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-2 rounded-lg">
-                                <button onClick={() => setEditingItem(item)} className="bg-blue-500 text-white px-2 py-1 rounded text-sm">Edit</button>
-                                <button onClick={() => handleDelete(item.id)} className="bg-red-500 text-white px-2 py-1 rounded text-sm">Delete</button>
+                                <button onClick={() => setEditingItem(item)} disabled={actionId === item.id} className="bg-blue-500 text-white px-2 py-1 rounded text-sm disabled:opacity-50">Edit</button>
+                                <button onClick={() => handleDelete(item.id)} disabled={actionId === item.id} className="bg-red-500 text-white px-2 py-1 rounded text-sm disabled:opacity-50">Delete</button>
                             </div>
                             {item.title && <p className="text-sm text-gray-600 mt-1 truncate">{item.title}</p>}
                         </div>
@@ -253,16 +345,17 @@ export const GalleryTab = ({ gallery, onRefresh, showForm, setShowForm, editingI
 
             {activeMediaTab === 'videos' && (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {videos.map((item: any) => (
+                    {videos.map((item) => (
                         <div key={item.id} className="relative group bg-black rounded-lg overflow-hidden">
+                            {statusBadge(item.status)}
                             <video
                                 src={uploadAPI.getFullUrl(item.url)}
                                 className="w-full aspect-video object-cover"
                                 controls
                             />
                             <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition">
-                                <button onClick={() => setEditingItem(item)} className="bg-blue-500 text-white px-2 py-1 rounded text-sm">Edit</button>
-                                <button onClick={() => handleDelete(item.id)} className="bg-red-500 text-white px-2 py-1 rounded text-sm">Delete</button>
+                                <button onClick={() => setEditingItem(item)} disabled={actionId === item.id} className="bg-blue-500 text-white px-2 py-1 rounded text-sm disabled:opacity-50">Edit</button>
+                                <button onClick={() => handleDelete(item.id)} disabled={actionId === item.id} className="bg-red-500 text-white px-2 py-1 rounded text-sm disabled:opacity-50">Delete</button>
                             </div>
                             {item.title && (
                                 <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black to-transparent p-3">

@@ -6,6 +6,18 @@ import { AuthRequest } from '../middleware/auth';
 export const getCoreTeam = async (req: Request, res: Response) => {
     try {
         const data = await ctService.getCoreTeamByAY(Number(req.params.ayId));
+        
+        const authReq = req as AuthRequest;
+        if (authReq.user!.role !== 'superadmin') {
+            data.forEach((item: any) => {
+                if (item.volunteer) {
+                    delete item.volunteer.caste;
+                    delete item.volunteer.casteCategory;
+                    delete item.volunteer.religion;
+                }
+            });
+        }
+        
         ok(res, data);
     } catch (err) { handleError(res, err); }
 };

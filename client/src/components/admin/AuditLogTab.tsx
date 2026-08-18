@@ -11,7 +11,8 @@ const AuditLogTab = () => {
     const [loading, setLoading] = useState(true);
     const [page, setPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
-    const [isExporting, setIsExporting] = useState(false);
+    const [exportStatus, setExportStatus] = useState<'idle' | 'loading' | 'ready'>('idle');
+    const [exportData, setExportData] = useState<AuditLog[]>([]);
 
     const fetchLogs = async (currentPage: number) => {
         try {
@@ -35,15 +36,53 @@ const AuditLogTab = () => {
         fetchLogs(page);
     }, [page]);
 
+    const handleExportClick = async () => {
+        setExportStatus('loading');
+        try {
+            let allLogs: AuditLog[] = [];
+            let currentExportPage = 1;
+            let exportTotalPages = 1;
+
+            // Fetch first page to get total pages and first chunk
+            const firstRes = await auditAPI.getLogs(currentExportPage, 1000);
+            if (firstRes.data.success) {
+                allLogs = allLogs.concat(Array.isArray(firstRes.data.data) ? firstRes.data.data : []);
+                exportTotalPages = firstRes.data.meta?.totalPages || 1;
+            }
+
+            // Loop to fetch any remaining pages if total exceeds chunk limit
+            const MAX_PAGES = 100; // Safety cap: max 100,000 logs per export
+            while (currentExportPage < exportTotalPages && currentExportPage < MAX_PAGES) {
+                currentExportPage++;
+                const res = await auditAPI.getLogs(currentExportPage, 1000);
+                if (res.data.success) {
+                    allLogs = allLogs.concat(Array.isArray(res.data.data) ? res.data.data : []);
+                }
+            }
+
+            if (exportTotalPages > MAX_PAGES) {
+                toast.error(`Export truncated to the first ${MAX_PAGES * 1000} records to prevent browser crash.`);
+            }
+
+            setExportData(allLogs);
+            setExportStatus('ready');
+        } catch (error) {
+            console.error('Failed to fetch export data', error);
+            toast.error('Failed to load export data');
+            setExportStatus('idle');
+        }
+    };
+
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-center">
                 <h2 className="text-xl font-semibold text-white">System Audit Logs</h2>
                 <button
-                    onClick={() => setIsExporting(true)}
-                    className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm font-medium transition-colors"
+                    onClick={handleExportClick}
+                    disabled={exportStatus === 'loading'}
+                    className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
                 >
-                    Export to CSV
+                    {exportStatus === 'loading' ? 'Preparing...' : 'Export to CSV'}
                 </button>
             </div>
 
@@ -81,7 +120,7 @@ const AuditLogTab = () => {
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             {log.performedByRole} #{log.performedById}
                                         </td>
-                                        <td className="px-6 py-4 text-xs text-slate-400 max-w-xs truncate">
+                                        <td className="px-6 py-4 text-xs text-slate-400 max-w-xs truncate" title={log.details || ''}>
                                             {log.details || '-'}
                                         </td>
                                     </tr>
@@ -97,7 +136,7 @@ const AuditLogTab = () => {
                 <div className="flex justify-between items-center bg-slate-800 p-4 rounded-xl border border-slate-700/50">
                     <button
                         onClick={() => setPage(p => Math.max(1, p - 1))}
-                        disabled={page === 1}
+                        disabled={page === 1 || loading}
                         className="px-4 py-2 bg-slate-700 disabled:opacity-50 text-white rounded-lg text-sm"
                     >
                         Previous
@@ -107,7 +146,7 @@ const AuditLogTab = () => {
                     </span>
                     <button
                         onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                        disabled={page === totalPages}
+                        disabled={page === totalPages || loading}
                         className="px-4 py-2 bg-slate-700 disabled:opacity-50 text-white rounded-lg text-sm"
                     >
                         Next
@@ -115,23 +154,21 @@ const AuditLogTab = () => {
                 </div>
             )}
 
-            {isExporting && (
-                <ExportDataModal
-                    isOpen={isExporting}
-                    data={logs}
-                    filename="audit_logs.csv"
-                    onClose={() => setIsExporting(false)}
-                    columns={[
-                        { key: 'createdAt', label: 'Timestamp' },
-                        { key: 'action', label: 'Action' },
-                        { key: 'entityType', label: 'Entity Type' },
-                        { key: 'entityId', label: 'Entity ID' },
-                        { key: 'performedByRole', label: 'Performed By' },
-                        { key: 'performedById', label: 'Performed By ID' },
-                        { key: 'details', label: 'Details' }
-                    ]}
-                />
-            )}
+            <ExportDataModal
+                isOpen={exportStatus === 'ready'}
+                data={exportData}
+                filename="audit_logs"
+                onClose={() => setExportStatus('idle')}
+                columns={[
+                    { key: 'createdAt', label: 'Timestamp' },
+                    { key: 'action', label: 'Action' },
+                    { key: 'entityType', label: 'Entity Type' },
+                    { key: 'entityId', label: 'Entity ID' },
+                    { key: 'performedByRole', label: 'Performed By' },
+                    { key: 'performedById', label: 'Performed By ID' },
+                    { key: 'details', label: 'Details' }
+                ]}
+            />
         </div>
     );
 };

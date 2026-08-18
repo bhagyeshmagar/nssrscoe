@@ -1,33 +1,59 @@
 import { useState, useEffect, useCallback } from 'react';
-import { specialCampsAPI, volunteersAPI, DEPARTMENTS } from '../../services/api';
+import { specialCampsAPI, volunteersAPI, DEPARTMENTS, decodeToken } from '../../services/api';
 import type { AcademicYear, SpecialCamp, VolunteerWithProfile } from '../../services/api';
-import { useFlash, useAYSelector } from './Shared';
+import { useFlash, useAYSelector, PasswordPromptModal } from './Shared';
+import { useAuthStore } from '../../stores/authStore';
+
+type Participant = {
+    id: number;
+    volunteerId?: number;
+    snapName?: string;
+    currentName?: string;
+    name?: string;
+    snapDepartment?: string;
+    currentDept?: string;
+    department?: string;
+    snapCollegeYearAtEnrollment?: string;
+    collegeYear?: string;
+    snapNssYear?: number;
+    nssYear?: number;
+};
+
+type SpecialCampWithParticipants = SpecialCamp & {
+    participants?: Participant[];
+};
 
 export const SpecialCampsTab = ({ years, currentAY }: { years: AcademicYear[]; currentAY: AcademicYear | null }) => {
+    const { token } = useAuthStore();
+    const isSuperadmin = token ? decodeToken(token)?.isSuperadmin : false;
     const { selectedAyId, setSelectedAyId, selectedAY } = useAYSelector(years, currentAY);
-    const [camps, setCamps] = useState<SpecialCamp[]>([]);
+    const [camps, setCamps] = useState<SpecialCampWithParticipants[]>([]);
     const [showForm, setShowForm] = useState(false);
     const [form, setForm] = useState({ name: '', location: '', startDate: '', endDate: '', description: '', volunteerCap: 50 });
     const { msg, flash } = useFlash();
 
     // Manage Participants State
     const [manageCampId, setManageCampId] = useState<number | null>(null);
-    const [campDetails, setCampDetails] = useState<any | null>(null);
+    const [campDetails, setCampDetails] = useState<SpecialCampWithParticipants | null>(null);
     const [ayVols, setAyVols] = useState<VolunteerWithProfile[]>([]);
     const [selectedVolIds, setSelectedVolIds] = useState<Set<number>>(new Set());
     const [savingParticipants, setSavingParticipants] = useState(false);
+    const [actionId, setActionId] = useState<number | null>(null);
 
     // Unlock State
-    const [unlockCampId, setUnlockCampId] = useState<number | null>(null);
-    const [unlockPassword, setUnlockPassword] = useState('');
+    const [unlockCamp, setUnlockCamp] = useState<SpecialCampWithParticipants | null>(null);
 
     const load = useCallback(async () => { 
         if (!selectedAyId) return; 
         try { 
             const r = await specialCampsAPI.getByAY(selectedAyId); 
             setCamps(r.data.data);
-        } catch (e) { console.error(e); } 
-    }, [selectedAyId]);
+        } catch (err: unknown) { 
+            const e = err as { response?: { data?: { message?: string } } }; 
+            console.error(e);
+            flash('err', e.response?.data?.message ?? 'Failed to load camps.'); 
+        } 
+    }, [selectedAyId, flash]);
     
     useEffect(() => { load(); }, [load]);
     
@@ -59,7 +85,7 @@ export const SpecialCampsTab = ({ years, currentAY }: { years: AcademicYear[]; c
             const vData = vRes.data.data;
             setCampDetails(cData);
             setAyVols(vData?.data || []);
-            setSelectedVolIds(new Set(cData.participants.map((p: any) => p.volunteerId)));
+            setSelectedVolIds(new Set(cData.participants.map((p: Participant) => p.volunteerId).filter((id: number | undefined) => id !== undefined) as number[]));
             setManageCampId(campId);
         } catch (e: any) {
             flash('err', 'Failed to load camp details.');
@@ -87,46 +113,51 @@ export const SpecialCampsTab = ({ years, currentAY }: { years: AcademicYear[]; c
     
     const handleFinalize = async (id: number) => {
         if (!confirm('Finalize camp? This will permanently freeze participant data.')) return;
+        setActionId(id);
         try { 
             await specialCampsAPI.finalize(id); 
             flash('ok', 'Finalized.'); 
             load(); 
         } catch (err: unknown) { const e = err as { response?: { data?: { message?: string } } }; 
             flash('err', e.response?.data?.message ?? 'Error.'); 
+        } finally {
+            setActionId(null);
         }
     };
     
     const handleDelete = async (id: number) => {
-        if (!confirm('Delete?')) return;
+        if (!confirm('Delete? This action is permanent.')) return;
+        setActionId(id);
         try { 
             await specialCampsAPI.delete(id); 
             flash('ok', 'Deleted.'); 
             load(); 
         } catch (err: unknown) { const e = err as { response?: { data?: { message?: string } } }; 
             flash('err', e.response?.data?.message ?? 'Error.'); 
+        } finally {
+            setActionId(null);
         }
     };
     
-    const handleUnlock = async () => {
-        if (!unlockCampId) return;
+    const handleUnlock = async (pwd: string) => {
+        if (!unlockCamp) return false;
         try {
-            await specialCampsAPI.unlock(unlockCampId, unlockPassword);
+            await specialCampsAPI.unlock(unlockCamp.id, pwd);
             flash('ok', 'Camp unlocked successfully.');
-            setUnlockCampId(null);
-            setUnlockPassword('');
+            setUnlockCamp(null);
             load();
+            return true;
         } catch (err: unknown) { const e = err as { response?: { data?: { message?: string } } };
             flash('err', e.response?.data?.message ?? 'Invalid password or failed to unlock.');
+            return false;
         }
     };
 
     const [expandedCampId, setExpandedCampId] = useState<number | null>(null);
     const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
 
-
-
-    const sortParticipants = (participants: Array<any>) => {
-        const getVal = (p: any, key: string) => {
+    const sortParticipants = (participants: Participant[]) => {
+        const getVal = (p: Participant, key: string) => {
             if (key === 'snapName') return p.snapName || p.currentName || p.name || '';
             if (key === 'snapDepartment') return p.snapDepartment || p.currentDept || p.department || '';
             if (key === 'snapCollegeYear') return p.snapCollegeYearAtEnrollment || p.collegeYear || '';
@@ -144,8 +175,6 @@ export const SpecialCampsTab = ({ years, currentAY }: { years: AcademicYear[]; c
                 const aRank = DEPARTMENTS.indexOf(aVal as any) > -1 ? DEPARTMENTS.indexOf(aVal as any) : 999;
                 const bRank = DEPARTMENTS.indexOf(bVal as any) > -1 ? DEPARTMENTS.indexOf(bVal as any) : 999;
                 if (aRank !== bRank) return (aRank - bRank) * dir;
-                // Default fallback if no specific sort config
-                if (!sortConfig) return getVal(a, 'snapName').localeCompare(getVal(b, 'snapName'));
             }
 
             return aVal < bVal ? -dir : aVal > bVal ? dir : 0;
@@ -164,8 +193,6 @@ export const SpecialCampsTab = ({ years, currentAY }: { years: AcademicYear[]; c
         if (expandedCampId === campId) {
             setExpandedCampId(null);
         } else {
-            // we already load the camp and participants when we expand it
-            // actually we only have participants if we fetch getById. Let's make sure it's loaded.
             try {
                 const res = await specialCampsAPI.getById(campId);
                 const cData = res.data.data;
@@ -220,11 +247,11 @@ export const SpecialCampsTab = ({ years, currentAY }: { years: AcademicYear[]; c
                                     <button onClick={() => openManage(c.id)} className="text-xs px-3 py-1.5 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200">Manage</button>
                                     {!c.isFinalized ? (
                                         <>
-                                            <button onClick={() => handleFinalize(c.id)} className="text-xs px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700">Finalize</button>
-                                            <button onClick={() => handleDelete(c.id)} className="text-xs px-3 py-1.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-200">Delete</button>
+                                            {isSuperadmin && <button onClick={() => handleFinalize(c.id)} disabled={actionId === c.id} className="text-xs px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50">Finalize</button>}
+                                            {isSuperadmin && <button onClick={() => handleDelete(c.id)} disabled={actionId === c.id} className="text-xs px-3 py-1.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 disabled:opacity-50">Delete</button>}
                                         </>
                                     ) : (
-                                        <button onClick={() => setUnlockCampId(c.id)} className="text-xs px-3 py-1.5 bg-yellow-100 text-yellow-700 rounded-lg hover:bg-yellow-200">Unlock</button>
+                                        isSuperadmin && <button onClick={() => setUnlockCamp(c)} className="text-xs px-3 py-1.5 bg-yellow-100 text-yellow-700 rounded-lg hover:bg-yellow-200">Unlock</button>
                                     )}
                                 </div>
                             )}
@@ -234,9 +261,9 @@ export const SpecialCampsTab = ({ years, currentAY }: { years: AcademicYear[]; c
                                 </button>
                             )}
                         </div>
-                        {expandedCampId === c.id && (c as unknown as { participants: Array<any>, volunteerCap?: number }).participants && (
+                        {expandedCampId === c.id && c.participants && (
                             <div className="mt-4 border-t pt-4">
-                                <h4 className="font-semibold text-gray-700 mb-3">Selected Volunteers ({(c as unknown as { participants: Array<any>, volunteerCap?: number }).participants.length} / {(c as unknown as { participants: Array<any>, volunteerCap?: number }).volunteerCap ?? 50})</h4>
+                                <h4 className="font-semibold text-gray-700 mb-3">Selected Volunteers ({c.participants.length} / {c.volunteerCap ?? 50})</h4>
                                 <div className="overflow-x-auto border rounded-lg">
                                     <table className="w-full text-sm">
                                         <thead className="bg-gray-50">
@@ -248,7 +275,7 @@ export const SpecialCampsTab = ({ years, currentAY }: { years: AcademicYear[]; c
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y">
-                                            {sortParticipants((c as unknown as { participants: Array<any>, volunteerCap?: number }).participants).map(p => (
+                                            {sortParticipants(c.participants).map(p => (
                                                 <tr key={p.id} className="hover:bg-gray-50">
                                                     <td className="px-4 py-2">{p.snapName || p.currentName}</td>
                                                     <td className="px-4 py-2">{p.snapDepartment || p.currentDept}</td>
@@ -256,7 +283,7 @@ export const SpecialCampsTab = ({ years, currentAY }: { years: AcademicYear[]; c
                                                     <td className="px-4 py-2">{p.snapNssYear || p.nssYear || '-'}</td>
                                                 </tr>
                                             ))}
-                                            {(c as unknown as { participants: Array<any>, volunteerCap?: number }).participants.length === 0 && (
+                                            {c.participants.length === 0 && (
                                                 <tr><td colSpan={4} className="px-4 py-4 text-center text-gray-500">No volunteers selected yet.</td></tr>
                                             )}
                                         </tbody>
@@ -282,9 +309,9 @@ export const SpecialCampsTab = ({ years, currentAY }: { years: AcademicYear[]; c
                                     <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-800 text-sm">
                                         This camp is finalized. Participants cannot be edited.
                                     </div>
-                                    <h4 className="font-semibold mb-2">Finalized Participants ({campDetails.participants.length})</h4>
+                                    <h4 className="font-semibold mb-2">Finalized Participants ({campDetails.participants?.length || 0})</h4>
                                     <ul className="divide-y border rounded-lg">
-                                        {campDetails.participants.map((p: any) => (
+                                        {(campDetails.participants || []).map((p: Participant) => (
                                             <li key={p.id} className="p-3 text-sm flex justify-between">
                                                 <span>{p.snapName}</span>
                                                 <span className="text-gray-500">{p.snapDepartment}</span>
@@ -295,7 +322,7 @@ export const SpecialCampsTab = ({ years, currentAY }: { years: AcademicYear[]; c
                             ) : (
                                 <div>
                                     <div className="flex justify-between items-center mb-4">
-                                        <h4 className="font-semibold">Select Volunteers (Cap: {campDetails.volunteerCap ?? 50})</h4>
+                                        <h4 className="font-semibold">Select Volunteers (Exactly {campDetails.volunteerCap ?? 50} Required)</h4>
                                         <span className={`text-sm px-2 py-1 rounded ${selectedVolIds.size === (campDetails.volunteerCap ?? 50) ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}`}>
                                             {selectedVolIds.size} / {campDetails.volunteerCap ?? 50} Selected
                                         </span>
@@ -322,7 +349,7 @@ export const SpecialCampsTab = ({ years, currentAY }: { years: AcademicYear[]; c
                                                 {ayVols.length === 0 && (
                                                     <tr><td colSpan={3} className="text-center py-4 text-gray-500">No regular active volunteers found.</td></tr>
                                                 )}
-                                                {sortParticipants(ayVols).map(v => (
+                                                {sortParticipants(ayVols as unknown as Participant[]).map((v: any) => (
                                                     <tr key={v.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => {
                                                         const newSet = new Set(selectedVolIds);
                                                         if (newSet.has(v.id)) newSet.delete(v.id);
@@ -354,26 +381,12 @@ export const SpecialCampsTab = ({ years, currentAY }: { years: AcademicYear[]; c
                 </div>
             )}
 
-            {/* Unlock Camp Modal */}
-            {unlockCampId && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6">
-                        <h3 className="text-lg font-bold text-gray-800 mb-2">Unlock Camp</h3>
-                        <p className="text-sm text-gray-600 mb-4">Enter your admin password to unlock this camp for editing.</p>
-                        <input
-                            type="password"
-                            placeholder="Admin Password"
-                            value={unlockPassword}
-                            onChange={(e) => setUnlockPassword(e.target.value)}
-                            className="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 mb-4"
-                        />
-                        <div className="flex gap-3 justify-end">
-                            <button onClick={() => { setUnlockCampId(null); setUnlockPassword(''); }} className="px-4 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
-                            <button onClick={handleUnlock} className="px-4 py-2 bg-yellow-500 text-white rounded-lg text-sm hover:bg-yellow-600">Unlock</button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            <PasswordPromptModal 
+                isOpen={!!unlockCamp} 
+                targetLabel={unlockCamp?.name || ''}
+                onClose={() => setUnlockCamp(null)} 
+                onSubmit={handleUnlock}
+            />
         </div>
     );
 };

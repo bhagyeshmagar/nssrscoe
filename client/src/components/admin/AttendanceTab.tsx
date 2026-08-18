@@ -1,26 +1,27 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { attendanceAPI, eventsAPI, volunteersAPI } from '../../services/api';
-import type { AcademicYear, VolunteerWithProfile } from '../../services/api';
+import type { AcademicYear, VolunteerWithProfile, EventData } from '../../services/api';
 import { useFlash, useAYSelector } from './Shared';
-import { ExportDataModal } from '../common/ExportDataModal';
 import { FileSpreadsheet } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import toast from 'react-hot-toast';
 
 export const AttendanceTab = ({ years, currentAY }: { years: AcademicYear[]; currentAY: AcademicYear | null }) => {
     const { selectedAyId, setSelectedAyId, selectedAY } = useAYSelector(years, currentAY);
-    const [eventsList, setEventsList] = useState<any[]>([]);
+    const [eventsList, setEventsList] = useState<EventData[]>([]);
     const [volunteersList, setVolunteersList] = useState<VolunteerWithProfile[]>([]);
-    const [selectedEvent, setSelectedEvent] = useState<any | null>(null);
+    const [selectedEvent, setSelectedEvent] = useState<EventData | null>(null);
     const [attendanceMap, setAttendanceMap] = useState<Record<number, boolean>>({});
-    const [showExportModal, setShowExportModal] = useState(false);
     const [exportingId, setExportingId] = useState<number | null>(null);
+    const [managingId, setManagingId] = useState<number | null>(null);
+    const [saving, setSaving] = useState(false);
+    const [sortBy, setSortBy] = useState<'name' | 'department'>('department');
     const { msg, flash } = useFlash();
 
     const load = useCallback(async () => {
         if (!selectedAyId) return;
         try {
-            const selectedAY = years.find((y: any) => y.id === selectedAyId);
+            const selectedAY = years.find((y: AcademicYear) => y.id === selectedAyId);
 
             const [eRes, vRes] = await Promise.all([
                 eventsAPI.getAll(),
@@ -29,7 +30,7 @@ export const AttendanceTab = ({ years, currentAY }: { years: AcademicYear[]; cur
             if (selectedAY) {
                 const ayStart = new Date(selectedAY.startDate);
                 const ayEnd = new Date(selectedAY.endDate);
-                const filteredEvents = (eRes.data.data as any[]).filter(ev => {
+                const filteredEvents = (eRes.data.data as EventData[]).filter(ev => {
                     const evDate = new Date(ev.date);
                     const belongsToAY = ev.academicYearId
                         ? ev.academicYearId === selectedAyId
@@ -38,10 +39,13 @@ export const AttendanceTab = ({ years, currentAY }: { years: AcademicYear[]; cur
                 });
                 setEventsList(filteredEvents);
             } else {
-                setEventsList((eRes.data.data as any[]).filter(ev => ev.type === 'past' || ev.type === 'today'));
+                setEventsList((eRes.data.data as EventData[]).filter(ev => ev.type === 'past' || ev.type === 'today'));
             }
             setVolunteersList(vRes.data.data?.data || []);
-        } catch (e) { console.error(e); }
+        } catch (e: any) {
+            console.error(e);
+            flash('err', e.response?.data?.message || 'Failed to load attendance data.');
+        }
     }, [selectedAyId, years]);
 
     useEffect(() => { load(); }, [load]);
@@ -54,7 +58,8 @@ export const AttendanceTab = ({ years, currentAY }: { years: AcademicYear[]; cur
 
 
 
-    const handleManage = async (event: any) => {
+    const handleManage = async (event: EventData) => {
+        setManagingId(event.id);
         try {
             const res = await attendanceAPI.getEventAttendance(selectedAyId, event.id);
             const data = res.data.data;
@@ -68,19 +73,26 @@ export const AttendanceTab = ({ years, currentAY }: { years: AcademicYear[]; cur
             setSelectedEvent(event);
         } catch (e: any) {
             flash('err', e.response?.data?.message ?? 'Failed to load attendance.');
+        } finally {
+            setManagingId(null);
         }
     };
 
-    const handleExportAttendance = async (event: any) => {
+    const sortedVolunteers = useMemo(() => {
+        return [...volunteersList].sort((a, b) => {
+            if (sortBy === 'name') {
+                return a.name.localeCompare(b.name);
+            }
+            return a.department.localeCompare(b.department) || a.name.localeCompare(b.name);
+        });
+    }, [volunteersList, sortBy]);
+
+    const handleExportAttendance = async (event: EventData) => {
         setExportingId(event.id);
         try {
             // Fetch the attendance records for this event
-            const [attRes, volRes] = await Promise.all([
-                attendanceAPI.getEventAttendance(selectedAyId, event.id),
-                volunteersAPI.getByAY(selectedAyId, { status: 'regular', isActive: true }),
-            ]);
+            const attRes = await attendanceAPI.getEventAttendance(selectedAyId, event.id);
             const records: any[] = attRes.data.data?.records || [];
-            const vols: VolunteerWithProfile[] = volRes.data.data?.data || [];
 
             // Build a map of volunteerId -> status
             const statusMap: Record<number, string> = {};
@@ -91,9 +103,10 @@ export const AttendanceTab = ({ years, currentAY }: { years: AcademicYear[]; cur
                 [`Date: ${new Date(event.date).toLocaleDateString()}`],
                 [`Location: ${event.location}`],
                 [],
-                ['Sr. No.', 'Name', 'Department', 'Attendance Status'],
-                ...vols.map((v, i) => [
+                ['Sr. No.', 'PRN No.', 'Name', 'Department', 'Attendance Status'],
+                ...sortedVolunteers.map((v, i) => [
                     i + 1,
+                    v.profile?.prnNo || 'N/A',
                     v.name,
                     v.department,
                     statusMap[v.id]
@@ -104,7 +117,7 @@ export const AttendanceTab = ({ years, currentAY }: { years: AcademicYear[]; cur
 
             const wb = XLSX.utils.book_new();
             const ws = XLSX.utils.aoa_to_sheet(wsData);
-            ws['!cols'] = [{ wch: 8 }, { wch: 30 }, { wch: 35 }, { wch: 18 }];
+            ws['!cols'] = [{ wch: 8 }, { wch: 15 }, { wch: 30 }, { wch: 35 }, { wch: 18 }];
             XLSX.utils.book_append_sheet(wb, ws, 'Attendance');
             const safeTitle = event.title.replace(/[^a-zA-Z0-9_\- ]/g, '').trim();
             XLSX.writeFile(wb, `Attendance_${safeTitle}_${new Date(event.date).toISOString().slice(0, 10)}.xlsx`);
@@ -118,7 +131,8 @@ export const AttendanceTab = ({ years, currentAY }: { years: AcademicYear[]; cur
     };
 
     const handleSave = async () => {
-        if (!selectedEvent) return;
+        if (!selectedEvent || saving) return;
+        setSaving(true);
         const records = volunteersList.map(v => ({
             volunteerId: v.id,
             status: attendanceMap[v.id] ? 'present' : 'absent' as 'present' | 'absent'
@@ -129,6 +143,8 @@ export const AttendanceTab = ({ years, currentAY }: { years: AcademicYear[]; cur
             setSelectedEvent(null);
         } catch (e: any) {
             flash('err', e.response?.data?.message ?? 'Failed to save attendance.');
+        } finally {
+            setSaving(false);
         }
     };
 
@@ -162,8 +178,12 @@ export const AttendanceTab = ({ years, currentAY }: { years: AcademicYear[]; cur
                                     <td className="px-4 py-3 text-gray-500">{e.location}</td>
                                     <td className="px-4 py-3">
                                         <div className="flex items-center gap-2">
-                                            <button onClick={() => handleManage(e)} className="text-xs px-3 py-1.5 rounded bg-blue-100 text-blue-700 hover:bg-blue-200 font-medium">
-                                                Manage Attendance
+                                            <button 
+                                                onClick={() => handleManage(e)} 
+                                                disabled={managingId === e.id || exportingId === e.id}
+                                                className="text-xs px-3 py-1.5 rounded bg-blue-100 text-blue-700 hover:bg-blue-200 font-medium disabled:opacity-50"
+                                            >
+                                                {managingId === e.id ? 'Loading...' : 'Manage Attendance'}
                                             </button>
                                             <button
                                                 onClick={() => handleExportAttendance(e)}
@@ -188,7 +208,20 @@ export const AttendanceTab = ({ years, currentAY }: { years: AcademicYear[]; cur
                             <h3 className="text-xl font-bold text-gray-800">Attendance for: {selectedEvent.title}</h3>
                             <p className="text-sm text-gray-500 mt-1">{new Date(selectedEvent.date).toLocaleDateString()} • {selectedEvent.location}</p>
                         </div>
-                        <button onClick={() => setSelectedEvent(null)} className="text-gray-500 hover:bg-gray-100 px-3 py-1.5 rounded-lg text-sm">Close</button>
+                        <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-2">
+                                <label className="text-sm text-gray-600 font-medium">Sort by:</label>
+                                <select 
+                                    value={sortBy} 
+                                    onChange={e => setSortBy(e.target.value as 'name' | 'department')}
+                                    className="border rounded px-2 py-1 text-sm bg-white"
+                                >
+                                    <option value="department">Department</option>
+                                    <option value="name">Name</option>
+                                </select>
+                            </div>
+                            <button onClick={() => setSelectedEvent(null)} className="text-gray-500 hover:bg-gray-100 px-3 py-1.5 rounded-lg text-sm">Close</button>
+                        </div>
                     </div>
 
                     <div className="max-h-[500px] overflow-y-auto mb-6">
@@ -196,12 +229,13 @@ export const AttendanceTab = ({ years, currentAY }: { years: AcademicYear[]; cur
                             <thead className="bg-gray-50 border-b sticky top-0">
                                 <tr>
                                     <th className="px-4 py-3 text-left w-16">Present</th>
+                                    <th className="px-4 py-3 text-left">PRN No.</th>
                                     <th className="px-4 py-3 text-left">Volunteer Name</th>
                                     <th className="px-4 py-3 text-left">Department</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y">
-                                {volunteersList.map(v => (
+                                {sortedVolunteers.map(v => (
                                     <tr key={v.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => !selectedAY?.isLocked && setAttendanceMap(p => ({ ...p, [v.id]: !p[v.id] }))}>
                                         <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                                             <input
@@ -212,6 +246,7 @@ export const AttendanceTab = ({ years, currentAY }: { years: AcademicYear[]; cur
                                                 className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                                             />
                                         </td>
+                                        <td className="px-4 py-3 text-gray-600">{v.profile?.prnNo || 'N/A'}</td>
                                         <td className="px-4 py-3 font-medium text-gray-800">{v.name}</td>
                                         <td className="px-4 py-3 text-gray-500">{v.department}</td>
                                     </tr>
@@ -223,27 +258,17 @@ export const AttendanceTab = ({ years, currentAY }: { years: AcademicYear[]; cur
                     {!selectedAY?.isLocked && (
                         <div className="flex justify-end gap-3 pt-4 border-t">
                             <button onClick={() => setSelectedEvent(null)} className="border px-5 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
-                            <button onClick={handleSave} className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 text-sm font-medium">Save Attendance</button>
+                            <button 
+                                onClick={handleSave} 
+                                disabled={saving}
+                                className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 text-sm font-medium disabled:opacity-50"
+                            >
+                                {saving ? 'Saving...' : 'Save Attendance'}
+                            </button>
                         </div>
                     )}
                 </div>
             )}
-            
-            <ExportDataModal 
-                isOpen={showExportModal}
-                onClose={() => setShowExportModal(false)}
-                data={volunteersList.map(v => ({
-                    volunteerName: v.name,
-                    department: v.department,
-                    status: attendanceMap[v.id] ? 'Present' : 'Absent',
-                }))}
-                columns={[
-                    { key: 'volunteerName', label: 'Volunteer Name' },
-                    { key: 'department', label: 'Department' },
-                    { key: 'status', label: 'Attendance Status' }
-                ]}
-                filename={`Attendance_${selectedEvent?.title}_AY_${selectedAY?.label || 'All'}`}
-            />
         </div>
     );
 };

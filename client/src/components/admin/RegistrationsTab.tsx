@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { registrationsAPI } from '../../services/api';
-import type { EventRegistration } from '../../services/api';
+import type { EventRegistration, EventData } from '../../services/api';
 import { CheckCircle, XCircle, Clock, Mail } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 type FilterStatus = 'all' | 'pending' | 'approved' | 'rejected';
 
@@ -23,18 +24,12 @@ const StatusBadge = ({ status }: { status: string }) => {
     );
 };
 
-export const RegistrationsTab = ({ events }: { events: Array<any> }) => {
+export const RegistrationsTab = ({ events }: { events: (EventData & { id: number })[] }) => {
     const [selectedEventId, setSelectedEventId] = useState<string>('');
     const [registrations, setRegistrations] = useState<EventRegistration[]>([]);
     const [loading, setLoading] = useState(false);
     const [actionLoading, setActionLoading] = useState<number | null>(null);
     const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
-    const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
-
-    const showToast = (type: 'success' | 'error', message: string) => {
-        setToast({ type, message });
-        setTimeout(() => setToast(null), 3500);
-    };
 
     const fetchRegistrations = useCallback(async (eventId: number) => {
         setLoading(true);
@@ -43,6 +38,7 @@ export const RegistrationsTab = ({ events }: { events: Array<any> }) => {
             setRegistrations((response.data as any).data || []);
         } catch (error) {
             console.error('Error fetching registrations:', error);
+            toast.error('Failed to load registrations');
         }
         setLoading(false);
     }, []);
@@ -59,12 +55,10 @@ export const RegistrationsTab = ({ events }: { events: Array<any> }) => {
         setActionLoading(id);
         try {
             await registrationsAPI.approve(id);
-            setRegistrations(prev =>
-                prev.map(r => r.id === id ? { ...r, status: 'approved' } : r)
-            );
-            showToast('success', 'Registration approved! Pass email sent to the volunteer.');
+            await fetchRegistrations(Number(selectedEventId));
+            toast.success('Registration approved! Pass email sent to the volunteer.');
         } catch (err: any) {
-            showToast('error', err?.response?.data?.message || 'Failed to approve registration.');
+            toast.error(err?.response?.data?.message || 'Failed to approve registration.');
         }
         setActionLoading(null);
     };
@@ -74,12 +68,10 @@ export const RegistrationsTab = ({ events }: { events: Array<any> }) => {
         setActionLoading(id);
         try {
             await registrationsAPI.reject(id);
-            setRegistrations(prev =>
-                prev.map(r => r.id === id ? { ...r, status: 'rejected' } : r)
-            );
-            showToast('success', 'Registration rejected.');
+            await fetchRegistrations(Number(selectedEventId));
+            toast.success('Registration rejected.');
         } catch (err: any) {
-            showToast('error', err?.response?.data?.message || 'Failed to reject registration.');
+            toast.error(err?.response?.data?.message || 'Failed to reject registration.');
         }
         setActionLoading(null);
     };
@@ -97,13 +89,6 @@ export const RegistrationsTab = ({ events }: { events: Array<any> }) => {
 
     return (
         <div>
-            {/* Toast */}
-            {toast && (
-                <div className={`fixed top-4 right-4 z-50 px-5 py-3 rounded-lg shadow-lg text-white font-medium text-sm transition-all ${toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'}`}>
-                    {toast.message}
-                </div>
-            )}
-
             <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-bold text-gray-800">Event Registrations</h2>
             </div>
@@ -117,7 +102,7 @@ export const RegistrationsTab = ({ events }: { events: Array<any> }) => {
                     className="w-full md:w-1/2 border rounded px-3 py-2"
                 >
                     <option value="">-- Select an Event --</option>
-                    {events.map((e: any) => (
+                    {events.map(e => (
                         <option key={e.id} value={e.id}>
                             {e.title} ({new Date(e.date).toLocaleDateString()}) – {e.type}
                         </option>

@@ -1,14 +1,20 @@
 import { useState, useEffect } from 'react';
-import { adminsAPI } from '../../services/api';
+import { adminsAPI, decodeToken } from '../../services/api';
+import type { AdminData } from '../../services/api';
+import { useAuthStore } from '../../stores/authStore';
 import { useFlash } from './Shared';
 
 export const AdminsTab = () => {
-    const [adminsList, setAdminsList] = useState<any[]>([]);
+    const [adminsList, setAdminsList] = useState<AdminData[]>([]);
     const [loading, setLoading] = useState(true);
+    const [busy, setBusy] = useState(false);
     const [form, setForm] = useState({ username: '', password: '', isSuperadmin: false });
     const [editingId, setEditingId] = useState<number | null>(null);
     const [showForm, setShowForm] = useState(false);
     const { msg, flash } = useFlash();
+
+    const currentUser = decodeToken(useAuthStore.getState().token || '');
+    const currentAdminId = currentUser?.id;
 
     const loadAdmins = async () => {
         try {
@@ -16,7 +22,7 @@ export const AdminsTab = () => {
             const { data } = await adminsAPI.getAll();
             setAdminsList(data.data || []);
         } catch (e: any) {
-            flash('err', 'Failed to load admins');
+            flash('err', e.response?.data?.message || 'Failed to load admins');
         } finally {
             setLoading(false);
         }
@@ -26,12 +32,32 @@ export const AdminsTab = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        
+        if (!editingId && form.password.length < 6) {
+            return flash('err', 'Password must be at least 6 characters.');
+        }
+        if (editingId && form.password && form.password.length < 6) {
+            return flash('err', 'Password must be at least 6 characters.');
+        }
+
+        const adminBeingEdited = adminsList.find(a => a.id === editingId);
+        if (adminBeingEdited?.isSuperadmin && !form.isSuperadmin) {
+            const superadminCount = adminsList.filter(a => a.isSuperadmin).length;
+            if (superadminCount <= 1) {
+                return flash('err', 'Cannot demote the last superadmin.');
+            }
+        }
+
+        setBusy(true);
         try {
+            const payload: any = { username: form.username, isSuperadmin: form.isSuperadmin };
+            if (form.password) payload.password = form.password;
+
             if (editingId) {
-                await adminsAPI.update(editingId, form);
+                await adminsAPI.update(editingId, payload);
                 flash('ok', 'Admin updated successfully');
             } else {
-                await adminsAPI.create(form);
+                await adminsAPI.create(payload);
                 flash('ok', 'Admin created successfully');
             }
             setShowForm(false);
@@ -40,17 +66,35 @@ export const AdminsTab = () => {
             loadAdmins();
         } catch (err: any) {
             flash('err', err.response?.data?.message || 'Error saving admin');
+        } finally {
+            setBusy(false);
         }
     };
 
     const handleDelete = async (id: number) => {
+        if (id === currentAdminId) {
+            return flash('err', 'You cannot delete your own account while logged in.');
+        }
+        
+        const adminToDelete = adminsList.find(a => a.id === id);
+        if (adminToDelete?.isSuperadmin) {
+            const superadminCount = adminsList.filter(a => a.isSuperadmin).length;
+            if (superadminCount <= 1) {
+                return flash('err', 'Cannot delete the last superadmin account.');
+            }
+        }
+
         if (!confirm('Are you sure you want to delete this admin?')) return;
+        
+        setBusy(true);
         try {
             await adminsAPI.delete(id);
             flash('ok', 'Admin deleted');
             loadAdmins();
         } catch (err: any) {
-            flash('err', 'Failed to delete admin');
+            flash('err', err.response?.data?.message || 'Failed to delete admin');
+        } finally {
+            setBusy(false);
         }
     };
 
@@ -81,8 +125,8 @@ export const AdminsTab = () => {
                             <label htmlFor="superadmin-check" className="text-sm text-gray-600">Is Superadmin?</label>
                         </div>
                         <div className="flex gap-3">
-                            <button type="submit" className="bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700 text-sm font-medium">{editingId ? 'Update' : 'Create'}</button>
-                            <button type="button" onClick={() => setShowForm(false)} className="border px-5 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
+                            <button type="submit" disabled={busy} className="bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700 text-sm font-medium disabled:opacity-50">{busy ? 'Saving...' : (editingId ? 'Update' : 'Create')}</button>
+                            <button type="button" onClick={() => setShowForm(false)} disabled={busy} className="border px-5 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50">Cancel</button>
                         </div>
                     </form>
                 </div>
@@ -105,8 +149,8 @@ export const AdminsTab = () => {
                                     {a.isSuperadmin ? <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs">Superadmin</span> : <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs">Admin</span>}
                                 </td>
                                 <td className="p-4 flex gap-2 justify-end">
-                                    <button onClick={() => { setForm({ username: a.username, password: '', isSuperadmin: a.isSuperadmin }); setEditingId(a.id); setShowForm(true); }} className="px-3 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 rounded">Edit</button>
-                                    <button onClick={() => handleDelete(a.id)} className="px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-50 rounded">Delete</button>
+                                    <button disabled={busy} onClick={() => { setForm({ username: a.username, password: '', isSuperadmin: a.isSuperadmin }); setEditingId(a.id); setShowForm(true); }} className="px-3 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 rounded disabled:opacity-50">Edit</button>
+                                    <button disabled={busy} onClick={() => handleDelete(a.id)} className="px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-50 rounded disabled:opacity-50">Delete</button>
                                 </td>
                             </tr>
                         ))}

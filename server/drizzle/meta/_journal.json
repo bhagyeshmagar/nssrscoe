@@ -71,6 +71,13 @@
       "when": 1770183920000,
       "tag": "0009_meetings_and_portfolios",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1787035709322,
+      "tag": "0010_big_phalanx",
+      "breakpoints": true
     }
   ]
 }
