@@ -28,7 +28,8 @@ describe('Gallery API Integration Tests', () => {
             ];
 
             const mockOrderBy = vi.fn().mockResolvedValue(mockGallery);
-            const mockFrom = vi.fn().mockReturnValue({ orderBy: mockOrderBy });
+            const mockWhere = vi.fn().mockReturnValue({ orderBy: mockOrderBy });
+            const mockFrom = vi.fn().mockReturnValue({ where: mockWhere });
             const mockSelect = vi.fn().mockReturnValue({ from: mockFrom });
             (db.select as any) = mockSelect;
 
