@@ -1,26 +1,33 @@
 import {
-    pgTable,
-    pgEnum,
-    serial,
-    text,
-    timestamp,
+    mssqlTable,
+    int,
+    nvarchar,
+    bit,
+    datetime2,
     date,
-    varchar,
-    integer,
-    boolean,
     unique,
-} from 'drizzle-orm/pg-core';
-import { relations } from 'drizzle-orm';
+    check,
+    uniqueIndex,
+} from 'drizzle-orm/mssql-core';
+import { sql } from 'drizzle-orm';
+import { relations } from 'drizzle-orm/_relations';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ENUMS
+// TYPESCRIPT ENUM CONSTANTS
+// (MS SQL Server has no native ENUM type — these replace pgEnum and enforce
+//  type-safety at the TypeScript layer; CHECK constraints enforce them in DB)
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const eventTypeEnum = pgEnum('event_type', ['upcoming', 'past']);
-export const registrationStatusEnum = pgEnum('registration_status', ['pending', 'approved', 'rejected']);
-export const mediaTypeEnum = pgEnum('media_type', ['image', 'video']);
+export const EVENT_TYPES = ['upcoming', 'past'] as const;
+export type EventType = typeof EVENT_TYPES[number];
 
-export const departmentEnum = pgEnum('department', [
+export const REGISTRATION_STATUSES = ['pending', 'approved', 'rejected'] as const;
+export type RegistrationStatus = typeof REGISTRATION_STATUSES[number];
+
+export const MEDIA_TYPES = ['image', 'video'] as const;
+export type MediaType = typeof MEDIA_TYPES[number];
+
+export const DEPARTMENTS = [
     'Computer Engineering',
     'Computer Science and Business Systems',
     'Information Technology',
@@ -30,164 +37,176 @@ export const departmentEnum = pgEnum('department', [
     'Mechanical Engineering',
     'Civil Engineering',
     'Bachelor of Computer Applications',
-]);
+] as const;
+export type Department = typeof DEPARTMENTS[number];
 
-export const roleTypeEnum = pgEnum('role_type', ['institution', 'student']);
+export const ROLE_TYPES = ['institution', 'student'] as const;
+export type RoleType = typeof ROLE_TYPES[number];
 
 /** regular = counts toward the 100-per-AY cap; backup = overflow list */
-export const volunteerStatusEnum = pgEnum('volunteer_status', ['regular', 'backup']);
+export const VOLUNTEER_STATUSES = ['regular', 'backup'] as const;
+export type VolunteerStatus = typeof VOLUNTEER_STATUSES[number];
 
-export const attendanceStatusEnum = pgEnum('attendance_status', ['present', 'absent', 'late']);
+export const ATTENDANCE_STATUSES = ['present', 'absent', 'late'] as const;
+export type AttendanceStatus = typeof ATTENDANCE_STATUSES[number];
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ADMINS
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const admins = pgTable('admins', {
-    id: serial('id').primaryKey(),
-    username: varchar('username', { length: 255 }).notNull().unique(),
-    passwordHash: text('password_hash').notNull(),
-    isSuperadmin: boolean('is_superadmin').default(false).notNull(),
-    createdAt: timestamp('created_at').defaultNow(),
+export const admins = mssqlTable('admins', {
+    id: int('id').identity().primaryKey(),
+    username: nvarchar('username', { length: 255 }).notNull().unique(),
+    passwordHash: nvarchar('password_hash', { length: 'max' }).notNull(),
+    isSuperadmin: bit('is_superadmin').default(false).notNull(),
+    createdAt: datetime2('created_at').default(sql`getdate()`),
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ACADEMIC YEARS
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const academicYears = pgTable('academic_years', {
-    id: serial('id').primaryKey(),
-    label: varchar('label', { length: 20 }).notNull().unique(),   // "2024-25"
+export const academicYears = mssqlTable('academic_years', {
+    id: int('id').identity().primaryKey(),
+    label: nvarchar('label', { length: 20 }).notNull().unique(),   // "2024-25"
     startDate: date('start_date').notNull(),
     endDate: date('end_date').notNull(),
-    /** Enforced by partial unique index: UNIQUE (is_current) WHERE is_current = true */
-    isCurrent: boolean('is_current').default(false).notNull(),
+    /** Enforced by partial unique index: UNIQUE (is_current) WHERE is_current = 1 */
+    isCurrent: bit('is_current').default(false).notNull(),
     /** Write-lock. All volunteer/core-team/camp mutations blocked when true. */
-    isLocked: boolean('is_locked').default(false).notNull(),
+    isLocked: bit('is_locked').default(false).notNull(),
     /** Archived AYs are fully read-only and hidden from active management views. */
-    isArchived: boolean('is_archived').default(false).notNull(),
-    volunteerCap: integer('volunteer_cap').default(100).notNull(),
-    lockedAt: timestamp('locked_at'),
-    lockedById: integer('locked_by_id').references(() => admins.id),
-    regularActivityReportUrl: varchar('regular_activity_report_url', { length: 1024 }),
-    specialCampReportUrl: varchar('special_camp_report_url', { length: 1024 }),
-    createdAt: timestamp('created_at').defaultNow(),
-});
+    isArchived: bit('is_archived').default(false).notNull(),
+    volunteerCap: int('volunteer_cap').default(100).notNull(),
+    lockedAt: datetime2('locked_at'),
+    lockedById: int('locked_by_id').references(() => admins.id),
+    regularActivityReportUrl: nvarchar('regular_activity_report_url', { length: 1024 }),
+    specialCampReportUrl: nvarchar('special_camp_report_url', { length: 1024 }),
+    createdAt: datetime2('created_at').default(sql`getdate()`),
+}, (t) => [
+    uniqueIndex('unq_is_current').on(t.isCurrent).where(sql`${t.isCurrent} = 1`)
+]);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ACTIVITY CALENDAR
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const activityCalendar = pgTable('activity_calendar', {
-    id: serial('id').primaryKey(),
-    academicYearId: integer('academic_year_id').references(() => academicYears.id, { onDelete: 'cascade' }).notNull(),
-    month: varchar('month', { length: 50 }).notNull(),
-    tentativeDate: varchar('tentative_date', { length: 255 }).notNull(),
-    activity: varchar('activity', { length: 500 }).notNull(),
-    type: varchar('type', { length: 50 }).notNull(), // 'Field Work', 'Health', 'Campus', 'National'
-    createdAt: timestamp('created_at').defaultNow(),
+export const activityCalendar = mssqlTable('activity_calendar', {
+    id: int('id').identity().primaryKey(),
+    academicYearId: int('academic_year_id').references(() => academicYears.id, { onDelete: 'cascade' }).notNull(),
+    month: nvarchar('month', { length: 50 }).notNull(),
+    tentativeDate: nvarchar('tentative_date', { length: 255 }).notNull(),
+    activity: nvarchar('activity', { length: 500 }).notNull(),
+    type: nvarchar('type', { length: 50 }).notNull(), // 'Field Work', 'Health', 'Campus', 'National'
+    createdAt: datetime2('created_at').default(sql`getdate()`),
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
 // VOLUNTEERS (auth + identity)
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const volunteers = pgTable('volunteers', {
-    id: serial('id').primaryKey(),
-    academicYearId: integer('academic_year_id').references(() => academicYears.id).notNull(),
-    name: varchar('name', { length: 255 }).notNull(),
-    email: varchar('email', { length: 255 }).notNull().unique(),
-    passwordHash: text('password_hash').notNull(),
-    isActive: boolean('is_active').default(true),
-    department: departmentEnum('department').notNull(),
+export const volunteers = mssqlTable('volunteers', {
+    id: int('id').identity().primaryKey(),
+    academicYearId: int('academic_year_id').references(() => academicYears.id).notNull(),
+    name: nvarchar('name', { length: 255 }).notNull(),
+    email: nvarchar('email', { length: 255 }).notNull().unique(),
+    passwordHash: nvarchar('password_hash', { length: 'max' }).notNull(),
+    isActive: bit('is_active').default(true),
+    department: nvarchar('department', { length: 100 }).notNull(),
     /** regular = counts toward 100-per-AY cap; backup = overflow */
-    status: volunteerStatusEnum('status').default('regular').notNull(),
-    createdById: integer('created_by_id').references(() => admins.id),
-    createdAt: timestamp('created_at').defaultNow(),
-    updatedAt: timestamp('updated_at').defaultNow(),
-});
+    status: nvarchar('status', { length: 20 }).default('regular').notNull(),
+    createdById: int('created_by_id').references(() => admins.id),
+    createdAt: datetime2('created_at').default(sql`getdate()`),
+    updatedAt: datetime2('updated_at').default(sql`getdate()`),
+}, (t) => [
+check('chk_volunteers_department', sql`${t.department} IN ('Computer Engineering','Computer Science and Business Systems','Information Technology','Electronics and Telecommunication','Electrical Engineering','Automation and Robotics','Mechanical Engineering','Civil Engineering','Bachelor of Computer Applications')`),
+    check('chk_volunteers_status', sql`${t.status} IN ('regular','backup')`),
+]);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // VOLUNTEER PROFILES (self-filled personal details — kept split from auth)
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const volunteerProfiles = pgTable('volunteer_profiles', {
-    id: serial('id').primaryKey(),
-    volunteerId: integer('volunteer_id')
+export const volunteerProfiles = mssqlTable('volunteer_profiles', {
+    id: int('id').identity().primaryKey(),
+    volunteerId: int('volunteer_id')
         .references(() => volunteers.id, { onDelete: 'cascade' })
         .notNull()
         .unique(),
-    fullName: varchar('full_name', { length: 255 }),
-    prnNo: varchar('prn_no', { length: 50 }),
+    fullName: nvarchar('full_name', { length: 255 }),
+    prnNo: nvarchar('prn_no', { length: 50 }),
     /** FE / SE / TE / BE — the student's college year at NSS enrollment time. */
-    collegeYearAtEnrollment: varchar('college_year_at_enrollment', { length: 20 }),
-    nssYear: integer('nss_year'),
-    marksheetUrl: text('marksheet_url'),
-    cgpa: varchar('cgpa', { length: 10 }),
-    eligibilityNo: varchar('eligibility_no', { length: 50 }),
-    religion: varchar('religion', { length: 50 }),
-    caste: varchar('caste', { length: 100 }),
-    casteCategory: varchar('caste_category', { length: 50 }),
-    phoneNo: varchar('phone_no', { length: 20 }),
-    emailId: varchar('email_id', { length: 255 }),
-    department: varchar('department', { length: 100 }), // Added so Drizzle can map the existing DB column
-    profilePhotoUrl: text('profile_photo_url'),
-    experienceText: text('experience_text'),
-    portfolioChoices: text('portfolio_choices'), // Added for preferred portfolios
-    updatedAt: timestamp('updated_at').defaultNow(),
+    collegeYearAtEnrollment: nvarchar('college_year_at_enrollment', { length: 20 }),
+    nssYear: int('nss_year'),
+    marksheetUrl: nvarchar('marksheet_url', { length: 'max' }),
+    cgpa: nvarchar('cgpa', { length: 10 }),
+    eligibilityNo: nvarchar('eligibility_no', { length: 50 }),
+    religion: nvarchar('religion', { length: 50 }),
+    caste: nvarchar('caste', { length: 100 }),
+    casteCategory: nvarchar('caste_category', { length: 50 }),
+    phoneNo: nvarchar('phone_no', { length: 20 }),
+    emailId: nvarchar('email_id', { length: 255 }),
+    department: nvarchar('department', { length: 100 }), // Added so Drizzle can map the existing DB column
+    profilePhotoUrl: nvarchar('profile_photo_url', { length: 'max' }),
+    experienceText: nvarchar('experience_text', { length: 'max' }),
+    isExperienceApproved: bit('is_experience_approved').default(false),
+    portfolioChoices: nvarchar('portfolio_choices', { length: 'max' }), // Added for preferred portfolios
+    updatedAt: datetime2('updated_at').default(sql`getdate()`),
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CORE TEAM ROLES (master reference — seeded once)
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const coreTeamRoles = pgTable('core_team_roles', {
-    id: serial('id').primaryKey(),
-    name: varchar('name', { length: 100 }).notNull().unique(),
+export const coreTeamRoles = mssqlTable('core_team_roles', {
+    id: int('id').identity().primaryKey(),
+    name: nvarchar('name', { length: 100 }).notNull().unique(),
     /** Stable code used for programmatic validation (e.g. 'department_coordinator'). */
-    code: varchar('code', { length: 50 }).notNull().unique(),
-    roleType: roleTypeEnum('role_type').notNull(),
-    isUniquePerAy: boolean('is_unique_per_ay').default(true).notNull(),
-    displayOrder: integer('display_order').default(0).notNull(),
-    category: varchar('category', { length: 100 }),
-    createdAt: timestamp('created_at').defaultNow(),
-});
+    code: nvarchar('code', { length: 50 }).notNull().unique(),
+    roleType: nvarchar('role_type', { length: 20 }).notNull(),
+    isUniquePerAy: bit('is_unique_per_ay').default(true).notNull(),
+    displayOrder: int('display_order').default(0).notNull(),
+    category: nvarchar('category', { length: 100 }),
+    createdAt: datetime2('created_at').default(sql`getdate()`),
+}, (t) => [
+check('chk_core_team_roles_role_type', sql`${t.roleType} IN ('institution','student')`),
+]);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CORE TEAM ASSIGNMENTS (per-AY selection)
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const coreTeamAssignments = pgTable('core_team_assignments', {
-    id: serial('id').primaryKey(),
-    academicYearId: integer('academic_year_id').notNull().references(() => academicYears.id),
-    coreTeamRoleId: integer('core_team_role_id').notNull().references(() => coreTeamRoles.id),
-    volunteerId: integer('volunteer_id').references(() => volunteers.id, { onDelete: 'set null' }),
+export const coreTeamAssignments = mssqlTable('core_team_assignments', {
+    id: int('id').identity().primaryKey(),
+    academicYearId: int('academic_year_id').notNull().references(() => academicYears.id),
+    coreTeamRoleId: int('core_team_role_id').notNull().references(() => coreTeamRoles.id),
+    volunteerId: int('volunteer_id').references(() => volunteers.id, { onDelete: 'set null' }),
     /** For institution roles (principal, nss_po). NULL for student roles. */
-    displayName: varchar('display_name', { length: 255 }),
-    displayPhotoUrl: text('display_photo_url'),
+    displayName: nvarchar('display_name', { length: 255 }),
+    displayPhotoUrl: nvarchar('display_photo_url', { length: 'max' }),
     /** For department_coordinator only — which dept this coordinator manages. */
-    department: varchar('department', { length: 100 }),
-    displayOrder: integer('display_order').default(0),
-    createdAt: timestamp('created_at').defaultNow(),
+    department: nvarchar('department', { length: 100 }),
+    displayOrder: int('display_order').default(0),
+    createdAt: datetime2('created_at').default(sql`getdate()`),
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SPECIAL CAMPS
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const specialCamps = pgTable('special_camps', {
-    id: serial('id').primaryKey(),
-    academicYearId: integer('academic_year_id').notNull().references(() => academicYears.id),
-    name: varchar('name', { length: 255 }).notNull(),
-    location: varchar('location', { length: 255 }).notNull(),
+export const specialCamps = mssqlTable('special_camps', {
+    id: int('id').identity().primaryKey(),
+    academicYearId: int('academic_year_id').notNull().references(() => academicYears.id),
+    name: nvarchar('name', { length: 255 }).notNull(),
+    location: nvarchar('location', { length: 255 }).notNull(),
     startDate: date('start_date').notNull(),
     endDate: date('end_date').notNull(),
-    description: text('description'),
-    volunteerCap: integer('volunteer_cap').default(50).notNull(),
-    isFinalized: boolean('is_finalized').default(false).notNull(),
-    finalizedAt: timestamp('finalized_at'),
-    finalizedById: integer('finalized_by_id').references(() => admins.id),
-    createdAt: timestamp('created_at').defaultNow(),
+    description: nvarchar('description', { length: 'max' }),
+    volunteerCap: int('volunteer_cap').default(50).notNull(),
+    isFinalized: bit('is_finalized').default(false).notNull(),
+    finalizedAt: datetime2('finalized_at'),
+    finalizedById: int('finalized_by_id').references(() => admins.id),
+    createdAt: datetime2('created_at').default(sql`getdate()`),
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -195,156 +214,164 @@ export const specialCamps = pgTable('special_camps', {
 // snap_* columns are frozen at finalization time and never updated after.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const specialCampParticipants = pgTable('special_camp_participants', {
-    id: serial('id').primaryKey(),
-    specialCampId: integer('special_camp_id').notNull().references(() => specialCamps.id, { onDelete: 'cascade' }),
-    volunteerId: integer('volunteer_id').references(() => volunteers.id, { onDelete: 'set null' }),
-    snapName: varchar('snap_name', { length: 255 }).notNull(),
-    snapPrnNo: varchar('snap_prn_no', { length: 50 }),
-    snapDepartment: varchar('snap_department', { length: 100 }),
-    snapCollegeYearAtEnrollment: varchar('snap_college_year_at_enrollment', { length: 20 }),
-    snapNssYear: integer('snap_nss_year'),
-    snapCgpa: varchar('snap_cgpa', { length: 10 }),
-    snapPhoneNo: varchar('snap_phone_no', { length: 20 }),
-    snapFinalizedAt: timestamp('snap_finalized_at'),
-    addedAt: timestamp('added_at').defaultNow(),
+export const specialCampParticipants = mssqlTable('special_camp_participants', {
+    id: int('id').identity().primaryKey(),
+    specialCampId: int('special_camp_id').notNull().references(() => specialCamps.id, { onDelete: 'cascade' }),
+    volunteerId: int('volunteer_id').references(() => volunteers.id, { onDelete: 'set null' }),
+    snapName: nvarchar('snap_name', { length: 255 }).notNull(),
+    snapPrnNo: nvarchar('snap_prn_no', { length: 50 }),
+    snapDepartment: nvarchar('snap_department', { length: 100 }),
+    snapCollegeYearAtEnrollment: nvarchar('snap_college_year_at_enrollment', { length: 20 }),
+    snapNssYear: int('snap_nss_year'),
+    snapCgpa: nvarchar('snap_cgpa', { length: 10 }),
+    snapPhoneNo: nvarchar('snap_phone_no', { length: 20 }),
+    snapFinalizedAt: datetime2('snap_finalized_at'),
+    addedAt: datetime2('added_at').default(sql`getdate()`),
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ATTENDANCE SESSIONS
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const attendanceSessions = pgTable('attendance_sessions', {
-    id: serial('id').primaryKey(),
-    academicYearId: integer('academic_year_id').notNull().references(() => academicYears.id),
-    eventId: integer('event_id').references(() => events.id, { onDelete: 'set null' }),
-    title: varchar('title', { length: 255 }).notNull(),
+export const attendanceSessions = mssqlTable('attendance_sessions', {
+    id: int('id').identity().primaryKey(),
+    academicYearId: int('academic_year_id').notNull().references(() => academicYears.id),
+    eventId: int('event_id').references(() => events.id, { onDelete: 'set null' }),
+    title: nvarchar('title', { length: 255 }).notNull(),
     date: date('date').notNull(),
-    description: text('description'),
-    createdById: integer('created_by_id').references(() => admins.id, { onDelete: 'set null' }),
-    createdAt: timestamp('created_at').defaultNow(),
+    description: nvarchar('description', { length: 'max' }),
+    createdById: int('created_by_id').references(() => admins.id, { onDelete: 'set null' }),
+    createdAt: datetime2('created_at').default(sql`getdate()`),
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ATTENDANCE RECORDS
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const attendanceRecords = pgTable('attendance_records', {
-    id: serial('id').primaryKey(),
-    sessionId: integer('session_id').notNull().references(() => attendanceSessions.id, { onDelete: 'cascade' }),
-    volunteerId: integer('volunteer_id').notNull().references(() => volunteers.id, { onDelete: 'cascade' }),
-    status: attendanceStatusEnum('status').notNull(),
-    notes: text('notes'),
-    recordedById: integer('recorded_by_id').references(() => admins.id, { onDelete: 'set null' }),
-    createdAt: timestamp('created_at').defaultNow(),
-}, (t) => ({
-    unqSessionVolunteer: unique('unq_session_volunteer').on(t.sessionId, t.volunteerId),
-}));
+export const attendanceRecords = mssqlTable('attendance_records', {
+    id: int('id').identity().primaryKey(),
+    sessionId: int('session_id').notNull().references(() => attendanceSessions.id, { onDelete: 'cascade' }),
+    volunteerId: int('volunteer_id').notNull().references(() => volunteers.id, { onDelete: 'cascade' }),
+    status: nvarchar('status', { length: 20 }).notNull(),
+    notes: nvarchar('notes', { length: 'max' }),
+    recordedById: int('recorded_by_id').references(() => admins.id, { onDelete: 'set null' }),
+    createdAt: datetime2('created_at').default(sql`getdate()`),
+}, (t) => [
+unique('unq_session_volunteer').on(t.sessionId, t.volunteerId),
+    check('chk_attendance_records_status', sql`${t.status} IN ('present','absent','late')`),
+]);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // AUDIT LOGS
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const auditLogs = pgTable('audit_logs', {
-    id: serial('id').primaryKey(),
+export const auditLogs = mssqlTable('audit_logs', {
+    id: int('id').identity().primaryKey(),
     /** e.g. 'volunteer.create', 'academic_year.lock', 'special_camp.finalize' */
-    action: varchar('action', { length: 100 }).notNull(),
+    action: nvarchar('action', { length: 100 }).notNull(),
     /** e.g. 'volunteer', 'academic_year', 'special_camp' */
-    entityType: varchar('entity_type', { length: 50 }).notNull(),
-    entityId: integer('entity_id'),
-    performedById: integer('performed_by_id'),
-    performedByRole: varchar('performed_by_role', { length: 20 }).default('admin').notNull(),
-    academicYearId: integer('academic_year_id'),
+    entityType: nvarchar('entity_type', { length: 50 }).notNull(),
+    entityId: int('entity_id'),
+    performedById: int('performed_by_id'),
+    performedByRole: nvarchar('performed_by_role', { length: 20 }).default('admin').notNull(),
+    academicYearId: int('academic_year_id'),
     /** JSON string with relevant context (before/after values, params). */
-    details: text('details'),
-    createdAt: timestamp('created_at').defaultNow(),
+    details: nvarchar('details', { length: 'max' }),
+    createdAt: datetime2('created_at').default(sql`getdate()`),
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
 // EVENTS
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const events = pgTable('events', {
-    id: serial('id').primaryKey(),
-    title: varchar('title', { length: 255 }).notNull(),
-    description: text('description').notNull(),
-    date: timestamp('date').notNull(),
-    location: varchar('location', { length: 255 }).notNull(),
-    imageUrl: text('image_url'),
-    type: eventTypeEnum('type').default('upcoming'),
-    reportUrl: text('report_url'),
-    driveLink: text('drive_link'),
-    volunteersCount: integer('volunteers_count').default(0),
-    academicYearId: integer('academic_year_id').references(() => academicYears.id),
-    createdAt: timestamp('created_at').defaultNow(),
+export const events = mssqlTable('events', {
+    id: int('id').identity().primaryKey(),
+    title: nvarchar('title', { length: 255 }).notNull(),
+    description: nvarchar('description', { length: 'max' }).notNull(),
+    date: datetime2('date').notNull(),
+    location: nvarchar('location', { length: 255 }).notNull(),
+    imageUrl: nvarchar('image_url', { length: 'max' }),
+    type: nvarchar('type', { length: 20 }).default('upcoming'),
+    reportUrl: nvarchar('report_url', { length: 'max' }),
+    driveLink: nvarchar('drive_link', { length: 'max' }),
+    volunteersCount: int('volunteers_count').default(0),
+    academicYearId: int('academic_year_id').references(() => academicYears.id),
+    createdAt: datetime2('created_at').default(sql`getdate()`),
+}, (t) => [
+check('chk_events_type', sql`${t.type} IN ('upcoming','past')`),
+]);
+
+export const eventImages = mssqlTable('event_images', {
+    id: int('id').identity().primaryKey(),
+    eventId: int('event_id').references(() => events.id).notNull(),
+    url: nvarchar('url', { length: 'max' }).notNull(),
+    isMaster: bit('is_master').default(false),
+    caption: nvarchar('caption', { length: 255 }),
+    createdAt: datetime2('created_at').default(sql`getdate()`),
 });
 
-export const eventImages = pgTable('event_images', {
-    id: serial('id').primaryKey(),
-    eventId: integer('event_id').references(() => events.id).notNull(),
-    url: text('url').notNull(),
-    isMaster: boolean('is_master').default(false),
-    caption: varchar('caption', { length: 255 }),
-    createdAt: timestamp('created_at').defaultNow(),
-});
-
-export const eventRegistrations = pgTable('event_registrations', {
-    id: serial('id').primaryKey(),
-    eventId: integer('event_id').references(() => events.id).notNull(),
-    name: varchar('name', { length: 255 }).notNull(),
-    email: varchar('email', { length: 255 }).notNull(),
-    phone: varchar('phone', { length: 20 }).notNull(),
-    department: varchar('department', { length: 100 }).notNull(),
-    year: varchar('year', { length: 20 }).notNull(),
-    visitorPassId: varchar('visitor_pass_id', { length: 50 }).unique(),
+export const eventRegistrations = mssqlTable('event_registrations', {
+    id: int('id').identity().primaryKey(),
+    eventId: int('event_id').references(() => events.id).notNull(),
+    name: nvarchar('name', { length: 255 }).notNull(),
+    email: nvarchar('email', { length: 255 }).notNull(),
+    phone: nvarchar('phone', { length: 20 }).notNull(),
+    department: nvarchar('department', { length: 100 }).notNull(),
+    year: nvarchar('year', { length: 20 }).notNull(),
+    visitorPassId: nvarchar('visitor_pass_id', { length: 50 }).unique(),
     /** Admin approval workflow: pending → approved | rejected */
-    status: registrationStatusEnum('status').default('pending').notNull(),
-    approvedAt: timestamp('approved_at'),
-    approvedById: integer('approved_by_id').references(() => admins.id),
-    createdAt: timestamp('created_at').defaultNow(),
-});
+    status: nvarchar('status', { length: 20 }).default('pending').notNull(),
+    approvedAt: datetime2('approved_at'),
+    approvedById: int('approved_by_id').references(() => admins.id),
+    createdAt: datetime2('created_at').default(sql`getdate()`),
+}, (t) => [
+check('chk_event_registrations_status', sql`${t.status} IN ('pending','approved','rejected')`),
+]);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GALLERY
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const gallery = pgTable('gallery', {
-    id: serial('id').primaryKey(),
-    title: varchar('title', { length: 255 }),
-    description: text('description').notNull().default(''),
-    url: text('url').notNull(),
-    type: mediaTypeEnum('type').default('image'),
-    eventId: integer('event_id').references(() => events.id),
-    status: text('status', { enum: ['pending', 'approved', 'rejected'] }).notNull().default('pending'),
-    submittedById: integer('submitted_by_id').references(() => admins.id),
-    reviewedById: integer('reviewed_by_id').references(() => admins.id),
-    rejectionReason: text('rejection_reason'),
-    createdAt: timestamp('created_at').defaultNow(),
-});
+export const gallery = mssqlTable('gallery', {
+    id: int('id').identity().primaryKey(),
+    title: nvarchar('title', { length: 255 }),
+    description: nvarchar('description', { length: 'max' }).notNull().default(''),
+    url: nvarchar('url', { length: 'max' }).notNull(),
+    type: nvarchar('type', { length: 20 }).default('image'),
+    eventId: int('event_id').references(() => events.id),
+    status: nvarchar('status', { length: 20 }).notNull().default('pending'),
+    submittedById: int('submitted_by_id').references(() => admins.id),
+    reviewedById: int('reviewed_by_id').references(() => admins.id),
+    rejectionReason: nvarchar('rejection_reason', { length: 'max' }),
+    createdAt: datetime2('created_at').default(sql`getdate()`),
+}, (t) => [
+check('chk_gallery_type', sql`${t.type} IN ('image','video')`),
+    check('chk_gallery_status', sql`${t.status} IN ('pending','approved','rejected')`),
+]);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SITE SETTINGS
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const siteSettings = pgTable('site_settings', {
-    id: serial('id').primaryKey(),
-    key: varchar('key', { length: 100 }).notNull().unique(),
-    value: text('value').notNull(),
-    updatedAt: timestamp('updated_at').defaultNow(),
+export const siteSettings = mssqlTable('site_settings', {
+    id: int('id').identity().primaryKey(),
+    key: nvarchar('key', { length: 100 }).notNull().unique(),
+    value: nvarchar('value', { length: 'max' }).notNull(),
+    updatedAt: datetime2('updated_at').default(sql`getdate()`),
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
 // RELATIONS
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const adminsRelations = relations(admins, ({ many }) => ({
+export const adminsRelations = relations(admins, ({ many }: any) => ({
     createdVolunteers: many(volunteers),
     lockedYears: many(academicYears),
     finalizedCamps: many(specialCamps),
     attendanceSessions: many(attendanceSessions),
 }));
 
-export const academicYearsRelations = relations(academicYears, ({ many, one }) => ({
+export const academicYearsRelations = relations(academicYears, ({ many, one }: any) => ({
     volunteers: many(volunteers),
     coreTeamAssignments: many(coreTeamAssignments),
     specialCamps: many(specialCamps),
@@ -353,7 +380,7 @@ export const academicYearsRelations = relations(academicYears, ({ many, one }) =
     lockedBy: one(admins, { fields: [academicYears.lockedById], references: [admins.id] }),
 }));
 
-export const volunteersRelations = relations(volunteers, ({ one, many }) => ({
+export const volunteersRelations = relations(volunteers, ({ one, many }: any) => ({
     academicYear: one(academicYears, { fields: [volunteers.academicYearId], references: [academicYears.id] }),
     profile: one(volunteerProfiles, { fields: [volunteers.id], references: [volunteerProfiles.volunteerId] }),
     createdBy: one(admins, { fields: [volunteers.createdById], references: [admins.id] }),
@@ -362,45 +389,45 @@ export const volunteersRelations = relations(volunteers, ({ one, many }) => ({
     attendanceRecords: many(attendanceRecords),
 }));
 
-export const volunteerProfilesRelations = relations(volunteerProfiles, ({ one }) => ({
+export const volunteerProfilesRelations = relations(volunteerProfiles, ({ one }: any) => ({
     volunteer: one(volunteers, { fields: [volunteerProfiles.volunteerId], references: [volunteers.id] }),
 }));
 
-export const coreTeamRolesRelations = relations(coreTeamRoles, ({ many }) => ({
+export const coreTeamRolesRelations = relations(coreTeamRoles, ({ many }: any) => ({
     assignments: many(coreTeamAssignments),
 }));
 
-export const coreTeamAssignmentsRelations = relations(coreTeamAssignments, ({ one }) => ({
+export const coreTeamAssignmentsRelations = relations(coreTeamAssignments, ({ one }: any) => ({
     academicYear: one(academicYears, { fields: [coreTeamAssignments.academicYearId], references: [academicYears.id] }),
     role: one(coreTeamRoles, { fields: [coreTeamAssignments.coreTeamRoleId], references: [coreTeamRoles.id] }),
     volunteer: one(volunteers, { fields: [coreTeamAssignments.volunteerId], references: [volunteers.id] }),
 }));
 
-export const specialCampsRelations = relations(specialCamps, ({ one, many }) => ({
+export const specialCampsRelations = relations(specialCamps, ({ one, many }: any) => ({
     academicYear: one(academicYears, { fields: [specialCamps.academicYearId], references: [academicYears.id] }),
     finalizedBy: one(admins, { fields: [specialCamps.finalizedById], references: [admins.id] }),
     participants: many(specialCampParticipants),
 }));
 
-export const specialCampParticipantsRelations = relations(specialCampParticipants, ({ one }) => ({
+export const specialCampParticipantsRelations = relations(specialCampParticipants, ({ one }: any) => ({
     specialCamp: one(specialCamps, { fields: [specialCampParticipants.specialCampId], references: [specialCamps.id] }),
     volunteer: one(volunteers, { fields: [specialCampParticipants.volunteerId], references: [volunteers.id] }),
 }));
 
-export const attendanceSessionsRelations = relations(attendanceSessions, ({ one, many }) => ({
+export const attendanceSessionsRelations = relations(attendanceSessions, ({ one, many }: any) => ({
     academicYear: one(academicYears, { fields: [attendanceSessions.academicYearId], references: [academicYears.id] }),
     event: one(events, { fields: [attendanceSessions.eventId], references: [events.id] }),
     createdBy: one(admins, { fields: [attendanceSessions.createdById], references: [admins.id] }),
     records: many(attendanceRecords),
 }));
 
-export const attendanceRecordsRelations = relations(attendanceRecords, ({ one }) => ({
+export const attendanceRecordsRelations = relations(attendanceRecords, ({ one }: any) => ({
     session: one(attendanceSessions, { fields: [attendanceRecords.sessionId], references: [attendanceSessions.id] }),
     volunteer: one(volunteers, { fields: [attendanceRecords.volunteerId], references: [volunteers.id] }),
     recordedBy: one(admins, { fields: [attendanceRecords.recordedById], references: [admins.id] }),
 }));
 
-export const eventsRelations = relations(events, ({ many, one }) => ({
+export const eventsRelations = relations(events, ({ many, one }: any) => ({
     registrations: many(eventRegistrations),
     gallery: many(gallery),
     images: many(eventImages),
@@ -408,15 +435,15 @@ export const eventsRelations = relations(events, ({ many, one }) => ({
     attendanceSessions: many(attendanceSessions),
 }));
 
-export const eventImagesRelations = relations(eventImages, ({ one }) => ({
+export const eventImagesRelations = relations(eventImages, ({ one }: any) => ({
     event: one(events, { fields: [eventImages.eventId], references: [events.id] }),
 }));
 
-export const registrationRelations = relations(eventRegistrations, ({ one }) => ({
+export const registrationRelations = relations(eventRegistrations, ({ one }: any) => ({
     event: one(events, { fields: [eventRegistrations.eventId], references: [events.id] }),
 }));
 
-export const galleryRelations = relations(gallery, ({ one }) => ({
+export const galleryRelations = relations(gallery, ({ one }: any) => ({
     event: one(events, { fields: [gallery.eventId], references: [events.id] }),
 }));
 
@@ -424,49 +451,99 @@ export const galleryRelations = relations(gallery, ({ one }) => ({
 // MEETINGS
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const meetings = pgTable('meetings', {
-    id: serial('id').primaryKey(),
-    academicYearId: integer('academic_year_id').notNull().references(() => academicYears.id),
-    title: varchar('title', { length: 255 }).notNull(),
-    description: text('description'),
-    meetingType: varchar('meeting_type', { length: 50 }).notNull(), // 'regular' | 'core_team' | 'special_camp'
-    status: varchar('status', { length: 50 }).default('scheduled').notNull(), // 'scheduled' | 'active' | 'ended'
-    scheduledDate: timestamp('scheduled_date').notNull(),
-    location: varchar('location', { length: 255 }).notNull(),
-    startedAt: timestamp('started_at'),
-    endedAt: timestamp('ended_at'),
-    durationMinutes: integer('duration_minutes'),
-    specialCampId: integer('special_camp_id').references(() => specialCamps.id, { onDelete: 'set null' }),
-    createdById: integer('created_by_id').references(() => admins.id),
-    createdAt: timestamp('created_at').defaultNow(),
-});
+export const meetings = mssqlTable('meetings', {
+    id: int('id').identity().primaryKey(),
+    academicYearId: int('academic_year_id').notNull().references(() => academicYears.id),
+    title: nvarchar('title', { length: 255 }).notNull(),
+    description: nvarchar('description', { length: 'max' }),
+    meetingType: nvarchar('meeting_type', { length: 50 }).notNull(), // 'regular' | 'core_team' | 'special_camp'
+    status: nvarchar('status', { length: 50 }).default('scheduled').notNull(), // 'scheduled' | 'active' | 'ended'
+    scheduledDate: datetime2('scheduled_date').notNull(),
+    location: nvarchar('location', { length: 255 }).notNull(),
+    startedAt: datetime2('started_at'),
+    endedAt: datetime2('ended_at'),
+    durationMinutes: int('duration_minutes'),
+    specialCampId: int('special_camp_id').references(() => specialCamps.id, { onDelete: 'set null' }),
+    createdById: int('created_by_id').references(() => admins.id),
+    createdAt: datetime2('created_at').default(sql`getdate()`),
+}, (t) => [
+check('chk_meetings_meeting_type', sql`${t.meetingType} IN ('regular','core_team','special_camp')`),
+    check('chk_meetings_status', sql`${t.status} IN ('scheduled','active','ended')`),
+]);
 
-export const meetingAttendance = pgTable('meeting_attendance', {
-    id: serial('id').primaryKey(),
-    meetingId: integer('meeting_id').notNull().references(() => meetings.id, { onDelete: 'cascade' }),
-    volunteerId: integer('volunteer_id').notNull().references(() => volunteers.id, { onDelete: 'cascade' }),
-    status: attendanceStatusEnum('status').notNull(),
-    volunteerType: volunteerStatusEnum('volunteer_type').notNull(),
-    notes: text('notes'),
-    markedById: integer('marked_by_id').references(() => admins.id),
-    markedAt: timestamp('marked_at').defaultNow(),
-});
+export const meetingAttendance = mssqlTable('meeting_attendance', {
+    id: int('id').identity().primaryKey(),
+    meetingId: int('meeting_id').notNull().references(() => meetings.id, { onDelete: 'cascade' }),
+    volunteerId: int('volunteer_id').notNull().references(() => volunteers.id, { onDelete: 'cascade' }),
+    status: nvarchar('status', { length: 20 }).notNull(),
+    volunteerType: nvarchar('volunteer_type', { length: 20 }).notNull(),
+    notes: nvarchar('notes', { length: 'max' }),
+    markedById: int('marked_by_id').references(() => admins.id),
+    markedAt: datetime2('marked_at').default(sql`getdate()`),
+}, (t) => [
+    unique('unq_meeting_volunteer').on(t.meetingId, t.volunteerId),
+    check('chk_meeting_attendance_status', sql`${t.status} IN ('present','absent','late')`),
+    check('chk_meeting_attendance_volunteer_type', sql`${t.volunteerType} IN ('regular','backup')`),
+]);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // NOTIFICATIONS
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const notifications = pgTable('notifications', {
-    id: serial('id').primaryKey(),
-    volunteerId: integer('volunteer_id').notNull().references(() => volunteers.id, { onDelete: 'cascade' }),
-    type: varchar('type', { length: 50 }).notNull(),
-    title: varchar('title', { length: 255 }).notNull(),
-    body: text('body').notNull(),
-    isRead: boolean('is_read').default(false).notNull(),
-    emailSent: boolean('email_sent').default(false).notNull(),
-    referenceType: varchar('reference_type', { length: 50 }),
-    referenceId: integer('reference_id'),
-    createdAt: timestamp('created_at').defaultNow(),
+export const notifications = mssqlTable('notifications', {
+    id: int('id').identity().primaryKey(),
+    volunteerId: int('volunteer_id').notNull().references(() => volunteers.id, { onDelete: 'cascade' }),
+    type: nvarchar('type', { length: 50 }).notNull(),
+    title: nvarchar('title', { length: 255 }).notNull(),
+    body: nvarchar('body', { length: 'max' }).notNull(),
+    isRead: bit('is_read').default(false).notNull(),
+    emailSent: bit('email_sent').default(false).notNull(),
+    referenceType: nvarchar('reference_type', { length: 50 }),
+    referenceId: int('reference_id'),
+    createdAt: datetime2('created_at').default(sql`getdate()`),
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// HOD CONTACTS (department Head of Department email list)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const hodContacts = mssqlTable('hod_contacts', {
+    id: int('id').identity().primaryKey(),
+    department: nvarchar('department', { length: 100 }).notNull().unique(),
+    name: nvarchar('name', { length: 255 }).notNull(),
+    email: nvarchar('email', { length: 255 }).notNull(),
+    isActive: bit('is_active').default(true).notNull(),
+    createdAt: datetime2('created_at').default(sql`getdate()`),
+    updatedAt: datetime2('updated_at').default(sql`getdate()`),
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EMAIL LOGS (audit trail of all emails sent by the system)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const EMAIL_TYPES = [
+    'volunteer_welcome',
+    'volunteer_backup',
+    'volunteer_regular',
+    'hod_attendance',
+    'meeting_notification',
+    'pass_approval',
+] as const;
+export type EmailType = typeof EMAIL_TYPES[number];
+
+export const emailLogs = mssqlTable('email_logs', {
+    id: int('id').identity().primaryKey(),
+    emailType: nvarchar('email_type', { length: 50 }).notNull(),
+    subject: nvarchar('subject', { length: 500 }).notNull(),
+    recipientEmail: nvarchar('recipient_email', { length: 'max' }).notNull(),
+    recipientName: nvarchar('recipient_name', { length: 255 }),
+    status: nvarchar('status', { length: 20 }).notNull().default('sent'), // 'sent' | 'failed'
+    errorMessage: nvarchar('error_message', { length: 'max' }),
+    /** JSON blob: extra info like eventId, sessionId, ayLabel etc. */
+    metadata: nvarchar('metadata', { length: 'max' }),
+    sentByAdminId: int('sent_by_admin_id').references(() => admins.id, { onDelete: 'set null' }),
+    sentAt: datetime2('sent_at').default(sql`getdate()`),
+}, (t) => [
+    check('chk_email_logs_status', sql`${t.status} IN ('sent','failed')`),
+]);
 

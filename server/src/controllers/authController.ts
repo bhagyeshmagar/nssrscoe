@@ -5,65 +5,77 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { eq } from 'drizzle-orm';
 
+interface JwtPayload {
+    id: number;
+    role: 'admin' | 'superadmin' | 'volunteer';
+    isSuperadmin?: boolean;
+    username?: string;
+    email?: string;
+}
+
 // Unified login for both admin and volunteer
 export const login = async (req: Request, res: Response) => {
     const { email, password } = req.body;
 
-    if (!email || !password) {
-        return res.status(400).json({ message: 'Email and password are required' });
+    if (!email || typeof email !== 'string' || !password || typeof password !== 'string') {
+        return res.status(400).json({ success: false, message: 'Email and password are required.' });
     }
 
-    try {
-        // First check admin table (admin can login with username as email)
-        const admin = await db.select().from(admins)
-            .where(eq(admins.username, email))
-            .limit(1);
+    const normalizedEmail = email.toLowerCase().trim();
 
-        if (admin.length > 0) {
-            const validPassword = await bcrypt.compare(password, admin[0].passwordHash);
+    try {
+        // Check admin table first (admins log in with their username)
+        const [admin] = await db.select().top(1).from(admins)
+            .where(eq(admins.username, normalizedEmail));
+
+        if (admin) {
+            const validPassword = await bcrypt.compare(password, admin.passwordHash);
             if (validPassword) {
-                const role = admin[0].isSuperadmin ? 'superadmin' : 'admin';
+                const role = admin.isSuperadmin ? 'superadmin' : 'admin';
                 const token = jwt.sign(
-                    { id: admin[0].id, username: admin[0].username, role, isSuperadmin: admin[0].isSuperadmin },
+                    { id: admin.id, username: admin.username, role, isSuperadmin: !!admin.isSuperadmin },
                     process.env.JWT_SECRET as string,
                     { expiresIn: '1d' }
                 );
-                return res.json({ token, role, isSuperadmin: admin[0].isSuperadmin, user: { id: admin[0].id, username: admin[0].username, isSuperadmin: admin[0].isSuperadmin } });
+                return res.json({
+                    token,
+                    role,
+                    isSuperadmin: !!admin.isSuperadmin,
+                    user: { id: admin.id, username: admin.username, isSuperadmin: !!admin.isSuperadmin },
+                });
             }
         }
 
-        // Then check volunteer table
-        const volunteer = await db.select().from(volunteers)
-            .where(eq(volunteers.email, email))
-            .limit(1);
+        // Check volunteer table
+        const [volunteer] = await db.select().top(1).from(volunteers)
+            .where(eq(volunteers.email, normalizedEmail));
 
-        if (volunteer.length > 0) {
-            // Check if volunteer is active
-            if (!volunteer[0].isActive) {
-                return res.status(403).json({ message: 'Your account has been deactivated. Please contact admin.' });
+        if (volunteer) {
+            if (!volunteer.isActive) {
+                return res.status(403).json({ success: false, message: 'Your account has been deactivated. Please contact admin.' });
             }
 
-            const validPassword = await bcrypt.compare(password, volunteer[0].passwordHash);
+            const validPassword = await bcrypt.compare(password, volunteer.passwordHash);
             if (validPassword) {
                 const token = jwt.sign(
-                    { id: volunteer[0].id, email: volunteer[0].email, role: 'volunteer' },
+                    { id: volunteer.id, email: volunteer.email, role: 'volunteer' },
                     process.env.JWT_SECRET as string,
                     { expiresIn: '1d' }
                 );
                 return res.json({
                     token,
                     role: 'volunteer',
-                    user: { id: volunteer[0].id, name: volunteer[0].name, email: volunteer[0].email }
+                    user: { id: volunteer.id, name: volunteer.name, email: volunteer.email },
                 });
             }
         }
 
-        // No valid credentials found
-        return res.status(401).json({ message: 'Invalid credentials' });
+        // Generic message to avoid username enumeration
+        return res.status(401).json({ success: false, message: 'Invalid credentials.' });
 
     } catch (error) {
-        console.error('Login error:', error);
-        res.status(500).json({ message: 'Server error', error });
+        console.error('[login] Error:', error);
+        return res.status(500).json({ success: false, message: 'An error occurred during authentication.' });
     }
 };
 
@@ -73,11 +85,11 @@ export const verifyToken = async (req: Request, res: Response) => {
     const token = authHeader && authHeader.split(' ')[1];
 
     if (!token) {
-        return res.status(401).json({ message: 'No token provided' });
+        return res.status(401).json({ success: false, message: 'No token provided.' });
     }
 
     try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as any;
+        const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as JwtPayload;
         return res.json({
             valid: true,
             role: decoded.role,
@@ -87,9 +99,9 @@ export const verifyToken = async (req: Request, res: Response) => {
                 username: decoded.username,
                 email: decoded.email,
                 isSuperadmin: decoded.isSuperadmin,
-            }
+            },
         });
-    } catch (error) {
-        return res.status(401).json({ valid: false, message: 'Invalid token' });
+    } catch {
+        return res.status(401).json({ valid: false, success: false, message: 'Token is invalid or expired.' });
     }
 };

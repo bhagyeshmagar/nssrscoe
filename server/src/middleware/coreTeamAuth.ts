@@ -5,12 +5,14 @@ import { eq, and } from 'drizzle-orm';
 import { UnauthorizedError } from '../lib/errors';
 import { AuthRequest } from './auth';
 
+import { Department } from '../lib/db-constants';
+
 export interface CoreTeamAuthRequest extends AuthRequest {
     coreTeam?: {
         assignmentId: number;
         roleCode: string;
         roleName: string;
-        department?: string;
+        department?: Department;
         academicYearId: number;
     };
 }
@@ -23,7 +25,7 @@ export const requireCoreTeamRole = async (req: Request, res: Response, next: Nex
         }
 
         // Find current AY
-        const [currentAy] = await db.select().from(academicYears).where(eq(academicYears.isCurrent, true)).limit(1);
+        const [currentAy] = await db.select().top(1).from(academicYears).where(eq(academicYears.isCurrent, true));
         if (!currentAy) {
             throw new UnauthorizedError('No active academic year found');
         }
@@ -35,13 +37,13 @@ export const requireCoreTeamRole = async (req: Request, res: Response, next: Nex
             roleCode: coreTeamRoles.code,
             roleName: coreTeamRoles.name,
         })
-        .from(coreTeamAssignments)
+        .top(1).from(coreTeamAssignments)
         .innerJoin(coreTeamRoles, eq(coreTeamAssignments.coreTeamRoleId, coreTeamRoles.id))
         .where(and(
             eq(coreTeamAssignments.volunteerId, authReq.user.id),
             eq(coreTeamAssignments.academicYearId, currentAy.id)
         ))
-        .limit(1);
+        ;
 
         if (!assignment) {
             throw new UnauthorizedError('Access denied. You are not assigned to the core team for the current academic year.');
@@ -52,7 +54,7 @@ export const requireCoreTeamRole = async (req: Request, res: Response, next: Nex
             assignmentId: assignment.id,
             roleCode: assignment.roleCode,
             roleName: assignment.roleName,
-            department: assignment.department || undefined,
+            department: (assignment.department as Department) || undefined,
             academicYearId: currentAy.id
         };
 

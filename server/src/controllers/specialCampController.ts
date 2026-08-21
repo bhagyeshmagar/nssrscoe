@@ -12,7 +12,8 @@ export const listCamps = async (req: Request, res: Response) => {
 export const createCamp = async (req: Request, res: Response) => {
     try {
         const adminId = (req as AuthRequest).user!.id;
-        const camp = await campService.createCamp(Number(req.params.ayId), req.body, adminId);
+        const { name, location, startDate, endDate, description, volunteerCap } = req.body;
+        const camp = await campService.createCamp(Number(req.params.ayId), { name, location, startDate, endDate, description, volunteerCap }, adminId);
         created(res, camp, 'Special camp created.');
     } catch (err) { handleError(res, err); }
 };
@@ -26,7 +27,8 @@ export const getCamp = async (req: Request, res: Response) => {
 export const updateCamp = async (req: Request, res: Response) => {
     try {
         const adminId = (req as AuthRequest).user!.id;
-        ok(res, await campService.updateCamp(Number(req.params.campId), req.body, adminId), 'Camp updated.');
+        const { name, location, startDate, endDate, description, volunteerCap } = req.body;
+        ok(res, await campService.updateCamp(Number(req.params.campId), { name, location, startDate, endDate, description, volunteerCap }, adminId), 'Camp updated.');
     } catch (err) { handleError(res, err); }
 };
 

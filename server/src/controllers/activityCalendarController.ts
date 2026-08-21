@@ -20,18 +20,18 @@ export const createActivity = async (req: Request, res: Response) => {
     try {
         const ayId = Number(req.params.ayId);
         
-        const [ay] = await db.select({ isLocked: academicYears.isLocked }).from(academicYears).where(eq(academicYears.id, ayId)).limit(1);
+        const [ay] = await db.select({ isLocked: academicYears.isLocked }).top(1).from(academicYears).where(eq(academicYears.id, ayId));
         if (ay?.isLocked) return res.status(403).json({ success: false, message: 'Cannot add activity to a locked academic year.' });
 
         const { month, tentativeDate, activity, type } = req.body;
         
-        const [newItem] = await db.insert(activityCalendar).values({
+        const [newItem] = await db.insert(activityCalendar).output().values({
             academicYearId: ayId,
             month,
             tentativeDate,
             activity,
             type
-        }).returning();
+        });
         
         created(res, newItem, 'Activity added to calendar.');
     } catch (err) { handleError(res, err); }
@@ -41,10 +41,10 @@ export const updateActivity = async (req: Request, res: Response) => {
     try {
         const activityId = Number(req.params.id);
         
-        const [act] = await db.select({ academicYearId: activityCalendar.academicYearId }).from(activityCalendar).where(eq(activityCalendar.id, activityId)).limit(1);
+        const [act] = await db.select({ academicYearId: activityCalendar.academicYearId }).top(1).from(activityCalendar).where(eq(activityCalendar.id, activityId));
         if (!act) return res.status(404).json({ success: false, message: 'Activity not found.' });
 
-        const [ay] = await db.select({ isLocked: academicYears.isLocked }).from(academicYears).where(eq(academicYears.id, act.academicYearId)).limit(1);
+        const [ay] = await db.select({ isLocked: academicYears.isLocked }).top(1).from(academicYears).where(eq(academicYears.id, act.academicYearId));
         if (ay?.isLocked) return res.status(403).json({ success: false, message: 'Cannot update activity in a locked academic year.' });
 
         const { month, tentativeDate, activity, type } = req.body;
@@ -54,7 +54,7 @@ export const updateActivity = async (req: Request, res: Response) => {
             tentativeDate,
             activity,
             type
-        }).where(eq(activityCalendar.id, activityId)).returning();
+        }).where(eq(activityCalendar.id, activityId)).output();
         
         ok(res, updatedItem, 'Activity updated.');
     } catch (err) { handleError(res, err); }
@@ -64,10 +64,10 @@ export const deleteActivity = async (req: Request, res: Response) => {
     try {
         const activityId = Number(req.params.id);
 
-        const [act] = await db.select({ academicYearId: activityCalendar.academicYearId }).from(activityCalendar).where(eq(activityCalendar.id, activityId)).limit(1);
+        const [act] = await db.select({ academicYearId: activityCalendar.academicYearId }).top(1).from(activityCalendar).where(eq(activityCalendar.id, activityId));
         if (!act) return res.status(404).json({ success: false, message: 'Activity not found.' });
 
-        const [ay] = await db.select({ isLocked: academicYears.isLocked }).from(academicYears).where(eq(academicYears.id, act.academicYearId)).limit(1);
+        const [ay] = await db.select({ isLocked: academicYears.isLocked }).top(1).from(academicYears).where(eq(academicYears.id, act.academicYearId));
         if (ay?.isLocked) return res.status(403).json({ success: false, message: 'Cannot delete activity in a locked academic year.' });
 
         await db.delete(activityCalendar).where(eq(activityCalendar.id, activityId));

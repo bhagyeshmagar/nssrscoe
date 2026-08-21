@@ -5,7 +5,7 @@ export const createMeetingSchema = z.object({
         title: z.string().min(1, 'Title is required').max(255),
         description: z.string().optional(),
         meetingType: z.enum(['regular', 'core_team', 'special_camp']),
-        scheduledDate: z.string().datetime({ message: 'Must be a valid ISO 8601 date string' }).or(z.string().min(1)), // Fallback since frontend passes slice(0, 16)
+        scheduledDate: z.string().min(1, 'Scheduled date is required'),
         location: z.string().min(1, 'Location is required').max(255),
         sendEmail: z.boolean().optional(),
         specialCampId: z.number().optional(),

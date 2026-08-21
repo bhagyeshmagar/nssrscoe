@@ -55,6 +55,7 @@ const Calendar = () => {
                 <div className="text-center py-10">Loading...</div>
             ) : (
                 <div className="bg-white rounded-lg shadow overflow-hidden">
+                    <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-200 text-sm">
                         <thead className="bg-nss-blue text-white">
                             <tr>
@@ -86,6 +87,7 @@ const Calendar = () => {
                             )}
                         </tbody>
                     </table>
+                    </div>
                 </div>
             )}
             <p className="mt-4 text-sm text-gray-500 italic text-center">* Dates are tentative and subject to change as per university guidelines.</p>

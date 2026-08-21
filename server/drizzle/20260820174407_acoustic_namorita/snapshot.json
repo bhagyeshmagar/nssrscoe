@@ -1,0 +1,3766 @@
+{
+  "version": "2",
+  "dialect": "mssql",
+  "id": "3d02fab6-2d4e-445b-b060-ccda94d810c3",
+  "prevIds": [
+    "0a9c35f4-d9e3-4326-89e7-ab2b642b6e4d"
+  ],
+  "ddl": [
+    {
+      "name": "academic_years",
+      "entityType": "tables",
+      "schema": "dbo"
+    },
+    {
+      "name": "activity_calendar",
+      "entityType": "tables",
+      "schema": "dbo"
+    },
+    {
+      "name": "admins",
+      "entityType": "tables",
+      "schema": "dbo"
+    },
+    {
+      "name": "attendance_records",
+      "entityType": "tables",
+      "schema": "dbo"
+    },
+    {
+      "name": "attendance_sessions",
+      "entityType": "tables",
+      "schema": "dbo"
+    },
+    {
+      "name": "audit_logs",
+      "entityType": "tables",
+      "schema": "dbo"
+    },
+    {
+      "name": "core_team_assignments",
+      "entityType": "tables",
+      "schema": "dbo"
+    },
+    {
+      "name": "core_team_roles",
+      "entityType": "tables",
+      "schema": "dbo"
+    },
+    {
+      "name": "email_logs",
+      "entityType": "tables",
+      "schema": "dbo"
+    },
+    {
+      "name": "event_images",
+      "entityType": "tables",
+      "schema": "dbo"
+    },
+    {
+      "name": "event_registrations",
+      "entityType": "tables",
+      "schema": "dbo"
+    },
+    {
+      "name": "events",
+      "entityType": "tables",
+      "schema": "dbo"
+    },
+    {
+      "name": "gallery",
+      "entityType": "tables",
+      "schema": "dbo"
+    },
+    {
+      "name": "hod_contacts",
+      "entityType": "tables",
+      "schema": "dbo"
+    },
+    {
+      "name": "meeting_attendance",
+      "entityType": "tables",
+      "schema": "dbo"
+    },
+    {
+      "name": "meetings",
+      "entityType": "tables",
+      "schema": "dbo"
+    },
+    {
+      "name": "notifications",
+      "entityType": "tables",
+      "schema": "dbo"
+    },
+    {
+      "name": "site_settings",
+      "entityType": "tables",
+      "schema": "dbo"
+    },
+    {
+      "name": "special_camp_participants",
+      "entityType": "tables",
+      "schema": "dbo"
+    },
+    {
+      "name": "special_camps",
+      "entityType": "tables",
+      "schema": "dbo"
+    },
+    {
+      "name": "volunteer_profiles",
+      "entityType": "tables",
+      "schema": "dbo"
+    },
+    {
+      "name": "volunteers",
+      "entityType": "tables",
+      "schema": "dbo"
+    },
+    {
+      "type": "int",
+      "notNull": true,
+      "generated": null,
+      "identity": {
+        "seed": 1,
+        "increment": 1
+      },
+      "name": "id",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "academic_years"
+    },
+    {
+      "type": "nvarchar(20)",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "label",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "academic_years"
+    },
+    {
+      "type": "date",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "start_date",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "academic_years"
+    },
+    {
+      "type": "date",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "end_date",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "academic_years"
+    },
+    {
+      "type": "bit",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "is_current",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "academic_years"
+    },
+    {
+      "type": "bit",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "is_locked",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "academic_years"
+    },
+    {
+      "type": "bit",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "is_archived",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "academic_years"
+    },
+    {
+      "type": "int",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "volunteer_cap",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "academic_years"
+    },
+    {
+      "type": "datetime2",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "locked_at",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "academic_years"
+    },
+    {
+      "type": "int",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "locked_by_id",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "academic_years"
+    },
+    {
+      "type": "nvarchar(1024)",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "regular_activity_report_url",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "academic_years"
+    },
+    {
+      "type": "nvarchar(1024)",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "special_camp_report_url",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "academic_years"
+    },
+    {
+      "type": "datetime2",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "academic_years"
+    },
+    {
+      "type": "int",
+      "notNull": true,
+      "generated": null,
+      "identity": {
+        "seed": 1,
+        "increment": 1
+      },
+      "name": "id",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "activity_calendar"
+    },
+    {
+      "type": "int",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "academic_year_id",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "activity_calendar"
+    },
+    {
+      "type": "nvarchar(50)",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "month",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "activity_calendar"
+    },
+    {
+      "type": "nvarchar(255)",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "tentative_date",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "activity_calendar"
+    },
+    {
+      "type": "nvarchar(500)",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "activity",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "activity_calendar"
+    },
+    {
+      "type": "nvarchar(50)",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "type",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "activity_calendar"
+    },
+    {
+      "type": "datetime2",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "activity_calendar"
+    },
+    {
+      "type": "int",
+      "notNull": true,
+      "generated": null,
+      "identity": {
+        "seed": 1,
+        "increment": 1
+      },
+      "name": "id",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "admins"
+    },
+    {
+      "type": "nvarchar(255)",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "username",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "admins"
+    },
+    {
+      "type": "nvarchar(max)",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "password_hash",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "admins"
+    },
+    {
+      "type": "bit",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "is_superadmin",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "admins"
+    },
+    {
+      "type": "datetime2",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "admins"
+    },
+    {
+      "type": "int",
+      "notNull": true,
+      "generated": null,
+      "identity": {
+        "seed": 1,
+        "increment": 1
+      },
+      "name": "id",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "attendance_records"
+    },
+    {
+      "type": "int",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "session_id",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "attendance_records"
+    },
+    {
+      "type": "int",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "volunteer_id",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "attendance_records"
+    },
+    {
+      "type": "nvarchar(20)",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "status",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "attendance_records"
+    },
+    {
+      "type": "nvarchar(max)",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "notes",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "attendance_records"
+    },
+    {
+      "type": "int",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "recorded_by_id",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "attendance_records"
+    },
+    {
+      "type": "datetime2",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "attendance_records"
+    },
+    {
+      "type": "int",
+      "notNull": true,
+      "generated": null,
+      "identity": {
+        "seed": 1,
+        "increment": 1
+      },
+      "name": "id",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "attendance_sessions"
+    },
+    {
+      "type": "int",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "academic_year_id",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "attendance_sessions"
+    },
+    {
+      "type": "int",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "event_id",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "attendance_sessions"
+    },
+    {
+      "type": "nvarchar(255)",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "title",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "attendance_sessions"
+    },
+    {
+      "type": "date",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "date",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "attendance_sessions"
+    },
+    {
+      "type": "nvarchar(max)",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "description",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "attendance_sessions"
+    },
+    {
+      "type": "int",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "created_by_id",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "attendance_sessions"
+    },
+    {
+      "type": "datetime2",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "attendance_sessions"
+    },
+    {
+      "type": "int",
+      "notNull": true,
+      "generated": null,
+      "identity": {
+        "seed": 1,
+        "increment": 1
+      },
+      "name": "id",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "audit_logs"
+    },
+    {
+      "type": "nvarchar(100)",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "action",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "audit_logs"
+    },
+    {
+      "type": "nvarchar(50)",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "entity_type",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "audit_logs"
+    },
+    {
+      "type": "int",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "entity_id",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "audit_logs"
+    },
+    {
+      "type": "int",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "performed_by_id",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "audit_logs"
+    },
+    {
+      "type": "nvarchar(20)",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "performed_by_role",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "audit_logs"
+    },
+    {
+      "type": "int",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "academic_year_id",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "audit_logs"
+    },
+    {
+      "type": "nvarchar(max)",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "details",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "audit_logs"
+    },
+    {
+      "type": "datetime2",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "audit_logs"
+    },
+    {
+      "type": "int",
+      "notNull": true,
+      "generated": null,
+      "identity": {
+        "seed": 1,
+        "increment": 1
+      },
+      "name": "id",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "core_team_assignments"
+    },
+    {
+      "type": "int",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "academic_year_id",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "core_team_assignments"
+    },
+    {
+      "type": "int",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "core_team_role_id",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "core_team_assignments"
+    },
+    {
+      "type": "int",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "volunteer_id",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "core_team_assignments"
+    },
+    {
+      "type": "nvarchar(255)",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "display_name",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "core_team_assignments"
+    },
+    {
+      "type": "nvarchar(max)",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "display_photo_url",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "core_team_assignments"
+    },
+    {
+      "type": "nvarchar(100)",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "department",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "core_team_assignments"
+    },
+    {
+      "type": "int",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "display_order",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "core_team_assignments"
+    },
+    {
+      "type": "datetime2",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "core_team_assignments"
+    },
+    {
+      "type": "int",
+      "notNull": true,
+      "generated": null,
+      "identity": {
+        "seed": 1,
+        "increment": 1
+      },
+      "name": "id",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "core_team_roles"
+    },
+    {
+      "type": "nvarchar(100)",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "name",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "core_team_roles"
+    },
+    {
+      "type": "nvarchar(50)",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "code",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "core_team_roles"
+    },
+    {
+      "type": "nvarchar(20)",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "role_type",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "core_team_roles"
+    },
+    {
+      "type": "bit",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "is_unique_per_ay",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "core_team_roles"
+    },
+    {
+      "type": "int",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "display_order",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "core_team_roles"
+    },
+    {
+      "type": "nvarchar(100)",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "category",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "core_team_roles"
+    },
+    {
+      "type": "datetime2",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "core_team_roles"
+    },
+    {
+      "type": "int",
+      "notNull": true,
+      "generated": null,
+      "identity": {
+        "seed": 1,
+        "increment": 1
+      },
+      "name": "id",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "email_logs"
+    },
+    {
+      "type": "nvarchar(50)",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "email_type",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "email_logs"
+    },
+    {
+      "type": "nvarchar(500)",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "subject",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "email_logs"
+    },
+    {
+      "type": "nvarchar(max)",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "recipient_email",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "email_logs"
+    },
+    {
+      "type": "nvarchar(255)",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "recipient_name",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "email_logs"
+    },
+    {
+      "type": "nvarchar(20)",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "status",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "email_logs"
+    },
+    {
+      "type": "nvarchar(max)",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "error_message",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "email_logs"
+    },
+    {
+      "type": "nvarchar(max)",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "metadata",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "email_logs"
+    },
+    {
+      "type": "int",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "sent_by_admin_id",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "email_logs"
+    },
+    {
+      "type": "datetime2",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "sent_at",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "email_logs"
+    },
+    {
+      "type": "int",
+      "notNull": true,
+      "generated": null,
+      "identity": {
+        "seed": 1,
+        "increment": 1
+      },
+      "name": "id",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "event_images"
+    },
+    {
+      "type": "int",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "event_id",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "event_images"
+    },
+    {
+      "type": "nvarchar(max)",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "url",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "event_images"
+    },
+    {
+      "type": "bit",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "is_master",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "event_images"
+    },
+    {
+      "type": "nvarchar(255)",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "caption",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "event_images"
+    },
+    {
+      "type": "datetime2",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "event_images"
+    },
+    {
+      "type": "int",
+      "notNull": true,
+      "generated": null,
+      "identity": {
+        "seed": 1,
+        "increment": 1
+      },
+      "name": "id",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "event_registrations"
+    },
+    {
+      "type": "int",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "event_id",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "event_registrations"
+    },
+    {
+      "type": "nvarchar(255)",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "name",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "event_registrations"
+    },
+    {
+      "type": "nvarchar(255)",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "email",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "event_registrations"
+    },
+    {
+      "type": "nvarchar(20)",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "phone",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "event_registrations"
+    },
+    {
+      "type": "nvarchar(100)",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "department",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "event_registrations"
+    },
+    {
+      "type": "nvarchar(20)",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "year",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "event_registrations"
+    },
+    {
+      "type": "nvarchar(50)",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "visitor_pass_id",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "event_registrations"
+    },
+    {
+      "type": "nvarchar(20)",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "status",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "event_registrations"
+    },
+    {
+      "type": "datetime2",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "approved_at",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "event_registrations"
+    },
+    {
+      "type": "int",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "approved_by_id",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "event_registrations"
+    },
+    {
+      "type": "datetime2",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "event_registrations"
+    },
+    {
+      "type": "int",
+      "notNull": true,
+      "generated": null,
+      "identity": {
+        "seed": 1,
+        "increment": 1
+      },
+      "name": "id",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "events"
+    },
+    {
+      "type": "nvarchar(255)",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "title",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "events"
+    },
+    {
+      "type": "nvarchar(max)",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "description",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "events"
+    },
+    {
+      "type": "datetime2",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "date",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "events"
+    },
+    {
+      "type": "nvarchar(255)",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "location",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "events"
+    },
+    {
+      "type": "nvarchar(max)",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "image_url",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "events"
+    },
+    {
+      "type": "nvarchar(20)",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "type",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "events"
+    },
+    {
+      "type": "nvarchar(max)",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "report_url",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "events"
+    },
+    {
+      "type": "nvarchar(max)",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "drive_link",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "events"
+    },
+    {
+      "type": "int",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "volunteers_count",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "events"
+    },
+    {
+      "type": "int",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "academic_year_id",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "events"
+    },
+    {
+      "type": "datetime2",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "events"
+    },
+    {
+      "type": "int",
+      "notNull": true,
+      "generated": null,
+      "identity": {
+        "seed": 1,
+        "increment": 1
+      },
+      "name": "id",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "gallery"
+    },
+    {
+      "type": "nvarchar(255)",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "title",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "gallery"
+    },
+    {
+      "type": "nvarchar(max)",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "description",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "gallery"
+    },
+    {
+      "type": "nvarchar(max)",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "url",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "gallery"
+    },
+    {
+      "type": "nvarchar(20)",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "type",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "gallery"
+    },
+    {
+      "type": "int",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "event_id",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "gallery"
+    },
+    {
+      "type": "nvarchar(20)",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "status",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "gallery"
+    },
+    {
+      "type": "int",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "submitted_by_id",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "gallery"
+    },
+    {
+      "type": "int",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "reviewed_by_id",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "gallery"
+    },
+    {
+      "type": "nvarchar(max)",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "rejection_reason",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "gallery"
+    },
+    {
+      "type": "datetime2",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "gallery"
+    },
+    {
+      "type": "int",
+      "notNull": true,
+      "generated": null,
+      "identity": {
+        "seed": 1,
+        "increment": 1
+      },
+      "name": "id",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "hod_contacts"
+    },
+    {
+      "type": "nvarchar(100)",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "department",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "hod_contacts"
+    },
+    {
+      "type": "nvarchar(255)",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "name",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "hod_contacts"
+    },
+    {
+      "type": "nvarchar(255)",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "email",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "hod_contacts"
+    },
+    {
+      "type": "bit",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "is_active",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "hod_contacts"
+    },
+    {
+      "type": "datetime2",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "hod_contacts"
+    },
+    {
+      "type": "datetime2",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "hod_contacts"
+    },
+    {
+      "type": "int",
+      "notNull": true,
+      "generated": null,
+      "identity": {
+        "seed": 1,
+        "increment": 1
+      },
+      "name": "id",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "meeting_attendance"
+    },
+    {
+      "type": "int",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "meeting_id",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "meeting_attendance"
+    },
+    {
+      "type": "int",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "volunteer_id",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "meeting_attendance"
+    },
+    {
+      "type": "nvarchar(20)",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "status",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "meeting_attendance"
+    },
+    {
+      "type": "nvarchar(20)",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "volunteer_type",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "meeting_attendance"
+    },
+    {
+      "type": "nvarchar(max)",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "notes",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "meeting_attendance"
+    },
+    {
+      "type": "int",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "marked_by_id",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "meeting_attendance"
+    },
+    {
+      "type": "datetime2",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "marked_at",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "meeting_attendance"
+    },
+    {
+      "type": "int",
+      "notNull": true,
+      "generated": null,
+      "identity": {
+        "seed": 1,
+        "increment": 1
+      },
+      "name": "id",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "meetings"
+    },
+    {
+      "type": "int",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "academic_year_id",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "meetings"
+    },
+    {
+      "type": "nvarchar(255)",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "title",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "meetings"
+    },
+    {
+      "type": "nvarchar(max)",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "description",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "meetings"
+    },
+    {
+      "type": "nvarchar(50)",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "meeting_type",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "meetings"
+    },
+    {
+      "type": "nvarchar(50)",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "status",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "meetings"
+    },
+    {
+      "type": "datetime2",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "scheduled_date",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "meetings"
+    },
+    {
+      "type": "nvarchar(255)",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "location",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "meetings"
+    },
+    {
+      "type": "datetime2",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "started_at",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "meetings"
+    },
+    {
+      "type": "datetime2",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "ended_at",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "meetings"
+    },
+    {
+      "type": "int",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "duration_minutes",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "meetings"
+    },
+    {
+      "type": "int",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "special_camp_id",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "meetings"
+    },
+    {
+      "type": "int",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "created_by_id",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "meetings"
+    },
+    {
+      "type": "datetime2",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "meetings"
+    },
+    {
+      "type": "int",
+      "notNull": true,
+      "generated": null,
+      "identity": {
+        "seed": 1,
+        "increment": 1
+      },
+      "name": "id",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "notifications"
+    },
+    {
+      "type": "int",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "volunteer_id",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "notifications"
+    },
+    {
+      "type": "nvarchar(50)",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "type",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "notifications"
+    },
+    {
+      "type": "nvarchar(255)",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "title",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "notifications"
+    },
+    {
+      "type": "nvarchar(max)",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "body",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "notifications"
+    },
+    {
+      "type": "bit",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "is_read",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "notifications"
+    },
+    {
+      "type": "bit",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "email_sent",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "notifications"
+    },
+    {
+      "type": "nvarchar(50)",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "reference_type",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "notifications"
+    },
+    {
+      "type": "int",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "reference_id",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "notifications"
+    },
+    {
+      "type": "datetime2",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "notifications"
+    },
+    {
+      "type": "int",
+      "notNull": true,
+      "generated": null,
+      "identity": {
+        "seed": 1,
+        "increment": 1
+      },
+      "name": "id",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "site_settings"
+    },
+    {
+      "type": "nvarchar(100)",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "key",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "site_settings"
+    },
+    {
+      "type": "nvarchar(max)",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "value",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "site_settings"
+    },
+    {
+      "type": "datetime2",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "site_settings"
+    },
+    {
+      "type": "int",
+      "notNull": true,
+      "generated": null,
+      "identity": {
+        "seed": 1,
+        "increment": 1
+      },
+      "name": "id",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "special_camp_participants"
+    },
+    {
+      "type": "int",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "special_camp_id",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "special_camp_participants"
+    },
+    {
+      "type": "int",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "volunteer_id",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "special_camp_participants"
+    },
+    {
+      "type": "nvarchar(255)",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "snap_name",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "special_camp_participants"
+    },
+    {
+      "type": "nvarchar(50)",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "snap_prn_no",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "special_camp_participants"
+    },
+    {
+      "type": "nvarchar(100)",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "snap_department",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "special_camp_participants"
+    },
+    {
+      "type": "nvarchar(20)",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "snap_college_year_at_enrollment",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "special_camp_participants"
+    },
+    {
+      "type": "int",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "snap_nss_year",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "special_camp_participants"
+    },
+    {
+      "type": "nvarchar(10)",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "snap_cgpa",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "special_camp_participants"
+    },
+    {
+      "type": "nvarchar(20)",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "snap_phone_no",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "special_camp_participants"
+    },
+    {
+      "type": "datetime2",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "snap_finalized_at",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "special_camp_participants"
+    },
+    {
+      "type": "datetime2",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "added_at",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "special_camp_participants"
+    },
+    {
+      "type": "int",
+      "notNull": true,
+      "generated": null,
+      "identity": {
+        "seed": 1,
+        "increment": 1
+      },
+      "name": "id",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "special_camps"
+    },
+    {
+      "type": "int",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "academic_year_id",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "special_camps"
+    },
+    {
+      "type": "nvarchar(255)",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "name",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "special_camps"
+    },
+    {
+      "type": "nvarchar(255)",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "location",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "special_camps"
+    },
+    {
+      "type": "date",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "start_date",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "special_camps"
+    },
+    {
+      "type": "date",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "end_date",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "special_camps"
+    },
+    {
+      "type": "nvarchar(max)",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "description",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "special_camps"
+    },
+    {
+      "type": "int",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "volunteer_cap",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "special_camps"
+    },
+    {
+      "type": "bit",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "is_finalized",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "special_camps"
+    },
+    {
+      "type": "datetime2",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "finalized_at",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "special_camps"
+    },
+    {
+      "type": "int",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "finalized_by_id",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "special_camps"
+    },
+    {
+      "type": "datetime2",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "special_camps"
+    },
+    {
+      "type": "int",
+      "notNull": true,
+      "generated": null,
+      "identity": {
+        "seed": 1,
+        "increment": 1
+      },
+      "name": "id",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "volunteer_profiles"
+    },
+    {
+      "type": "int",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "volunteer_id",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "volunteer_profiles"
+    },
+    {
+      "type": "nvarchar(255)",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "full_name",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "volunteer_profiles"
+    },
+    {
+      "type": "nvarchar(50)",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "prn_no",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "volunteer_profiles"
+    },
+    {
+      "type": "nvarchar(20)",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "college_year_at_enrollment",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "volunteer_profiles"
+    },
+    {
+      "type": "int",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "nss_year",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "volunteer_profiles"
+    },
+    {
+      "type": "nvarchar(max)",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "marksheet_url",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "volunteer_profiles"
+    },
+    {
+      "type": "nvarchar(10)",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "cgpa",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "volunteer_profiles"
+    },
+    {
+      "type": "nvarchar(50)",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "eligibility_no",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "volunteer_profiles"
+    },
+    {
+      "type": "nvarchar(50)",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "religion",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "volunteer_profiles"
+    },
+    {
+      "type": "nvarchar(100)",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "caste",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "volunteer_profiles"
+    },
+    {
+      "type": "nvarchar(50)",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "caste_category",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "volunteer_profiles"
+    },
+    {
+      "type": "nvarchar(20)",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "phone_no",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "volunteer_profiles"
+    },
+    {
+      "type": "nvarchar(255)",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "email_id",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "volunteer_profiles"
+    },
+    {
+      "type": "nvarchar(100)",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "department",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "volunteer_profiles"
+    },
+    {
+      "type": "nvarchar(max)",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "profile_photo_url",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "volunteer_profiles"
+    },
+    {
+      "type": "nvarchar(max)",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "experience_text",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "volunteer_profiles"
+    },
+    {
+      "type": "nvarchar(max)",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "portfolio_choices",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "volunteer_profiles"
+    },
+    {
+      "type": "datetime2",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "volunteer_profiles"
+    },
+    {
+      "type": "int",
+      "notNull": true,
+      "generated": null,
+      "identity": {
+        "seed": 1,
+        "increment": 1
+      },
+      "name": "id",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "volunteers"
+    },
+    {
+      "type": "int",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "academic_year_id",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "volunteers"
+    },
+    {
+      "type": "nvarchar(255)",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "name",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "volunteers"
+    },
+    {
+      "type": "nvarchar(255)",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "email",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "volunteers"
+    },
+    {
+      "type": "nvarchar(max)",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "password_hash",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "volunteers"
+    },
+    {
+      "type": "bit",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "is_active",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "volunteers"
+    },
+    {
+      "type": "nvarchar(100)",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "department",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "volunteers"
+    },
+    {
+      "type": "nvarchar(20)",
+      "notNull": true,
+      "generated": null,
+      "identity": null,
+      "name": "status",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "volunteers"
+    },
+    {
+      "type": "int",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "created_by_id",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "volunteers"
+    },
+    {
+      "type": "datetime2",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "volunteers"
+    },
+    {
+      "type": "datetime2",
+      "notNull": false,
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "schema": "dbo",
+      "entityType": "columns",
+      "table": "volunteers"
+    },
+    {
+      "columns": [
+        {
+          "value": "is_current",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "[is_current] = 1",
+      "name": "unq_is_current",
+      "entityType": "indexes",
+      "table": "academic_years",
+      "schema": "dbo"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        "session_id",
+        "volunteer_id"
+      ],
+      "name": "unq_session_volunteer",
+      "entityType": "uniques",
+      "table": "attendance_records",
+      "schema": "dbo"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        "meeting_id",
+        "volunteer_id"
+      ],
+      "name": "unq_meeting_volunteer",
+      "entityType": "uniques",
+      "table": "meeting_attendance",
+      "schema": "dbo"
+    },
+    {
+      "columns": [
+        "locked_by_id"
+      ],
+      "nameExplicit": false,
+      "schemaTo": "dbo",
+      "tableTo": "admins",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "academic_years_locked_by_id_admins_id_fk",
+      "entityType": "fks",
+      "table": "academic_years",
+      "schema": "dbo"
+    },
+    {
+      "columns": [
+        "academic_year_id"
+      ],
+      "nameExplicit": false,
+      "schemaTo": "dbo",
+      "tableTo": "academic_years",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "name": "activity_calendar_academic_year_id_academic_years_id_fk",
+      "entityType": "fks",
+      "table": "activity_calendar",
+      "schema": "dbo"
+    },
+    {
+      "columns": [
+        "session_id"
+      ],
+      "nameExplicit": false,
+      "schemaTo": "dbo",
+      "tableTo": "attendance_sessions",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "name": "attendance_records_session_id_attendance_sessions_id_fk",
+      "entityType": "fks",
+      "table": "attendance_records",
+      "schema": "dbo"
+    },
+    {
+      "columns": [
+        "volunteer_id"
+      ],
+      "nameExplicit": false,
+      "schemaTo": "dbo",
+      "tableTo": "volunteers",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "name": "attendance_records_volunteer_id_volunteers_id_fk",
+      "entityType": "fks",
+      "table": "attendance_records",
+      "schema": "dbo"
+    },
+    {
+      "columns": [
+        "recorded_by_id"
+      ],
+      "nameExplicit": false,
+      "schemaTo": "dbo",
+      "tableTo": "admins",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "SET NULL",
+      "name": "attendance_records_recorded_by_id_admins_id_fk",
+      "entityType": "fks",
+      "table": "attendance_records",
+      "schema": "dbo"
+    },
+    {
+      "columns": [
+        "academic_year_id"
+      ],
+      "nameExplicit": false,
+      "schemaTo": "dbo",
+      "tableTo": "academic_years",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "attendance_sessions_academic_year_id_academic_years_id_fk",
+      "entityType": "fks",
+      "table": "attendance_sessions",
+      "schema": "dbo"
+    },
+    {
+      "columns": [
+        "event_id"
+      ],
+      "nameExplicit": false,
+      "schemaTo": "dbo",
+      "tableTo": "events",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "SET NULL",
+      "name": "attendance_sessions_event_id_events_id_fk",
+      "entityType": "fks",
+      "table": "attendance_sessions",
+      "schema": "dbo"
+    },
+    {
+      "columns": [
+        "created_by_id"
+      ],
+      "nameExplicit": false,
+      "schemaTo": "dbo",
+      "tableTo": "admins",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "SET NULL",
+      "name": "attendance_sessions_created_by_id_admins_id_fk",
+      "entityType": "fks",
+      "table": "attendance_sessions",
+      "schema": "dbo"
+    },
+    {
+      "columns": [
+        "academic_year_id"
+      ],
+      "nameExplicit": false,
+      "schemaTo": "dbo",
+      "tableTo": "academic_years",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "core_team_assignments_academic_year_id_academic_years_id_fk",
+      "entityType": "fks",
+      "table": "core_team_assignments",
+      "schema": "dbo"
+    },
+    {
+      "columns": [
+        "core_team_role_id"
+      ],
+      "nameExplicit": false,
+      "schemaTo": "dbo",
+      "tableTo": "core_team_roles",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "core_team_assignments_core_team_role_id_core_team_roles_id_fk",
+      "entityType": "fks",
+      "table": "core_team_assignments",
+      "schema": "dbo"
+    },
+    {
+      "columns": [
+        "volunteer_id"
+      ],
+      "nameExplicit": false,
+      "schemaTo": "dbo",
+      "tableTo": "volunteers",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "SET NULL",
+      "name": "core_team_assignments_volunteer_id_volunteers_id_fk",
+      "entityType": "fks",
+      "table": "core_team_assignments",
+      "schema": "dbo"
+    },
+    {
+      "columns": [
+        "sent_by_admin_id"
+      ],
+      "nameExplicit": false,
+      "schemaTo": "dbo",
+      "tableTo": "admins",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "SET NULL",
+      "name": "email_logs_sent_by_admin_id_admins_id_fk",
+      "entityType": "fks",
+      "table": "email_logs",
+      "schema": "dbo"
+    },
+    {
+      "columns": [
+        "event_id"
+      ],
+      "nameExplicit": false,
+      "schemaTo": "dbo",
+      "tableTo": "events",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "event_images_event_id_events_id_fk",
+      "entityType": "fks",
+      "table": "event_images",
+      "schema": "dbo"
+    },
+    {
+      "columns": [
+        "event_id"
+      ],
+      "nameExplicit": false,
+      "schemaTo": "dbo",
+      "tableTo": "events",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "event_registrations_event_id_events_id_fk",
+      "entityType": "fks",
+      "table": "event_registrations",
+      "schema": "dbo"
+    },
+    {
+      "columns": [
+        "approved_by_id"
+      ],
+      "nameExplicit": false,
+      "schemaTo": "dbo",
+      "tableTo": "admins",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "event_registrations_approved_by_id_admins_id_fk",
+      "entityType": "fks",
+      "table": "event_registrations",
+      "schema": "dbo"
+    },
+    {
+      "columns": [
+        "academic_year_id"
+      ],
+      "nameExplicit": false,
+      "schemaTo": "dbo",
+      "tableTo": "academic_years",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "events_academic_year_id_academic_years_id_fk",
+      "entityType": "fks",
+      "table": "events",
+      "schema": "dbo"
+    },
+    {
+      "columns": [
+        "event_id"
+      ],
+      "nameExplicit": false,
+      "schemaTo": "dbo",
+      "tableTo": "events",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "gallery_event_id_events_id_fk",
+      "entityType": "fks",
+      "table": "gallery",
+      "schema": "dbo"
+    },
+    {
+      "columns": [
+        "submitted_by_id"
+      ],
+      "nameExplicit": false,
+      "schemaTo": "dbo",
+      "tableTo": "admins",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "gallery_submitted_by_id_admins_id_fk",
+      "entityType": "fks",
+      "table": "gallery",
+      "schema": "dbo"
+    },
+    {
+      "columns": [
+        "reviewed_by_id"
+      ],
+      "nameExplicit": false,
+      "schemaTo": "dbo",
+      "tableTo": "admins",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "gallery_reviewed_by_id_admins_id_fk",
+      "entityType": "fks",
+      "table": "gallery",
+      "schema": "dbo"
+    },
+    {
+      "columns": [
+        "meeting_id"
+      ],
+      "nameExplicit": false,
+      "schemaTo": "dbo",
+      "tableTo": "meetings",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "name": "meeting_attendance_meeting_id_meetings_id_fk",
+      "entityType": "fks",
+      "table": "meeting_attendance",
+      "schema": "dbo"
+    },
+    {
+      "columns": [
+        "volunteer_id"
+      ],
+      "nameExplicit": false,
+      "schemaTo": "dbo",
+      "tableTo": "volunteers",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "name": "meeting_attendance_volunteer_id_volunteers_id_fk",
+      "entityType": "fks",
+      "table": "meeting_attendance",
+      "schema": "dbo"
+    },
+    {
+      "columns": [
+        "marked_by_id"
+      ],
+      "nameExplicit": false,
+      "schemaTo": "dbo",
+      "tableTo": "admins",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "meeting_attendance_marked_by_id_admins_id_fk",
+      "entityType": "fks",
+      "table": "meeting_attendance",
+      "schema": "dbo"
+    },
+    {
+      "columns": [
+        "academic_year_id"
+      ],
+      "nameExplicit": false,
+      "schemaTo": "dbo",
+      "tableTo": "academic_years",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "meetings_academic_year_id_academic_years_id_fk",
+      "entityType": "fks",
+      "table": "meetings",
+      "schema": "dbo"
+    },
+    {
+      "columns": [
+        "special_camp_id"
+      ],
+      "nameExplicit": false,
+      "schemaTo": "dbo",
+      "tableTo": "special_camps",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "SET NULL",
+      "name": "meetings_special_camp_id_special_camps_id_fk",
+      "entityType": "fks",
+      "table": "meetings",
+      "schema": "dbo"
+    },
+    {
+      "columns": [
+        "created_by_id"
+      ],
+      "nameExplicit": false,
+      "schemaTo": "dbo",
+      "tableTo": "admins",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "meetings_created_by_id_admins_id_fk",
+      "entityType": "fks",
+      "table": "meetings",
+      "schema": "dbo"
+    },
+    {
+      "columns": [
+        "volunteer_id"
+      ],
+      "nameExplicit": false,
+      "schemaTo": "dbo",
+      "tableTo": "volunteers",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "name": "notifications_volunteer_id_volunteers_id_fk",
+      "entityType": "fks",
+      "table": "notifications",
+      "schema": "dbo"
+    },
+    {
+      "columns": [
+        "special_camp_id"
+      ],
+      "nameExplicit": false,
+      "schemaTo": "dbo",
+      "tableTo": "special_camps",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "name": "special_camp_participants_special_camp_id_special_camps_id_fk",
+      "entityType": "fks",
+      "table": "special_camp_participants",
+      "schema": "dbo"
+    },
+    {
+      "columns": [
+        "volunteer_id"
+      ],
+      "nameExplicit": false,
+      "schemaTo": "dbo",
+      "tableTo": "volunteers",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "SET NULL",
+      "name": "special_camp_participants_volunteer_id_volunteers_id_fk",
+      "entityType": "fks",
+      "table": "special_camp_participants",
+      "schema": "dbo"
+    },
+    {
+      "columns": [
+        "academic_year_id"
+      ],
+      "nameExplicit": false,
+      "schemaTo": "dbo",
+      "tableTo": "academic_years",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "special_camps_academic_year_id_academic_years_id_fk",
+      "entityType": "fks",
+      "table": "special_camps",
+      "schema": "dbo"
+    },
+    {
+      "columns": [
+        "finalized_by_id"
+      ],
+      "nameExplicit": false,
+      "schemaTo": "dbo",
+      "tableTo": "admins",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "special_camps_finalized_by_id_admins_id_fk",
+      "entityType": "fks",
+      "table": "special_camps",
+      "schema": "dbo"
+    },
+    {
+      "columns": [
+        "volunteer_id"
+      ],
+      "nameExplicit": false,
+      "schemaTo": "dbo",
+      "tableTo": "volunteers",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "name": "volunteer_profiles_volunteer_id_volunteers_id_fk",
+      "entityType": "fks",
+      "table": "volunteer_profiles",
+      "schema": "dbo"
+    },
+    {
+      "columns": [
+        "academic_year_id"
+      ],
+      "nameExplicit": false,
+      "schemaTo": "dbo",
+      "tableTo": "academic_years",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "volunteers_academic_year_id_academic_years_id_fk",
+      "entityType": "fks",
+      "table": "volunteers",
+      "schema": "dbo"
+    },
+    {
+      "columns": [
+        "created_by_id"
+      ],
+      "nameExplicit": false,
+      "schemaTo": "dbo",
+      "tableTo": "admins",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "volunteers_created_by_id_admins_id_fk",
+      "entityType": "fks",
+      "table": "volunteers",
+      "schema": "dbo"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "id"
+      ],
+      "name": "academic_years_pkey",
+      "table": "academic_years",
+      "schema": "dbo",
+      "entityType": "pks"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "id"
+      ],
+      "name": "activity_calendar_pkey",
+      "table": "activity_calendar",
+      "schema": "dbo",
+      "entityType": "pks"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "id"
+      ],
+      "name": "admins_pkey",
+      "table": "admins",
+      "schema": "dbo",
+      "entityType": "pks"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "id"
+      ],
+      "name": "attendance_records_pkey",
+      "table": "attendance_records",
+      "schema": "dbo",
+      "entityType": "pks"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "id"
+      ],
+      "name": "attendance_sessions_pkey",
+      "table": "attendance_sessions",
+      "schema": "dbo",
+      "entityType": "pks"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "id"
+      ],
+      "name": "audit_logs_pkey",
+      "table": "audit_logs",
+      "schema": "dbo",
+      "entityType": "pks"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "id"
+      ],
+      "name": "core_team_assignments_pkey",
+      "table": "core_team_assignments",
+      "schema": "dbo",
+      "entityType": "pks"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "id"
+      ],
+      "name": "core_team_roles_pkey",
+      "table": "core_team_roles",
+      "schema": "dbo",
+      "entityType": "pks"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "id"
+      ],
+      "name": "email_logs_pkey",
+      "table": "email_logs",
+      "schema": "dbo",
+      "entityType": "pks"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "id"
+      ],
+      "name": "event_images_pkey",
+      "table": "event_images",
+      "schema": "dbo",
+      "entityType": "pks"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "id"
+      ],
+      "name": "event_registrations_pkey",
+      "table": "event_registrations",
+      "schema": "dbo",
+      "entityType": "pks"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "id"
+      ],
+      "name": "events_pkey",
+      "table": "events",
+      "schema": "dbo",
+      "entityType": "pks"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "id"
+      ],
+      "name": "gallery_pkey",
+      "table": "gallery",
+      "schema": "dbo",
+      "entityType": "pks"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "id"
+      ],
+      "name": "hod_contacts_pkey",
+      "table": "hod_contacts",
+      "schema": "dbo",
+      "entityType": "pks"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "id"
+      ],
+      "name": "meeting_attendance_pkey",
+      "table": "meeting_attendance",
+      "schema": "dbo",
+      "entityType": "pks"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "id"
+      ],
+      "name": "meetings_pkey",
+      "table": "meetings",
+      "schema": "dbo",
+      "entityType": "pks"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "id"
+      ],
+      "name": "notifications_pkey",
+      "table": "notifications",
+      "schema": "dbo",
+      "entityType": "pks"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "id"
+      ],
+      "name": "site_settings_pkey",
+      "table": "site_settings",
+      "schema": "dbo",
+      "entityType": "pks"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "id"
+      ],
+      "name": "special_camp_participants_pkey",
+      "table": "special_camp_participants",
+      "schema": "dbo",
+      "entityType": "pks"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "id"
+      ],
+      "name": "special_camps_pkey",
+      "table": "special_camps",
+      "schema": "dbo",
+      "entityType": "pks"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "id"
+      ],
+      "name": "volunteer_profiles_pkey",
+      "table": "volunteer_profiles",
+      "schema": "dbo",
+      "entityType": "pks"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "id"
+      ],
+      "name": "volunteers_pkey",
+      "table": "volunteers",
+      "schema": "dbo",
+      "entityType": "pks"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "label"
+      ],
+      "name": "academic_years_label_key",
+      "schema": "dbo",
+      "table": "academic_years",
+      "entityType": "uniques"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "username"
+      ],
+      "name": "admins_username_key",
+      "schema": "dbo",
+      "table": "admins",
+      "entityType": "uniques"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "name"
+      ],
+      "name": "core_team_roles_name_key",
+      "schema": "dbo",
+      "table": "core_team_roles",
+      "entityType": "uniques"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "code"
+      ],
+      "name": "core_team_roles_code_key",
+      "schema": "dbo",
+      "table": "core_team_roles",
+      "entityType": "uniques"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "visitor_pass_id"
+      ],
+      "name": "event_registrations_visitor_pass_id_key",
+      "schema": "dbo",
+      "table": "event_registrations",
+      "entityType": "uniques"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "department"
+      ],
+      "name": "hod_contacts_department_key",
+      "schema": "dbo",
+      "table": "hod_contacts",
+      "entityType": "uniques"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "key"
+      ],
+      "name": "site_settings_key_key",
+      "schema": "dbo",
+      "table": "site_settings",
+      "entityType": "uniques"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "volunteer_id"
+      ],
+      "name": "volunteer_profiles_volunteer_id_key",
+      "schema": "dbo",
+      "table": "volunteer_profiles",
+      "entityType": "uniques"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "email"
+      ],
+      "name": "volunteers_email_key",
+      "schema": "dbo",
+      "table": "volunteers",
+      "entityType": "uniques"
+    },
+    {
+      "column": "is_current",
+      "nameExplicit": false,
+      "default": "((0))",
+      "name": "academic_years_is_current_default",
+      "entityType": "defaults",
+      "schema": "dbo",
+      "table": "academic_years"
+    },
+    {
+      "column": "is_locked",
+      "nameExplicit": false,
+      "default": "((0))",
+      "name": "academic_years_is_locked_default",
+      "entityType": "defaults",
+      "schema": "dbo",
+      "table": "academic_years"
+    },
+    {
+      "column": "is_archived",
+      "nameExplicit": false,
+      "default": "((0))",
+      "name": "academic_years_is_archived_default",
+      "entityType": "defaults",
+      "schema": "dbo",
+      "table": "academic_years"
+    },
+    {
+      "column": "volunteer_cap",
+      "nameExplicit": false,
+      "default": "((100))",
+      "name": "academic_years_volunteer_cap_default",
+      "entityType": "defaults",
+      "schema": "dbo",
+      "table": "academic_years"
+    },
+    {
+      "column": "created_at",
+      "nameExplicit": false,
+      "default": "(getdate())",
+      "name": "academic_years_created_at_default",
+      "entityType": "defaults",
+      "schema": "dbo",
+      "table": "academic_years"
+    },
+    {
+      "column": "created_at",
+      "nameExplicit": false,
+      "default": "(getdate())",
+      "name": "activity_calendar_created_at_default",
+      "entityType": "defaults",
+      "schema": "dbo",
+      "table": "activity_calendar"
+    },
+    {
+      "column": "is_superadmin",
+      "nameExplicit": false,
+      "default": "((0))",
+      "name": "admins_is_superadmin_default",
+      "entityType": "defaults",
+      "schema": "dbo",
+      "table": "admins"
+    },
+    {
+      "column": "created_at",
+      "nameExplicit": false,
+      "default": "(getdate())",
+      "name": "admins_created_at_default",
+      "entityType": "defaults",
+      "schema": "dbo",
+      "table": "admins"
+    },
+    {
+      "column": "created_at",
+      "nameExplicit": false,
+      "default": "(getdate())",
+      "name": "attendance_records_created_at_default",
+      "entityType": "defaults",
+      "schema": "dbo",
+      "table": "attendance_records"
+    },
+    {
+      "column": "created_at",
+      "nameExplicit": false,
+      "default": "(getdate())",
+      "name": "attendance_sessions_created_at_default",
+      "entityType": "defaults",
+      "schema": "dbo",
+      "table": "attendance_sessions"
+    },
+    {
+      "column": "performed_by_role",
+      "nameExplicit": false,
+      "default": "('admin')",
+      "name": "audit_logs_performed_by_role_default",
+      "entityType": "defaults",
+      "schema": "dbo",
+      "table": "audit_logs"
+    },
+    {
+      "column": "created_at",
+      "nameExplicit": false,
+      "default": "(getdate())",
+      "name": "audit_logs_created_at_default",
+      "entityType": "defaults",
+      "schema": "dbo",
+      "table": "audit_logs"
+    },
+    {
+      "column": "display_order",
+      "nameExplicit": false,
+      "default": "((0))",
+      "name": "core_team_assignments_display_order_default",
+      "entityType": "defaults",
+      "schema": "dbo",
+      "table": "core_team_assignments"
+    },
+    {
+      "column": "created_at",
+      "nameExplicit": false,
+      "default": "(getdate())",
+      "name": "core_team_assignments_created_at_default",
+      "entityType": "defaults",
+      "schema": "dbo",
+      "table": "core_team_assignments"
+    },
+    {
+      "column": "is_unique_per_ay",
+      "nameExplicit": false,
+      "default": "((1))",
+      "name": "core_team_roles_is_unique_per_ay_default",
+      "entityType": "defaults",
+      "schema": "dbo",
+      "table": "core_team_roles"
+    },
+    {
+      "column": "display_order",
+      "nameExplicit": false,
+      "default": "((0))",
+      "name": "core_team_roles_display_order_default",
+      "entityType": "defaults",
+      "schema": "dbo",
+      "table": "core_team_roles"
+    },
+    {
+      "column": "created_at",
+      "nameExplicit": false,
+      "default": "(getdate())",
+      "name": "core_team_roles_created_at_default",
+      "entityType": "defaults",
+      "schema": "dbo",
+      "table": "core_team_roles"
+    },
+    {
+      "column": "status",
+      "nameExplicit": false,
+      "default": "('sent')",
+      "name": "email_logs_status_default",
+      "entityType": "defaults",
+      "schema": "dbo",
+      "table": "email_logs"
+    },
+    {
+      "column": "sent_at",
+      "nameExplicit": false,
+      "default": "(getdate())",
+      "name": "email_logs_sent_at_default",
+      "entityType": "defaults",
+      "schema": "dbo",
+      "table": "email_logs"
+    },
+    {
+      "column": "is_master",
+      "nameExplicit": false,
+      "default": "((0))",
+      "name": "event_images_is_master_default",
+      "entityType": "defaults",
+      "schema": "dbo",
+      "table": "event_images"
+    },
+    {
+      "column": "created_at",
+      "nameExplicit": false,
+      "default": "(getdate())",
+      "name": "event_images_created_at_default",
+      "entityType": "defaults",
+      "schema": "dbo",
+      "table": "event_images"
+    },
+    {
+      "column": "status",
+      "nameExplicit": false,
+      "default": "('pending')",
+      "name": "event_registrations_status_default",
+      "entityType": "defaults",
+      "schema": "dbo",
+      "table": "event_registrations"
+    },
+    {
+      "column": "created_at",
+      "nameExplicit": false,
+      "default": "(getdate())",
+      "name": "event_registrations_created_at_default",
+      "entityType": "defaults",
+      "schema": "dbo",
+      "table": "event_registrations"
+    },
+    {
+      "column": "type",
+      "nameExplicit": false,
+      "default": "('upcoming')",
+      "name": "events_type_default",
+      "entityType": "defaults",
+      "schema": "dbo",
+      "table": "events"
+    },
+    {
+      "column": "volunteers_count",
+      "nameExplicit": false,
+      "default": "((0))",
+      "name": "events_volunteers_count_default",
+      "entityType": "defaults",
+      "schema": "dbo",
+      "table": "events"
+    },
+    {
+      "column": "created_at",
+      "nameExplicit": false,
+      "default": "(getdate())",
+      "name": "events_created_at_default",
+      "entityType": "defaults",
+      "schema": "dbo",
+      "table": "events"
+    },
+    {
+      "column": "description",
+      "nameExplicit": false,
+      "default": "('')",
+      "name": "gallery_description_default",
+      "entityType": "defaults",
+      "schema": "dbo",
+      "table": "gallery"
+    },
+    {
+      "column": "type",
+      "nameExplicit": false,
+      "default": "('image')",
+      "name": "gallery_type_default",
+      "entityType": "defaults",
+      "schema": "dbo",
+      "table": "gallery"
+    },
+    {
+      "column": "status",
+      "nameExplicit": false,
+      "default": "('pending')",
+      "name": "gallery_status_default",
+      "entityType": "defaults",
+      "schema": "dbo",
+      "table": "gallery"
+    },
+    {
+      "column": "created_at",
+      "nameExplicit": false,
+      "default": "(getdate())",
+      "name": "gallery_created_at_default",
+      "entityType": "defaults",
+      "schema": "dbo",
+      "table": "gallery"
+    },
+    {
+      "column": "is_active",
+      "nameExplicit": false,
+      "default": "((1))",
+      "name": "hod_contacts_is_active_default",
+      "entityType": "defaults",
+      "schema": "dbo",
+      "table": "hod_contacts"
+    },
+    {
+      "column": "created_at",
+      "nameExplicit": false,
+      "default": "(getdate())",
+      "name": "hod_contacts_created_at_default",
+      "entityType": "defaults",
+      "schema": "dbo",
+      "table": "hod_contacts"
+    },
+    {
+      "column": "updated_at",
+      "nameExplicit": false,
+      "default": "(getdate())",
+      "name": "hod_contacts_updated_at_default",
+      "entityType": "defaults",
+      "schema": "dbo",
+      "table": "hod_contacts"
+    },
+    {
+      "column": "marked_at",
+      "nameExplicit": false,
+      "default": "(getdate())",
+      "name": "meeting_attendance_marked_at_default",
+      "entityType": "defaults",
+      "schema": "dbo",
+      "table": "meeting_attendance"
+    },
+    {
+      "column": "status",
+      "nameExplicit": false,
+      "default": "('scheduled')",
+      "name": "meetings_status_default",
+      "entityType": "defaults",
+      "schema": "dbo",
+      "table": "meetings"
+    },
+    {
+      "column": "created_at",
+      "nameExplicit": false,
+      "default": "(getdate())",
+      "name": "meetings_created_at_default",
+      "entityType": "defaults",
+      "schema": "dbo",
+      "table": "meetings"
+    },
+    {
+      "column": "is_read",
+      "nameExplicit": false,
+      "default": "((0))",
+      "name": "notifications_is_read_default",
+      "entityType": "defaults",
+      "schema": "dbo",
+      "table": "notifications"
+    },
+    {
+      "column": "email_sent",
+      "nameExplicit": false,
+      "default": "((0))",
+      "name": "notifications_email_sent_default",
+      "entityType": "defaults",
+      "schema": "dbo",
+      "table": "notifications"
+    },
+    {
+      "column": "created_at",
+      "nameExplicit": false,
+      "default": "(getdate())",
+      "name": "notifications_created_at_default",
+      "entityType": "defaults",
+      "schema": "dbo",
+      "table": "notifications"
+    },
+    {
+      "column": "updated_at",
+      "nameExplicit": false,
+      "default": "(getdate())",
+      "name": "site_settings_updated_at_default",
+      "entityType": "defaults",
+      "schema": "dbo",
+      "table": "site_settings"
+    },
+    {
+      "column": "added_at",
+      "nameExplicit": false,
+      "default": "(getdate())",
+      "name": "special_camp_participants_added_at_default",
+      "entityType": "defaults",
+      "schema": "dbo",
+      "table": "special_camp_participants"
+    },
+    {
+      "column": "volunteer_cap",
+      "nameExplicit": false,
+      "default": "((50))",
+      "name": "special_camps_volunteer_cap_default",
+      "entityType": "defaults",
+      "schema": "dbo",
+      "table": "special_camps"
+    },
+    {
+      "column": "is_finalized",
+      "nameExplicit": false,
+      "default": "((0))",
+      "name": "special_camps_is_finalized_default",
+      "entityType": "defaults",
+      "schema": "dbo",
+      "table": "special_camps"
+    },
+    {
+      "column": "created_at",
+      "nameExplicit": false,
+      "default": "(getdate())",
+      "name": "special_camps_created_at_default",
+      "entityType": "defaults",
+      "schema": "dbo",
+      "table": "special_camps"
+    },
+    {
+      "column": "updated_at",
+      "nameExplicit": false,
+      "default": "(getdate())",
+      "name": "volunteer_profiles_updated_at_default",
+      "entityType": "defaults",
+      "schema": "dbo",
+      "table": "volunteer_profiles"
+    },
+    {
+      "column": "is_active",
+      "nameExplicit": false,
+      "default": "((1))",
+      "name": "volunteers_is_active_default",
+      "entityType": "defaults",
+      "schema": "dbo",
+      "table": "volunteers"
+    },
+    {
+      "column": "status",
+      "nameExplicit": false,
+      "default": "('regular')",
+      "name": "volunteers_status_default",
+      "entityType": "defaults",
+      "schema": "dbo",
+      "table": "volunteers"
+    },
+    {
+      "column": "created_at",
+      "nameExplicit": false,
+      "default": "(getdate())",
+      "name": "volunteers_created_at_default",
+      "entityType": "defaults",
+      "schema": "dbo",
+      "table": "volunteers"
+    },
+    {
+      "column": "updated_at",
+      "nameExplicit": false,
+      "default": "(getdate())",
+      "name": "volunteers_updated_at_default",
+      "entityType": "defaults",
+      "schema": "dbo",
+      "table": "volunteers"
+    },
+    {
+      "value": "[attendance_records].[status] IN ('present','absent','late')",
+      "name": "chk_attendance_records_status",
+      "entityType": "checks",
+      "table": "attendance_records",
+      "schema": "dbo"
+    },
+    {
+      "value": "[core_team_roles].[role_type] IN ('institution','student')",
+      "name": "chk_core_team_roles_role_type",
+      "entityType": "checks",
+      "table": "core_team_roles",
+      "schema": "dbo"
+    },
+    {
+      "value": "[email_logs].[status] IN ('sent','failed')",
+      "name": "chk_email_logs_status",
+      "entityType": "checks",
+      "table": "email_logs",
+      "schema": "dbo"
+    },
+    {
+      "value": "[event_registrations].[status] IN ('pending','approved','rejected')",
+      "name": "chk_event_registrations_status",
+      "entityType": "checks",
+      "table": "event_registrations",
+      "schema": "dbo"
+    },
+    {
+      "value": "[events].[type] IN ('upcoming','past')",
+      "name": "chk_events_type",
+      "entityType": "checks",
+      "table": "events",
+      "schema": "dbo"
+    },
+    {
+      "value": "[gallery].[type] IN ('image','video')",
+      "name": "chk_gallery_type",
+      "entityType": "checks",
+      "table": "gallery",
+      "schema": "dbo"
+    },
+    {
+      "value": "[gallery].[status] IN ('pending','approved','rejected')",
+      "name": "chk_gallery_status",
+      "entityType": "checks",
+      "table": "gallery",
+      "schema": "dbo"
+    },
+    {
+      "value": "[meeting_attendance].[status] IN ('present','absent','late')",
+      "name": "chk_meeting_attendance_status",
+      "entityType": "checks",
+      "table": "meeting_attendance",
+      "schema": "dbo"
+    },
+    {
+      "value": "[meeting_attendance].[volunteer_type] IN ('regular','backup')",
+      "name": "chk_meeting_attendance_volunteer_type",
+      "entityType": "checks",
+      "table": "meeting_attendance",
+      "schema": "dbo"
+    },
+    {
+      "value": "[meetings].[meeting_type] IN ('regular','core_team','special_camp')",
+      "name": "chk_meetings_meeting_type",
+      "entityType": "checks",
+      "table": "meetings",
+      "schema": "dbo"
+    },
+    {
+      "value": "[meetings].[status] IN ('scheduled','active','ended')",
+      "name": "chk_meetings_status",
+      "entityType": "checks",
+      "table": "meetings",
+      "schema": "dbo"
+    },
+    {
+      "value": "[volunteers].[department] IN ('Computer Engineering','Computer Science and Business Systems','Information Technology','Electronics and Telecommunication','Electrical Engineering','Automation and Robotics','Mechanical Engineering','Civil Engineering','Bachelor of Computer Applications')",
+      "name": "chk_volunteers_department",
+      "entityType": "checks",
+      "table": "volunteers",
+      "schema": "dbo"
+    },
+    {
+      "value": "[volunteers].[status] IN ('regular','backup')",
+      "name": "chk_volunteers_status",
+      "entityType": "checks",
+      "table": "volunteers",
+      "schema": "dbo"
+    }
+  ],
+  "renames": []
+}

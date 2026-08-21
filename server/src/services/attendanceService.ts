@@ -1,8 +1,7 @@
 import { eq, and, count, sql } from 'drizzle-orm';
 import { db } from '../db';
-import { attendanceSessions, attendanceRecords, volunteers, academicYears } from '../db/schema';
-import { NotFoundError, ConflictError, AYLockedError, ValidationError } from '../lib/errors';
-import { events } from '../db/schema';
+import { attendanceSessions, attendanceRecords, volunteers, academicYears, events } from '../db/schema';
+import { NotFoundError, AYLockedError, ValidationError } from '../lib/errors';
 import { logAudit } from './auditService';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -22,19 +21,18 @@ export interface AttendanceRecord {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const requireUnlockedAY = async (ayId: number) => {
-    const [ay] = await db.select().from(academicYears).where(eq(academicYears.id, ayId)).limit(1);
+const requireUnlockedAY = async (ayId: number, tx: any = db) => {
+    const [ay] = await tx.select().top(1).from(academicYears).where(eq(academicYears.id, ayId));
     if (!ay) throw new NotFoundError(`Academic year ${ayId} not found.`);
     if (ay.isLocked) throw new AYLockedError(ay.label);
     return ay;
 };
 
-const findSession = async (sessionId: number) => {
-    const [session] = await db
+const findSession = async (sessionId: number, tx: any = db) => {
+    const [session] = await tx
         .select()
-        .from(attendanceSessions)
-        .where(eq(attendanceSessions.id, sessionId))
-        .limit(1);
+        .top(1).from(attendanceSessions)
+        .where(eq(attendanceSessions.id, sessionId));
     if (!session) throw new NotFoundError(`Attendance session ${sessionId} not found.`);
     return session;
 };
@@ -42,7 +40,7 @@ const findSession = async (sessionId: number) => {
 // ── Sessions ──────────────────────────────────────────────────────────────────
 
 export const listSessions = async (ayId: number, filters: { eventId?: number } = {}) => {
-    const [ay] = await db.select({ id: academicYears.id }).from(academicYears).where(eq(academicYears.id, ayId)).limit(1);
+    const [ay] = await db.select({ id: academicYears.id }).top(1).from(academicYears).where(eq(academicYears.id, ayId));
     if (!ay) throw new NotFoundError(`Academic year ${ayId} not found.`);
 
     const conditions = [eq(attendanceSessions.academicYearId, ayId)];
@@ -52,25 +50,33 @@ export const listSessions = async (ayId: number, filters: { eventId?: number } =
 };
 
 export const createSession = async (ayId: number, input: CreateSessionInput, adminId: number) => {
-    await requireUnlockedAY(ayId);
+    return await db.transaction(async (tx) => {
+        await requireUnlockedAY(ayId, tx);
 
-    const [session] = await db.insert(attendanceSessions).values({
-        academicYearId: ayId,
-        title: input.title,
-        date: input.date,
-        eventId: input.eventId ?? null,
-        description: input.description ?? null,
-        createdById: adminId,
-    }).returning();
+        const [session] = await tx.insert(attendanceSessions).output().values({
+            academicYearId: ayId,
+            title: input.title,
+            date: new Date(input.date),
+            description: input.description,
+            eventId: input.eventId,
+            createdById: adminId,
+        });
 
-    await logAudit({ action: 'attendance.session_create', entityType: 'attendance_session', entityId: session.id, performedById: adminId, academicYearId: ayId });
+        await logAudit({
+            action: 'attendance.session_create',
+            entityType: 'attendance_session',
+            entityId: session.id,
+            performedById: adminId,
+            academicYearId: ayId,
+        }, tx);
 
-    return session;
+        return session;
+    });
 };
 
-export const getSession = async (sessionId: number) => {
-    const session = await findSession(sessionId);
-    const records = await db
+export const getSession = async (sessionId: number, tx: any = db) => {
+    const session = await findSession(sessionId, tx);
+    const records = await tx
         .select({
             id: attendanceRecords.id,
             volunteerId: attendanceRecords.volunteerId,
@@ -88,10 +94,103 @@ export const getSession = async (sessionId: number) => {
 };
 
 export const deleteSession = async (sessionId: number, adminId: number) => {
-    const session = await findSession(sessionId);
-    await requireUnlockedAY(session.academicYearId);
-    await db.delete(attendanceSessions).where(eq(attendanceSessions.id, sessionId));
-    await logAudit({ action: 'attendance.session_delete', entityType: 'attendance_session', entityId: sessionId, performedById: adminId, academicYearId: session.academicYearId });
+    await db.transaction(async (tx) => {
+        const session = await findSession(sessionId, tx);
+        await requireUnlockedAY(session.academicYearId, tx);
+
+        // Delete child records first in case there is no ON DELETE CASCADE
+        await tx.delete(attendanceRecords).where(eq(attendanceRecords.sessionId, sessionId));
+        await tx.delete(attendanceSessions).where(eq(attendanceSessions.id, sessionId));
+
+        await logAudit({
+            action: 'attendance.session_delete',
+            entityType: 'attendance_session',
+            entityId: sessionId,
+            performedById: adminId,
+            academicYearId: session.academicYearId,
+        }, tx);
+    });
+};
+
+// ── Mark attendance (bulk) ────────────────────────────────────────────────────
+
+// ── Private helper: core upsert logic, runs inside an existing tx ─────────────
+
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+const _markAttendanceInTx = async (
+    tx: Tx,
+    sessionId: number,
+    session: { academicYearId: number },
+    records: AttendanceRecord[],
+    adminId: number,
+) => {
+    // Deduplicate by volunteerId (last entry wins)
+    const deduped = new Map<number, AttendanceRecord>();
+    for (const rec of records) deduped.set(rec.volunteerId, rec);
+    const uniqueRecords = [...deduped.values()];
+
+    // Validate all volunteers belong to this AY
+    const volIds = uniqueRecords.map(r => r.volunteerId);
+    const volRows = await tx
+        .select({ id: volunteers.id })
+        .from(volunteers)
+        .where(eq(volunteers.academicYearId, session.academicYearId));
+    const validIds = new Set(volRows.map(v => v.id));
+    const invalid = volIds.filter(id => !validIds.has(id));
+    if (invalid.length) {
+        throw new ValidationError(`Volunteers [${invalid.join(', ')}] do not belong to this academic year.`);
+    }
+
+    // Load existing records in one query
+    const existingRecords = await tx
+        .select({ id: attendanceRecords.id, volunteerId: attendanceRecords.volunteerId })
+        .from(attendanceRecords)
+        .where(eq(attendanceRecords.sessionId, sessionId));
+    const existingMap = new Map(existingRecords.map(r => [r.volunteerId, r.id]));
+
+    // Separate into updates and inserts
+    const toUpdate: { id: number; rec: AttendanceRecord }[] = [];
+    const toInsert: AttendanceRecord[] = [];
+    for (const rec of uniqueRecords) {
+        const existingId = existingMap.get(rec.volunteerId);
+        if (existingId !== undefined) {
+            toUpdate.push({ id: existingId, rec });
+        } else {
+            toInsert.push(rec);
+        }
+    }
+
+    for (const { id, rec } of toUpdate) {
+        await tx.update(attendanceRecords).set({
+            status: rec.status,
+            notes: rec.notes ?? null,
+            recordedById: adminId,
+        }).where(eq(attendanceRecords.id, id));
+    }
+
+    if (toInsert.length > 0) {
+        await tx.insert(attendanceRecords).values(
+            toInsert.map(rec => ({
+                sessionId,
+                volunteerId: rec.volunteerId,
+                status: rec.status,
+                notes: rec.notes ?? null,
+                recordedById: adminId,
+            }))
+        );
+    }
+
+    await logAudit({
+        action: 'attendance.mark',
+        entityType: 'attendance_session',
+        entityId: sessionId,
+        performedById: adminId,
+        academicYearId: session.academicYearId,
+        details: { count: uniqueRecords.length },
+    }, tx);
+
+    return getSession(sessionId, tx);
 };
 
 // ── Mark attendance (bulk) ────────────────────────────────────────────────────
@@ -101,61 +200,29 @@ export const markAttendance = async (
     records: AttendanceRecord[],
     adminId: number,
 ) => {
-    const session = await findSession(sessionId);
-    await requireUnlockedAY(session.academicYearId);
-
     if (!records.length) throw new ValidationError('At least one attendance record is required.');
 
-    // Validate all volunteers belong to this AY
-    const volIds = [...new Set(records.map(r => r.volunteerId))];
-    const volRows = await db
-        .select({ id: volunteers.id })
-        .from(volunteers)
-        .where(and(
-            eq(volunteers.academicYearId, session.academicYearId),
-            eq(volunteers.status, 'regular'),
-        ));
-    const validIds = new Set(volRows.map(v => v.id));
-    const invalid = volIds.filter(id => !validIds.has(id));
-    if (invalid.length) {
-        throw new ValidationError(`Volunteers [${invalid.join(', ')}] are not regular members of this academic year.`);
-    }
-
-    // Upsert each record
-    for (const rec of records) {
-        await db.insert(attendanceRecords).values({
-            sessionId,
-            volunteerId: rec.volunteerId,
-            status: rec.status,
-            notes: rec.notes ?? null,
-            recordedById: adminId,
-        }).onConflictDoUpdate({
-            target: [attendanceRecords.sessionId, attendanceRecords.volunteerId],
-            set: { status: rec.status, notes: rec.notes ?? null, recordedById: adminId },
-        });
-    }
-
-    await logAudit({ action: 'attendance.mark', entityType: 'attendance_session', entityId: sessionId, performedById: adminId, academicYearId: session.academicYearId, details: { count: records.length } });
-
-    return getSession(sessionId);
+    return await db.transaction(async (tx) => {
+        const session = await findSession(sessionId, tx);
+        await requireUnlockedAY(session.academicYearId, tx);
+        return _markAttendanceInTx(tx, sessionId, session, records, adminId);
+    });
 };
 
 // ── Event Attendance ──────────────────────────────────────────────────────────
 
 export const getEventAttendance = async (ayId: number, eventId: number) => {
     // 1. Ensure event exists
-    const [event] = await db.select().from(events).where(eq(events.id, eventId)).limit(1);
+    const [event] = await db.select().top(1).from(events).where(eq(events.id, eventId));
     if (!event) throw new NotFoundError(`Event ${eventId} not found.`);
 
     // 2. Find associated session for this event in this AY
     const [session] = await db
         .select()
-        .from(attendanceSessions)
-        .where(and(eq(attendanceSessions.academicYearId, ayId), eq(attendanceSessions.eventId, eventId)))
-        .limit(1);
+        .top(1).from(attendanceSessions)
+        .where(and(eq(attendanceSessions.academicYearId, ayId), eq(attendanceSessions.eventId, eventId)));
 
     if (!session) {
-        // No session exists yet, return empty records
         return { event, session: null, records: [] };
     }
 
@@ -165,38 +232,39 @@ export const getEventAttendance = async (ayId: number, eventId: number) => {
 };
 
 export const saveEventAttendance = async (ayId: number, eventId: number, records: AttendanceRecord[], adminId: number) => {
-    await requireUnlockedAY(ayId);
+    return await db.transaction(async (tx) => {
+        await requireUnlockedAY(ayId, tx);
 
-    const [event] = await db.select().from(events).where(eq(events.id, eventId)).limit(1);
-    if (!event) throw new NotFoundError(`Event ${eventId} not found.`);
+        const [event] = await tx.select().top(1).from(events).where(eq(events.id, eventId));
+        if (!event) throw new NotFoundError(`Event ${eventId} not found.`);
 
-    // Find or create session
-    let [session] = await db
-        .select()
-        .from(attendanceSessions)
-        .where(and(eq(attendanceSessions.academicYearId, ayId), eq(attendanceSessions.eventId, eventId)))
-        .limit(1);
+        // Find or create session (inside transaction to prevent TOCTOU)
+        let [session] = await tx
+            .select()
+            .top(1).from(attendanceSessions)
+            .where(and(eq(attendanceSessions.academicYearId, ayId), eq(attendanceSessions.eventId, eventId)));
 
-    if (!session) {
-        // Create session
-        [session] = await db.insert(attendanceSessions).values({
-            academicYearId: ayId,
-            eventId: eventId,
-            title: event.title,
-            date: (typeof event.date === 'string' ? new Date(event.date) : event.date).toISOString().split('T')[0], // Store date part
-            description: `Auto-created session for event: ${event.title}`,
-            createdById: adminId,
-        }).returning();
-    }
+        if (!session) {
+            const eventDate = typeof event.date === 'string' ? new Date(event.date) : event.date;
+            [session] = await tx.insert(attendanceSessions).output().values({
+                academicYearId: ayId,
+                eventId: eventId,
+                title: event.title,
+                date: eventDate,
+                description: `Auto-created session for event: ${event.title}`,
+                createdById: adminId,
+            });
+        }
 
-    // Use markAttendance which handles the upsert logic
-    return markAttendance(session.id, records, adminId);
+        // Use the shared inner helper directly — avoids opening a nested transaction
+        return _markAttendanceInTx(tx, session.id, session, records, adminId);
+    });
 };
 
 // ── Summary ───────────────────────────────────────────────────────────────────
 
 export const getAYAttendanceSummary = async (ayId: number) => {
-    const [ay] = await db.select({ id: academicYears.id }).from(academicYears).where(eq(academicYears.id, ayId)).limit(1);
+    const [ay] = await db.select({ id: academicYears.id }).top(1).from(academicYears).where(eq(academicYears.id, ayId));
     if (!ay) throw new NotFoundError(`Academic year ${ayId} not found.`);
 
     const sessionCount = await db.select({ n: count() }).from(attendanceSessions).where(eq(attendanceSessions.academicYearId, ayId));
@@ -228,7 +296,7 @@ export const getAYAttendanceSummary = async (ayId: number) => {
             absent: Number(r.absent),
             late: Number(r.late),
             total: Number(r.total),
-            attendanceRate: r.total > 0 ? Math.round((Number(r.present) / Number(r.total)) * 100) : 0,
+            attendanceRate: Number(r.total) > 0 ? Math.round((Number(r.present) / Number(r.total)) * 100) : 0,
         })),
     };
 };

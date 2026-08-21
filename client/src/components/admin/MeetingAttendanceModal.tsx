@@ -180,7 +180,7 @@ export const MeetingAttendanceModal = ({ meetingId, meetingStatus, meetingType, 
                     </select>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-6">
+                <div className="flex-1 overflow-y-auto overflow-x-auto p-6">
                     {loading ? (
                         <div className="text-center py-8 text-gray-500">Loading...</div>
                     ) : (

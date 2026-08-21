@@ -55,6 +55,12 @@
   }
   body {
     @apply antialiased text-gray-900 bg-gray-50 bg-background text-foreground;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+  }
+  /* Ensure interactive elements meet 44px minimum touch target on mobile */
+  button, a, [role="button"] {
+    -webkit-tap-highlight-color: transparent;
   }
 }
 
@@ -68,5 +74,10 @@
   .scrollbar-hide::-webkit-scrollbar {
     /* Chrome, Safari and Opera */
     display: none;
+  }
+  /* Wraps tables for horizontal scroll on mobile. Use: <div class="table-scroll"><table>... */
+  .table-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
 }

@@ -7,18 +7,18 @@ import {
     rejectRegistration,
 } from '../controllers/registrationController';
 import { authenticateToken, requireAdmin } from '../middleware/auth';
+import { validateRequest } from '../middleware/validate';
+import { createRegistrationSchema } from '../lib/schemas/index';
 
 const router = Router();
 
 // Public routes
-router.post('/', createRegistration);
+router.post('/', validateRequest(createRegistrationSchema), createRegistration);
 router.get('/visitor/:visitorId', getRegistrationByVisitorId);
 
-// Protected routes for admins
-router.get('/event/:eventId', authenticateToken, getRegistrationsByEventId);
-
-// Admin approval workflow
-router.patch('/:id/approve', authenticateToken, requireAdmin, approveRegistration);
-router.patch('/:id/reject',  authenticateToken, requireAdmin, rejectRegistration);
+// Admin-only routes
+router.get('/event/:eventId', authenticateToken, requireAdmin, getRegistrationsByEventId);
+router.patch('/:id/approve',  authenticateToken, requireAdmin, approveRegistration);
+router.patch('/:id/reject',   authenticateToken, requireAdmin, rejectRegistration);
 
 export default router;

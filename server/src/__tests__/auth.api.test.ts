@@ -24,11 +24,11 @@ describe('Auth API Integration Tests', () => {
         });
 
         it('should return 401 for non-existent user', async () => {
-            // Mock db.select().from().where().limit() to return empty array
-            const mockLimit = vi.fn().mockResolvedValue([]);
-            const mockWhere = vi.fn().mockReturnValue({ limit: mockLimit });
+            // Mock db.select().top(1).from().where().fetch() to return empty array
+            const mockWhere = vi.fn().mockResolvedValue([]);
             const mockFrom = vi.fn().mockReturnValue({ where: mockWhere });
-            const mockSelect = vi.fn().mockReturnValue({ from: mockFrom });
+            const mockTop = vi.fn().mockReturnValue({ from: mockFrom });
+            const mockSelect = vi.fn().mockReturnValue({ from: mockFrom, top: mockTop });
             (db.select as any) = mockSelect;
 
             const res = await request(app)
@@ -36,7 +36,7 @@ describe('Auth API Integration Tests', () => {
                 .send({ email: 'test@example.com', password: 'password123' });
 
             expect(res.status).toBe(401);
-            expect(res.body.message).toBe('Invalid credentials');
+            expect(res.body.message).toBe('Invalid credentials.');
         });
 
         it('should login successfully for valid user', async () => {
@@ -49,12 +49,12 @@ describe('Auth API Integration Tests', () => {
                 isActive: true
             };
 
-            const mockLimit = vi.fn()
+            const mockWhere = vi.fn()
                 .mockResolvedValueOnce([]) // Admin check
                 .mockResolvedValueOnce([mockUser]); // Volunteer check
-            const mockWhere = vi.fn().mockReturnValue({ limit: mockLimit });
             const mockFrom = vi.fn().mockReturnValue({ where: mockWhere });
-            const mockSelect = vi.fn().mockReturnValue({ from: mockFrom });
+            const mockTop = vi.fn().mockReturnValue({ from: mockFrom });
+            const mockSelect = vi.fn().mockReturnValue({ from: mockFrom, top: mockTop });
             (db.select as any) = mockSelect;
 
             const res = await request(app)

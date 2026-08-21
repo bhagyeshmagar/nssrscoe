@@ -4,19 +4,35 @@ import {
     addEventImages,
     setMasterImage,
     deleteEventImage,
-    updateEventImage
+    updateEventImage,
 } from '../controllers/eventImagesController';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, requireAdmin } from '../middleware/auth';
+import { validateRequest } from '../middleware/validate';
+import { addEventImagesSchema, updateEventImageSchema } from '../lib/schemas/index';
 
 const router = Router();
 
-// Public route - get images for an event
+// Public: anyone can view event images
 router.get('/:eventId', getEventImages);
 
-// Protected routes
-router.post('/:eventId', authenticateToken, addEventImages);
-router.put('/:eventId/master/:imageId', authenticateToken, setMasterImage);
-router.put('/:imageId', authenticateToken, updateEventImage);
-router.delete('/:imageId', authenticateToken, deleteEventImage);
+// Admin-only mutations
+router.post('/:eventId',
+    authenticateToken, requireAdmin,
+    validateRequest(addEventImagesSchema),
+    addEventImages,
+);
+router.put('/:eventId/master/:imageId',
+    authenticateToken, requireAdmin,
+    setMasterImage,
+);
+router.put('/:imageId',
+    authenticateToken, requireAdmin,
+    validateRequest(updateEventImageSchema),
+    updateEventImage,
+);
+router.delete('/:imageId',
+    authenticateToken, requireAdmin,
+    deleteEventImage,
+);
 
 export default router;

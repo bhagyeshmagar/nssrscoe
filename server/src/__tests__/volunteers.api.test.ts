@@ -30,10 +30,10 @@ describe('Volunteers API Integration Tests', () => {
             ];
 
             // Mock the first DB query for getting the user's AY
-            const mockLimit = vi.fn().mockResolvedValue([{ academicYearId: 1 }]);
-            const mockWhere = vi.fn().mockReturnValue({ limit: mockLimit });
+            const mockWhere = vi.fn().mockResolvedValue([{ academicYearId: 1 }]);
             const mockFrom = vi.fn().mockReturnValue({ where: mockWhere });
-            const mockSelect = vi.fn().mockReturnValue({ from: mockFrom });
+            const mockTop = vi.fn().mockReturnValue({ from: mockFrom });
+            const mockSelect = vi.fn().mockReturnValue({ from: mockFrom, top: mockTop });
             (db.select as any) = mockSelect;
 
             // Mock the volService using spyOn

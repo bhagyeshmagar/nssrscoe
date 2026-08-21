@@ -151,9 +151,9 @@ export const getPublicVolunteers = async (req: Request, res: Response) => {
         // Find AY for the requesting volunteer
         const [vol] = await db
             .select({ academicYearId: volunteers.academicYearId })
-            .from(volunteers)
+            .top(1).from(volunteers)
             .where(eq(volunteers.id, volunteerUser.id))
-            .limit(1);
+            ;
         if (!vol) return res.status(404).json({ success: false, message: 'Volunteer not found.' });
 
         const result = await volService.listVolunteersForAY(vol.academicYearId, { isActive: true, sortBy: 'department' });
@@ -179,20 +179,33 @@ export const getExperiences = async (req: Request, res: Response) => {
                 fullName: volunteerProfiles.fullName,
                 profilePhotoUrl: volunteerProfiles.profilePhotoUrl,
                 experienceText: volunteerProfiles.experienceText,
+                isExperienceApproved: volunteerProfiles.isExperienceApproved,
                 collegeYearAtEnrollment: volunteerProfiles.collegeYearAtEnrollment,
             })
             .from(volunteerProfiles);
 
         const experiences = profiles
-            .filter(p => p.experienceText && p.experienceText.trim() !== '')
+            .filter(p => p.isExperienceApproved === true && p.experienceText && p.experienceText.trim() !== '')
             .map(p => ({
                 id: p.id,
                 name: p.fullName ?? 'Anonymous',
                 role: p.collegeYearAtEnrollment ? `Volunteer, ${p.collegeYearAtEnrollment}` : 'Volunteer',
                 text: p.experienceText,
-                image: p.profilePhotoUrl ?? 'https://i.pravatar.cc/150?img=1',
+                // Only return the stored photo URL — never an external placeholder
+                image: p.profilePhotoUrl ?? null,
             }));
 
         ok(res, experiences);
+    } catch (err) { handleError(res, err); }
+};
+
+export const approveVolunteerExperience = async (req: Request, res: Response) => {
+    try {
+        const id = parseInt(req.params.id, 10);
+        if (isNaN(id)) return res.status(400).json({ success: false, message: 'Invalid volunteer ID.' });
+
+        const adminUser = (req as AuthRequest).user!;
+        const updated = await volService.approveVolunteerExperience(id, adminUser.id);
+        ok(res, updated);
     } catch (err) { handleError(res, err); }
 };

@@ -46,9 +46,9 @@ describe('Gallery API Integration Tests', () => {
         it('should create a gallery item as admin', async () => {
             const newItem = { title: 'New Photo', imageUrl: '/uploads/new.jpg', description: 'New' };
             
-            const mockReturning = vi.fn().mockResolvedValue([{ id: 2, ...newItem }]);
-            const mockValues = vi.fn().mockReturnValue({ returning: mockReturning });
-            (db.insert as any) = vi.fn().mockReturnValue({ values: mockValues });
+            const mockValues = vi.fn().mockResolvedValue([{ id: 2, ...newItem }]);
+            const mockOutput = vi.fn().mockReturnValue({ values: mockValues });
+            (db.insert as any) = vi.fn().mockReturnValue({ values: mockValues, output: mockOutput });
 
             const res = await request(app)
                 .post('/api/gallery')

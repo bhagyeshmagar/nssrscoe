@@ -11,14 +11,7 @@ export const validateRequest = (schema: z.ZodSchema) => {
                 params: req.params,
             });
             next();
-        } catch (error: any) {
-            if (error instanceof z.ZodError || error?.name === 'ZodError') {
-                return res.status(400).json({
-                    success: false,
-                    message: 'Validation failed',
-                    errors: error.errors || error.issues,
-                });
-            }
+        } catch (error) {
             handleError(res, error);
         }
     };

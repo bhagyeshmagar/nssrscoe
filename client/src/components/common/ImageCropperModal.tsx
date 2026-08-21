@@ -4,6 +4,7 @@ import type { ReactCropperElement } from 'react-cropper';
 import 'cropperjs/dist/cropper.css';
 import { X, RotateCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import toast from 'react-hot-toast';
 
 interface ImageCropperModalProps {
     isOpen: boolean;
@@ -33,7 +34,7 @@ export default function ImageCropperModal({ isOpen, imageSrc, onClose, onCropCom
             });
 
             if (!canvas) {
-                alert('Could not crop image. Please try again.');
+                toast.error('Could not crop image. Please try again.');
                 setIsProcessing(false);
                 return;
             }
@@ -45,26 +46,27 @@ export default function ImageCropperModal({ isOpen, imageSrc, onClose, onCropCom
                         lastModified: Date.now(),
                     });
                     onCropComplete(croppedFile);
+                    onClose();
                 } else {
-                    alert('Failed to process image');
+                    toast.error('Failed to process image');
                 }
                 setIsProcessing(false);
             }, 'image/jpeg', 0.95);
         } catch (e) {
             console.error(e);
-            alert('Failed to crop image');
+            toast.error('Failed to crop image');
             setIsProcessing(false);
         }
     };
 
     const handleRotate = () => {
         const cropper = cropperRef.current?.cropper;
-        if (cropper) {
+        if (cropper && !isProcessing) {
             cropper.rotate(90);
         }
     };
 
-    if (!isOpen) return null;
+    if (!isOpen || !imageSrc) return null;
 
     return (
         <AnimatePresence>
@@ -114,12 +116,13 @@ export default function ImageCropperModal({ isOpen, imageSrc, onClose, onCropCom
                             <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-start">
                                 <button
                                     onClick={handleRotate}
-                                    className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors border border-gray-200 whitespace-nowrap"
+                                    disabled={isProcessing}
+                                    className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors border border-gray-200 whitespace-nowrap disabled:opacity-50"
                                 >
                                     <RotateCw className="w-4 h-4" /> Rotate 90°
                                 </button>
                                 <p className="text-sm text-gray-500 hidden sm:block">
-                                    {aspectRatio ? "Drag corners to resize." : "Drag borders and corners to freely adjust crop area."}
+                                    {aspectRatio !== undefined ? "Drag corners to resize." : "Drag borders and corners to freely adjust crop area."}
                                 </p>
                             </div>
                             <div className="flex gap-3 w-full sm:w-auto justify-end">

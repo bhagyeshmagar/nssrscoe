@@ -209,8 +209,20 @@ export const ProfileTab = ({ setMessage }: { setMessage: (msg: { type: 'success'
                     {renderInfoField("Portfolio Choices", profile.portfolioChoices?.split(',').filter(Boolean).join(', ') || '-')}
                 </div>
 
-                <div className="mt-6">
-                    {renderInfoField("Volunteering Experience", profile.experienceText || 'No experience shared yet.')}
+                <div className="mt-6 border-t pt-4">
+                    <div className="flex items-center justify-between mb-2">
+                        <label className="block text-sm font-medium text-gray-500">Volunteering Experience</label>
+                        {profile.experienceText ? (
+                            profile.isExperienceApproved ? (
+                                <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded font-medium">Approved & Public</span>
+                            ) : (
+                                <span className="bg-yellow-100 text-yellow-700 text-xs px-2 py-0.5 rounded font-medium">Pending Admin Approval</span>
+                            )
+                        ) : null}
+                    </div>
+                    <div className="text-sm font-medium text-gray-900 bg-gray-50 p-4 rounded-lg italic">
+                        {profile.experienceText || 'No experience shared yet.'}
+                    </div>
                 </div>
 
                 {profile.marksheetUrl && (
@@ -460,9 +472,20 @@ export const ProfileTab = ({ setMessage }: { setMessage: (msg: { type: 'success'
             </div>
 
             <div className="mt-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Volunteering Experience <span className="text-gray-400 text-xs font-normal">(Shown on public page)</span>
-                </label>
+                <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-medium text-gray-700">
+                        Volunteering Experience <span className="text-gray-400 text-xs font-normal">(Shown on public page)</span>
+                    </label>
+                    {profile.experienceText && !isEditing ? null : (
+                         profile.experienceText ? (
+                            profile.isExperienceApproved ? (
+                                <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded font-medium">Approved & Public</span>
+                            ) : (
+                                <span className="bg-yellow-100 text-yellow-700 text-xs px-2 py-0.5 rounded font-medium">Pending Admin Approval</span>
+                            )
+                        ) : null
+                    )}
+                </div>
                 <textarea
                     value={profile.experienceText}
                     onChange={(e) => setProfile((prev) => ({ ...prev, experienceText: e.target.value }))}
@@ -476,26 +499,48 @@ export const ProfileTab = ({ setMessage }: { setMessage: (msg: { type: 'success'
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                     Marksheet (PDF/DOCX/Image, max 5MB)
                 </label>
-                <div className="flex items-center gap-4">
-                    <input
-                        type="file"
-                        accept=".pdf,.docx,image/*"
-                        onChange={handleFileUpload}
-                        className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-nss-blue file:text-white hover:file:bg-blue-900"
-                        disabled={uploadingFile}
-                    />
-                    {uploadingFile && <span className="text-sm text-gray-500">Uploading...</span>}
-                </div>
-                {profile.marksheetUrl && (
-                    <div className="mt-2">
-                        <a
-                            href={uploadAPI.getFullUrl(profile.marksheetUrl)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-sm text-nss-blue hover:underline"
-                        >
-                            View uploaded marksheet
-                        </a>
+                
+                {profile.marksheetUrl ? (
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 bg-gray-50 border border-gray-200 p-4 rounded-lg">
+                        <div className="flex items-center gap-2 flex-1">
+                            <span className="text-green-600 bg-green-100 p-1.5 rounded-full">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                            </span>
+                            <a
+                                href={uploadAPI.getFullUrl(profile.marksheetUrl)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-sm font-medium text-nss-blue hover:underline"
+                            >
+                                Document Uploaded (Click to view)
+                            </a>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <label className="cursor-pointer text-sm font-medium text-gray-600 hover:text-gray-900 border border-gray-300 bg-white px-3 py-1.5 rounded-md shadow-sm transition">
+                                Replace
+                                <input
+                                    type="file"
+                                    accept=".pdf,.docx,image/*"
+                                    onChange={handleFileUpload}
+                                    className="hidden"
+                                    disabled={uploadingFile}
+                                />
+                            </label>
+                            {uploadingFile && <span className="text-sm text-gray-500">Uploading...</span>}
+                        </div>
+                    </div>
+                ) : (
+                    <div className="flex items-center gap-4">
+                        <input
+                            type="file"
+                            accept=".pdf,.docx,image/*"
+                            onChange={handleFileUpload}
+                            className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-nss-blue file:text-white hover:file:bg-blue-900 cursor-pointer"
+                            disabled={uploadingFile}
+                        />
+                        {uploadingFile && <span className="text-sm text-gray-500">Uploading...</span>}
                     </div>
                 )}
             </div>

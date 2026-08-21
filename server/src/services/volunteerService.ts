@@ -1,5 +1,6 @@
-import { eq, and, count, ne, sql, ilike, or } from 'drizzle-orm';
+import { eq, and, count, ne, sql, like, or } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import { db } from '../db';
 import {
     volunteers,
@@ -20,19 +21,23 @@ import {
     VolunteerCapExceededError,
 } from '../lib/errors';
 import { logAudit, auditVolunteerCreate } from './auditService';
+import { sendVolunteerWelcomeEmail, sendVolunteerBackupEmail, sendVolunteerRegularEmail } from './emailService';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type Department =
-    | 'Computer Engineering'
-    | 'Computer Science and Business Systems'
-    | 'Information Technology'
-    | 'Electronics and Telecommunication'
-    | 'Electrical Engineering'
-    | 'Automation and Robotics'
-    | 'Mechanical Engineering'
-    | 'Civil Engineering'
-    | 'Bachelor of Computer Applications';
+export const VALID_DEPARTMENTS = [
+    'Computer Engineering',
+    'Computer Science and Business Systems',
+    'Information Technology',
+    'Electronics and Telecommunication',
+    'Electrical Engineering',
+    'Automation and Robotics',
+    'Mechanical Engineering',
+    'Civil Engineering',
+    'Bachelor of Computer Applications'
+] as const;
+
+export type Department = typeof VALID_DEPARTMENTS[number];
 
 export interface CreateVolunteerInput {
     name: string;
@@ -64,9 +69,9 @@ export interface ListVolunteerFilters {
 const requireUnlockedAY = async (ayId: number) => {
     const [ay] = await db
         .select()
-        .from(academicYears)
+        .top(1).from(academicYears)
         .where(eq(academicYears.id, ayId))
-        .limit(1);
+        ;
     if (!ay) throw new NotFoundError(`Academic year ${ayId} not found.`);
     if (ay.isLocked) throw new AYLockedError(ay.label);
     return ay;
@@ -82,7 +87,7 @@ const countRegularVolunteers = async (ayId: number): Promise<number> => {
 };
 
 const findVolunteer = async (id: number) => {
-    const [v] = await db.select().from(volunteers).where(eq(volunteers.id, id)).limit(1);
+    const [v] = await db.select().top(1).from(volunteers).where(eq(volunteers.id, id));
     if (!v) throw new NotFoundError(`Volunteer ${id} not found.`);
     return v;
 };
@@ -91,12 +96,15 @@ const findVolunteer = async (id: number) => {
 
 export const listVolunteersForAY = async (ayId: number, filters: ListVolunteerFilters = {}) => {
     // Verify AY exists
-    const [ay] = await db.select({ id: academicYears.id }).from(academicYears).where(eq(academicYears.id, ayId)).limit(1);
+    const [ay] = await db.select({ id: academicYears.id }).top(1).from(academicYears).where(eq(academicYears.id, ayId));
     if (!ay) throw new NotFoundError(`Academic year ${ayId} not found.`);
 
     const conditions = [eq(volunteers.academicYearId, ayId)];
 
     if (filters.department) {
+        if (!VALID_DEPARTMENTS.includes(filters.department as Department)) {
+            throw new ValidationError('Invalid department filter.');
+        }
         conditions.push(eq(volunteers.department, filters.department as Department));
     }
     if (filters.status) {
@@ -108,44 +116,34 @@ export const listVolunteersForAY = async (ayId: number, filters: ListVolunteerFi
 
     if (filters.search) {
         const q = `%${filters.search}%`;
-        conditions.push(or(
-            ilike(volunteers.name, q),
-            ilike(volunteers.email, q),
-            ilike(volunteerProfiles.prnNo, q)
-        ) as any);
+        const searchCondition = or(
+            like(volunteers.name, q),
+            like(volunteers.email, q),
+            like(volunteerProfiles.prnNo, q)
+        );
+        if (searchCondition) conditions.push(searchCondition);
     }
 
+    const cases = VALID_DEPARTMENTS.map((dept, idx) => `WHEN '${dept}' THEN ${idx + 1}`).join(' ');
     let orderClause: any[] = [volunteers.name];
     if (filters.sortBy === 'department') {
         orderClause = [
-            sql`CASE ${volunteers.department}
-                WHEN 'Computer Engineering' THEN 1
-                WHEN 'Computer Science and Business Systems' THEN 2
-                WHEN 'Information Technology' THEN 3
-                WHEN 'Electronics and Telecommunication' THEN 4
-                WHEN 'Electrical Engineering' THEN 5
-                WHEN 'Automation and Robotics' THEN 6
-                WHEN 'Mechanical Engineering' THEN 7
-                WHEN 'Civil Engineering' THEN 8
-                WHEN 'Bachelor of Computer Applications' THEN 9
-                ELSE 10
-            END`,
+            sql.raw(`CASE department ${cases} ELSE 99 END`),
             volunteers.name
         ];
     }
 
     const page = filters.page || 1;
-    const limit = filters.limit || 50;
+    let limit = filters.limit || 50;
+    if (limit > 1000) limit = 1000;
 
-    const [totalRow] = await db
+    const countQuery = db
         .select({ count: count() })
         .from(volunteers)
         .leftJoin(volunteerProfiles, eq(volunteers.id, volunteerProfiles.volunteerId))
         .where(and(...conditions));
-        
-    const total = Number(totalRow.count);
 
-    const rows = await db
+    const rowsQuery = db
         .select({
             id: volunteers.id,
             name: volunteers.name,
@@ -158,7 +156,7 @@ export const listVolunteersForAY = async (ayId: number, filters: ListVolunteerFi
             // Full profile needed by admin dashboard modal
             profile: volunteerProfiles,
             eventsAttendedCount: sql<number>`(
-                SELECT count(*)::int
+                SELECT count(*)
                 FROM ${attendanceRecords}
                 WHERE ${attendanceRecords.volunteerId} = ${volunteers.id}
                   AND ${attendanceRecords.status} = 'present'
@@ -168,8 +166,12 @@ export const listVolunteersForAY = async (ayId: number, filters: ListVolunteerFi
         .leftJoin(volunteerProfiles, eq(volunteers.id, volunteerProfiles.volunteerId))
         .where(and(...conditions))
         .orderBy(...orderClause)
-        .limit(limit)
-        .offset((page - 1) * limit);
+        .offset((page - 1) * limit)
+        .fetch(limit);
+
+    const [[totalRow], rows] = await Promise.all([countQuery, rowsQuery]);
+        
+    const total = Number(totalRow.count);
 
     return {
         data: rows,
@@ -188,16 +190,16 @@ export const getVolunteerById = async (id: number) => {
             volunteers: volunteers,
             profile: volunteerProfiles,
             eventsAttendedCount: sql<number>`(
-                SELECT count(*)::int
+                SELECT count(*)
                 FROM ${attendanceRecords}
                 WHERE ${attendanceRecords.volunteerId} = ${volunteers.id}
                   AND ${attendanceRecords.status} = 'present'
             )`.as('events_attended_count'),
         })
-        .from(volunteers)
+        .top(1).from(volunteers)
         .leftJoin(volunteerProfiles, eq(volunteers.id, volunteerProfiles.volunteerId))
         .where(eq(volunteers.id, id))
-        .limit(1);
+        ;
     if (!row) throw new NotFoundError(`Volunteer ${id} not found.`);
     return { ...row.volunteers, profile: row.profile, eventsAttendedCount: row.eventsAttendedCount };
 };
@@ -241,43 +243,59 @@ export const createVolunteer = async (
     const ay = await requireUnlockedAY(ayId);
     const status = input.status ?? 'regular';
 
-    // Enforce cap: 100 regular volunteers per AY
-    if (status === 'regular') {
-        const current = await countRegularVolunteers(ayId);
-        if (current >= ay.volunteerCap) {
-            throw new VolunteerCapExceededError(ay.volunteerCap);
-        }
+    if (input.password.length < 8) {
+        throw new ValidationError('Password must be at least 8 characters.');
     }
 
-    if (input.password.length < 6) {
-        throw new ValidationError('Password must be at least 6 characters.');
+    if (!VALID_DEPARTMENTS.includes(input.department)) {
+        throw new ValidationError('Invalid department.');
     }
-
-    // Email uniqueness across entire system
-    const [existing] = await db
-        .select({ id: volunteers.id })
-        .from(volunteers)
-        .where(eq(volunteers.email, input.email.toLowerCase().trim()))
-        .limit(1);
-    if (existing) throw new ConflictError(`Email "${input.email}" is already registered.`);
 
     const passwordHash = await bcrypt.hash(input.password, 10);
 
-    const [newVol] = await db.insert(volunteers).values({
-        academicYearId: ayId,
-        name: input.name.trim(),
-        email: input.email.toLowerCase().trim(),
-        passwordHash,
-        department: input.department,
-        status,
-        isActive: true,
-        createdById: adminId,
-    }).returning();
+    const newVol = await db.transaction(async (tx) => {
+        // Enforce cap: 100 regular volunteers per AY
+        if (status === 'regular') {
+            await tx.execute(sql`EXEC sp_getapplock @Resource=${'AY_CAP_' + ayId}, @LockMode='Exclusive', @LockOwner='Transaction', @LockTimeout=5000`);
+            const [row] = await tx.select({ n: count() }).from(volunteers).where(and(eq(volunteers.academicYearId, ayId), eq(volunteers.status, 'regular')));
+            if (Number(row.n) >= ay.volunteerCap) {
+                throw new VolunteerCapExceededError(ay.volunteerCap);
+            }
+        }
 
-    // Create empty profile
-    await db.insert(volunteerProfiles).values({ volunteerId: newVol.id });
+        try {
+            const [inserted] = await tx.insert(volunteers).output().values({
+                academicYearId: ayId,
+                name: input.name.trim(),
+                email: input.email.toLowerCase().trim(),
+                passwordHash,
+                department: input.department,
+                status,
+                isActive: true,
+                createdById: adminId,
+            });
+
+            // Create empty profile
+            await tx.insert(volunteerProfiles).values({ volunteerId: inserted.id });
+            
+            return inserted;
+        } catch (err: any) {
+            if (err?.number === 2627 || err?.number === 2601) {
+                throw new ConflictError(`Email "${input.email}" is already registered.`);
+            }
+            throw err;
+        }
+    });
 
     await auditVolunteerCreate(newVol.id, adminId, ayId, newVol.name);
+
+    // Send welcome email with credentials (fire-and-forget, never blocks creation)
+    sendVolunteerWelcomeEmail({
+        name: newVol.name,
+        email: newVol.email,
+        password: input.password, // plaintext password before hashing
+        department: newVol.department,
+    }, adminId).catch(e => console.error('[createVolunteer] welcome email error:', e));
 
     return newVol;
 };
@@ -288,36 +306,36 @@ export const updateVolunteer = async (id: number, input: UpdateVolunteerInput, a
     const vol = await findVolunteer(id);
     await requireUnlockedAY(vol.academicYearId);
 
-    if (input.email && input.email !== vol.email) {
-        const [dup] = await db
-            .select({ id: volunteers.id })
-            .from(volunteers)
-            .where(and(eq(volunteers.email, input.email), ne(volunteers.id, id)))
-            .limit(1);
-        if (dup) throw new ConflictError(`Email "${input.email}" is already registered.`);
+    try {
+        const [updated] = await db
+            .update(volunteers)
+            .set({
+                ...(input.name && { name: input.name.trim() }),
+                ...(input.email && { email: input.email.toLowerCase().trim() }),
+                ...(input.department && { department: input.department }),
+                updatedAt: new Date(),
+            })
+            .where(eq(volunteers.id, id)).output();
+
+        await logAudit({ action: 'volunteer.update', entityType: 'volunteer', entityId: id, performedById: adminId, academicYearId: vol.academicYearId, details: input as unknown as Record<string, unknown> });
+        return updated;
+    } catch (err: any) {
+        if (err?.number === 2627 || err?.number === 2601) {
+            throw new ConflictError(`Email "${input.email}" is already registered.`);
+        }
+        throw err;
     }
-
-    const [updated] = await db
-        .update(volunteers)
-        .set({
-            ...(input.name && { name: input.name.trim() }),
-            ...(input.email && { email: input.email.toLowerCase().trim() }),
-            ...(input.department && { department: input.department }),
-            updatedAt: new Date(),
-        })
-        .where(eq(volunteers.id, id))
-        .returning();
-
-    await logAudit({ action: 'volunteer.update', entityType: 'volunteer', entityId: id, performedById: adminId, academicYearId: vol.academicYearId, details: input as unknown as Record<string, unknown> });
-
-    return updated;
 };
+
 
 /** Update the volunteer's own profile fields (not auth fields). */
 export const updateVolunteerProfile = async (volunteerId: number, profileData: Record<string, unknown>) => {
     const vol = await findVolunteer(volunteerId);
-    const ay = await db.select({ isLocked: academicYears.isLocked, label: academicYears.label }).from(academicYears).where(eq(academicYears.id, vol.academicYearId)).limit(1);
-    if (ay[0]?.isLocked) throw new AYLockedError(ay[0]?.label);
+    const [ay] = await db
+        .select({ isLocked: academicYears.isLocked, label: academicYears.label })
+        .top(1).from(academicYears)
+        .where(eq(academicYears.id, vol.academicYearId));
+    if (ay?.isLocked) throw new AYLockedError(ay.label);
 
     const allowedFields = [
         'fullName', 'prnNo', 'collegeYearAtEnrollment', 'nssYear', 'marksheetUrl',
@@ -325,35 +343,59 @@ export const updateVolunteerProfile = async (volunteerId: number, profileData: R
         'phoneNo', 'emailId', 'profilePhotoUrl', 'experienceText',
     ];
 
-    const update: Record<string, unknown> = { updatedAt: new Date() };
+    const [existingProfile] = await db
+        .select()
+        .from(volunteerProfiles)
+        .where(eq(volunteerProfiles.volunteerId, volunteerId));
+
+    const profileUpdate: Record<string, unknown> = { updatedAt: new Date() };
     for (const field of allowedFields) {
-        if (field in profileData) update[field] = profileData[field];
+        if (field in profileData) profileUpdate[field] = profileData[field];
     }
 
+    if (
+        profileData.experienceText !== undefined &&
+        profileData.experienceText !== existingProfile?.experienceText
+    ) {
+        profileUpdate.isExperienceApproved = false;
+    }
+
+    // Update volunteers.department if provided (kept in sync)
     if (profileData.department) {
-        update.department = profileData.department;
+        profileUpdate.department = profileData.department;
         await db
             .update(volunteers)
-            .set({ department: profileData.department as any })
+            .set({ department: profileData.department as Department })
             .where(eq(volunteers.id, volunteerId));
     }
 
     const [updated] = await db
         .update(volunteerProfiles)
-        .set(update)
+        .set(profileUpdate)
         .where(eq(volunteerProfiles.volunteerId, volunteerId))
-        .returning();
-
-    if (!updated) {
-        // Profile row doesn't exist yet — create it
-        const [newProfile] = await db
-            .insert(volunteerProfiles)
-            .values({ volunteerId, ...update })
-            .returning();
-        return { ...newProfile, department: profileData.department };
+        .output();
+        
+    if (updated) {
+        return { ...updated, department: profileData.department };
     }
 
-    return { ...updated, department: profileData.department };
+    try {
+        const [newProfile] = await db
+            .insert(volunteerProfiles)
+            .output().values({ volunteerId, ...profileUpdate });
+        return { ...newProfile, department: profileData.department };
+    } catch (err: any) {
+        if (err?.number === 2627 || err?.number === 2601) {
+            // Raced with another insert, try update again
+            const [retryUpdated] = await db
+                .update(volunteerProfiles)
+                .set(profileUpdate)
+                .where(eq(volunteerProfiles.volunteerId, volunteerId))
+                .output();
+            return { ...retryUpdated, department: profileData.department };
+        }
+        throw err;
+    }
 };
 
 // ── Status changes ────────────────────────────────────────────────────────────
@@ -370,21 +412,39 @@ export const changeVolunteerStatus = async (
         throw new ConflictError(`Volunteer is already "${newStatus}".`);
     }
 
-    // Moving to regular: check cap
-    if (newStatus === 'regular') {
-        const current = await countRegularVolunteers(vol.academicYearId);
-        if (current >= ay.volunteerCap) {
-            throw new VolunteerCapExceededError(ay.volunteerCap);
+    const updated = await db.transaction(async (tx) => {
+        if (newStatus === 'regular') {
+            await tx.execute(sql`EXEC sp_getapplock @Resource=${'AY_CAP_' + vol.academicYearId}, @LockMode='Exclusive', @LockOwner='Transaction', @LockTimeout=5000`);
+            const [row] = await tx.select({ n: count() }).from(volunteers).where(and(eq(volunteers.academicYearId, vol.academicYearId), eq(volunteers.status, 'regular')));
+            if (Number(row.n) >= ay.volunteerCap) {
+                throw new VolunteerCapExceededError(ay.volunteerCap);
+            }
         }
-    }
 
-    const [updated] = await db
-        .update(volunteers)
-        .set({ status: newStatus, updatedAt: new Date() })
-        .where(eq(volunteers.id, id))
-        .returning();
+        const [res] = await tx
+            .update(volunteers)
+            .set({ status: newStatus, updatedAt: new Date() })
+            .where(eq(volunteers.id, id))
+            .output();
+        return res;
+    });
 
     await logAudit({ action: 'volunteer.status_change', entityType: 'volunteer', entityId: id, performedById: adminId, academicYearId: vol.academicYearId, details: { from: vol.status, to: newStatus } });
+
+    // Notify the volunteer if they've been moved to backup status
+    if (newStatus === 'backup') {
+        sendVolunteerBackupEmail({
+            name: vol.name,
+            email: vol.email,
+            department: vol.department,
+        }, adminId).catch(e => console.error('[changeVolunteerStatus] backup email error:', e));
+    } else if (newStatus === 'regular' && vol.status === 'backup') {
+        sendVolunteerRegularEmail({
+            name: vol.name,
+            email: vol.email,
+            department: vol.department,
+        }, adminId).catch(e => console.error('[changeVolunteerStatus] regular email error:', e));
+    }
 
     return updated;
 };
@@ -397,7 +457,7 @@ export const toggleVolunteerActive = async (id: number, adminId: number) => {
         .update(volunteers)
         .set({ isActive: !vol.isActive, updatedAt: new Date() })
         .where(eq(volunteers.id, id))
-        .returning();
+        .output();
 
     await logAudit({ action: 'volunteer.toggle_active', entityType: 'volunteer', entityId: id, performedById: adminId, academicYearId: vol.academicYearId, details: { isActive: updated.isActive } });
 
@@ -408,10 +468,37 @@ export const deleteVolunteer = async (id: number, adminId: number) => {
     const vol = await findVolunteer(id);
     await requireUnlockedAY(vol.academicYearId);
 
-    await db.delete(volunteers).where(eq(volunteers.id, id));
+    const [updated] = await db
+        .update(volunteers)
+        .set({ isActive: false, updatedAt: new Date() })
+        .where(eq(volunteers.id, id))
+        .output();
 
-    await logAudit({ action: 'volunteer.delete', entityType: 'volunteer', entityId: id, performedById: adminId, academicYearId: vol.academicYearId, details: { name: vol.name, email: vol.email } });
+    await logAudit({ action: 'volunteer.delete', entityType: 'volunteer', entityId: id, performedById: adminId, academicYearId: vol.academicYearId });
+
+    return updated;
 };
+
+export const approveVolunteerExperience = async (volunteerId: number, adminId: number) => {
+    const vol = await findVolunteer(volunteerId);
+    
+    const [updatedProfile] = await db
+        .update(volunteerProfiles)
+        .set({ isExperienceApproved: true, updatedAt: new Date() })
+        .where(eq(volunteerProfiles.volunteerId, volunteerId))
+        .output();
+        
+    await logAudit({ 
+        action: 'volunteer.approve_experience', 
+        entityType: 'volunteer', 
+        entityId: volunteerId, 
+        performedById: adminId, 
+        academicYearId: vol.academicYearId 
+    });
+
+    return updatedProfile;
+};
+
 
 // ── Import from previous AY ───────────────────────────────────────────────────
 
@@ -432,61 +519,76 @@ export const importVolunteersFromAY = async (input: ImportVolunteerInput, adminI
         errors: [],
     };
 
-    for (const sourceId of input.sourceVolunteerIds) {
-        try {
-            const source = await getVolunteerById(sourceId);
+    if (input.sourceVolunteerIds.length === 0) return results;
 
-            // Check cap before each regular import
-            if (defaultStatus === 'regular') {
-                const current = await countRegularVolunteers(input.targetAyId);
-                if (current >= targetAy.volunteerCap) {
-                    results.skipped.push(`${source.name} — cap reached`);
+    await db.transaction(async (tx) => {
+        if (defaultStatus === 'regular') {
+            await tx.execute(sql`EXEC sp_getapplock @Resource=${'AY_CAP_' + input.targetAyId}, @LockMode='Exclusive', @LockOwner='Transaction', @LockTimeout=5000`);
+        }
+        
+        let currentCap = 0;
+        if (defaultStatus === 'regular') {
+            const [row] = await tx.select({ n: count() }).from(volunteers).where(and(eq(volunteers.academicYearId, input.targetAyId), eq(volunteers.status, 'regular')));
+            currentCap = Number(row.n);
+        }
+
+        for (const sourceId of input.sourceVolunteerIds) {
+            try {
+                const [source] = await tx.select({
+                    volunteers: volunteers,
+                    profile: volunteerProfiles,
+                }).from(volunteers).leftJoin(volunteerProfiles, eq(volunteers.id, volunteerProfiles.volunteerId)).where(eq(volunteers.id, sourceId));
+                
+                if (!source) {
+                    results.errors.push(`Volunteer ${sourceId}: not found`);
                     continue;
                 }
+
+                if (defaultStatus === 'regular' && currentCap >= targetAy.volunteerCap) {
+                    results.skipped.push(`${source.volunteers.name} — cap reached`);
+                    continue;
+                }
+
+                const password = input.resetPassword ?? crypto.randomBytes(4).toString('hex');
+                const passwordHash = await bcrypt.hash(password, 10);
+
+                try {
+                    const [newVol] = await tx.insert(volunteers).output().values({
+                        academicYearId: input.targetAyId,
+                        name: source.volunteers.name,
+                        email: source.volunteers.email,
+                        passwordHash,
+                        department: source.volunteers.department,
+                        status: defaultStatus,
+                        isActive: true,
+                        createdById: adminId,
+                    });
+
+                    if (source.profile) {
+                        const { volunteerId: _, id: __, updatedAt: ___, ...profileCopy } = source.profile as Record<string, unknown>;
+                        await tx.insert(volunteerProfiles).values({
+                            volunteerId: newVol.id,
+                            ...(profileCopy as Partial<typeof volunteerProfiles.$inferInsert>),
+                        });
+                    } else {
+                        await tx.insert(volunteerProfiles).values({ volunteerId: newVol.id });
+                    }
+                    
+                    if (defaultStatus === 'regular') currentCap++;
+                    results.imported.push(source.volunteers.name);
+
+                } catch (err: any) {
+                    if (err?.number === 2627 || err?.number === 2601) {
+                        results.skipped.push(`${source.volunteers.name} — already in target AY`);
+                    } else {
+                        throw err;
+                    }
+                }
+            } catch (err) {
+                results.errors.push(`Volunteer ${sourceId}: ${err instanceof Error ? err.message : 'unknown error'}`);
             }
-
-            // Check if this email already exists in target AY
-            const [dup] = await db
-                .select({ id: volunteers.id })
-                .from(volunteers)
-                .where(and(eq(volunteers.email, source.email), eq(volunteers.academicYearId, input.targetAyId)))
-                .limit(1);
-
-            if (dup) {
-                results.skipped.push(`${source.name} — already in target AY`);
-                continue;
-            }
-
-            const password = input.resetPassword ?? Math.random().toString(36).slice(-8);
-            const passwordHash = await bcrypt.hash(password, 10);
-
-            const [newVol] = await db.insert(volunteers).values({
-                academicYearId: input.targetAyId,
-                name: source.name,
-                email: source.email,
-                passwordHash,
-                department: source.department,
-                status: defaultStatus,
-                isActive: true,
-                createdById: adminId,
-            }).returning();
-
-            // Copy profile data
-            if (source.profile) {
-                const { volunteerId: _, id: __, updatedAt: ___, ...profileCopy } = source.profile as Record<string, unknown>;
-                await db.insert(volunteerProfiles).values({
-                    volunteerId: newVol.id,
-                    ...(profileCopy as Partial<typeof volunteerProfiles.$inferInsert>),
-                });
-            } else {
-                await db.insert(volunteerProfiles).values({ volunteerId: newVol.id });
-            }
-
-            results.imported.push(source.name);
-        } catch (err) {
-            results.errors.push(`Volunteer ${sourceId}: ${err instanceof Error ? err.message : 'unknown error'}`);
         }
-    }
+    });
 
     await logAudit({ action: 'volunteer.import', entityType: 'academic_year', entityId: input.targetAyId, performedById: adminId, academicYearId: input.targetAyId, details: { count: results.imported.length, skipped: results.skipped.length } });
 
@@ -496,13 +598,13 @@ export const importVolunteersFromAY = async (input: ImportVolunteerInput, adminI
 // ── Password ──────────────────────────────────────────────────────────────────
 
 export const changePassword = async (volunteerId: number, currentPassword: string, newPassword: string) => {
-    const [vol] = await db.select().from(volunteers).where(eq(volunteers.id, volunteerId)).limit(1);
+    const [vol] = await db.select().top(1).from(volunteers).where(eq(volunteers.id, volunteerId));
     if (!vol) throw new NotFoundError('Volunteer not found.');
 
     const valid = await bcrypt.compare(currentPassword, vol.passwordHash);
     if (!valid) throw new ValidationError('Current password is incorrect.');
 
-    if (newPassword.length < 6) throw new ValidationError('New password must be at least 6 characters.');
+    if (newPassword.length < 8) throw new ValidationError('New password must be at least 8 characters.');
 
     const hash = await bcrypt.hash(newPassword, 10);
     await db.update(volunteers).set({ passwordHash: hash, updatedAt: new Date() }).where(eq(volunteers.id, volunteerId));

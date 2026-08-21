@@ -36,7 +36,7 @@ const Footer = () => {
                             </a>
                         </p>
                         <p className="text-gray-400 text-sm">Tathawade, Pune</p>
-                        <p className="text-gray-400 text-sm mt-2">Email: {settings.contactEmail || 'nss@jspmrscoe.edu.in'}</p>
+                        <p className="text-gray-400 text-sm mt-2">Email: {settings.contactEmail || 'nssrscoe073@gmail.com'}</p>
                     </div>
                     <div>
                         <h3 className="text-lg font-semibold mb-4">Follow Us</h3>

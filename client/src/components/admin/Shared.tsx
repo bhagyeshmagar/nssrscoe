@@ -3,17 +3,7 @@ import type { AcademicYear } from '../../services/api';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 
-export const DEPT_LIST: import('../../services/api').Department[] = [
-    'Computer Engineering',
-    'Computer Science and Business Systems',
-    'Information Technology',
-    'Electronics and Telecommunication',
-    'Electrical Engineering',
-    'Automation and Robotics',
-    'Mechanical Engineering',
-    'Civil Engineering',
-    'Bachelor of Computer Applications',
-];
+
 
 export const AYStatusBadge = ({ ay }: { ay: AcademicYear }) => {
     if (ay.isArchived) return <Badge variant="secondary" className="bg-gray-200 text-gray-700 hover:bg-gray-300">Archived</Badge>;
@@ -83,7 +73,8 @@ export function useAYSelector(years: AcademicYear[], currentAY: AcademicYear | n
     const [selectedAyId, setSelectedAyId] = useState<number>(currentAY?.id ?? (years[0]?.id || 0));
     
     useEffect(() => {
-        if (!selectedAyId && years.length > 0) {
+        const stillExists = years.some(y => y.id === selectedAyId);
+        if ((!selectedAyId || !stillExists) && years.length > 0) {
             setSelectedAyId(currentAY?.id ?? years[0].id);
         }
     }, [currentAY, years, selectedAyId]);
@@ -96,6 +87,15 @@ export function useAYSelector(years: AcademicYear[], currentAY: AcademicYear | n
 export const PasswordPromptModal = ({ isOpen, onSubmit, onClose, targetLabel }: { isOpen: boolean, onSubmit: (pwd: string) => Promise<boolean>, onClose: () => void, targetLabel: string }) => {
     const [pwd, setPwd] = useState('');
     const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        const handleEsc = (e: KeyboardEvent) => {
+            if (e.key === 'Escape' && isOpen) onClose();
+        };
+        window.addEventListener('keydown', handleEsc);
+        return () => window.removeEventListener('keydown', handleEsc);
+    }, [isOpen, onClose]);
+
     if (!isOpen) return null;
 
     const handleSubmit = async () => {
@@ -130,6 +130,50 @@ export const PasswordPromptModal = ({ isOpen, onSubmit, onClose, targetLabel }: 
                 <div className="p-4 bg-gray-50 flex justify-end gap-2 border-t">
                     <button onClick={() => { onClose(); setPwd(''); }} disabled={loading} className="px-4 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-200 disabled:opacity-50">Cancel</button>
                     <button onClick={handleSubmit} disabled={!pwd.trim() || loading} className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 text-sm font-medium disabled:opacity-50">{loading ? 'Unlocking...' : 'Unlock'}</button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export const ConfirmModal = ({ isOpen, title, message, confirmText = 'Confirm', onConfirm, onClose }: { isOpen: boolean, title: string, message: string, confirmText?: string, onConfirm: () => void | Promise<void>, onClose: () => void }) => {
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        const handleEsc = (e: KeyboardEvent) => {
+            if (e.key === 'Escape' && isOpen) onClose();
+        };
+        window.addEventListener('keydown', handleEsc);
+        return () => window.removeEventListener('keydown', handleEsc);
+    }, [isOpen, onClose]);
+
+    if (!isOpen) return null;
+
+    const handleConfirm = async () => {
+        if (loading) return;
+        setLoading(true);
+        try {
+            await onConfirm();
+            onClose();
+        } catch (error) {
+            console.error('Error in ConfirmModal onConfirm:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden">
+                <div className="p-4 border-b bg-gray-50">
+                    <h3 className="font-bold text-gray-800">{title}</h3>
+                </div>
+                <div className="p-4">
+                    <p className="text-sm text-gray-700">{message}</p>
+                </div>
+                <div className="p-4 bg-gray-50 flex justify-end gap-2 border-t">
+                    <button autoFocus onClick={onClose} disabled={loading} className="px-4 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-200 disabled:opacity-50">Cancel</button>
+                    <button onClick={handleConfirm} disabled={loading} className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm font-medium disabled:opacity-50">{loading ? 'Processing...' : confirmText}</button>
                 </div>
             </div>
         </div>

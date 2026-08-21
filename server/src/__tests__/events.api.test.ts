@@ -47,16 +47,16 @@ describe('Events API Integration Tests', () => {
             const newEvent = { title: 'New Event', date: '2026-06-06', description: 'desc', location: 'Lab' };
             
             // Mock the Academic Year lookup
-            const mockLimit = vi.fn().mockResolvedValue([{ id: 1, isLocked: false }]);
-            const mockWhere = vi.fn().mockReturnValue({ limit: mockLimit });
+            const mockWhere = vi.fn().mockResolvedValue([{ id: 1, isLocked: false }]);
             const mockFrom = vi.fn().mockReturnValue({ where: mockWhere });
-            const mockSelect = vi.fn().mockReturnValue({ from: mockFrom });
+            const mockTop = vi.fn().mockReturnValue({ from: mockFrom });
+            const mockSelect = vi.fn().mockReturnValue({ from: mockFrom, top: mockTop });
             (db.select as any) = mockSelect;
 
             // Mock the insert
-            const mockReturning = vi.fn().mockResolvedValue([{ id: 3, ...newEvent }]);
-            const mockValues = vi.fn().mockReturnValue({ returning: mockReturning });
-            (db.insert as any) = vi.fn().mockReturnValue({ values: mockValues });
+            const mockValues = vi.fn().mockResolvedValue([{ id: 3, ...newEvent }]);
+            const mockOutput = vi.fn().mockReturnValue({ values: mockValues });
+            (db.insert as any) = vi.fn().mockReturnValue({ values: mockValues, output: mockOutput });
 
             const res = await request(app)
                 .post('/api/events')

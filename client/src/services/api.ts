@@ -136,6 +136,8 @@ export const volunteersAPI = {
         api.patch<VolunteerData>(`/academic-years/${ayId}/volunteers/${id}/status`, { status }),
     toggleActive:(ayId: number, id: number) =>
         api.patch<VolunteerData>(`/academic-years/${ayId}/volunteers/${id}/toggle-active`),
+    approveExperience:(ayId: number, id: number) =>
+        api.patch<VolunteerData>(`/academic-years/${ayId}/volunteers/${id}/approve-experience`),
     import:      (ayId: number, data: ImportVolunteerData) =>
         api.post(`/academic-years/${ayId}/volunteers/import`, data),
     // Legacy public/self-service
@@ -458,6 +460,7 @@ export interface VolunteerProfileData {
     emailId?: string;
     profilePhotoUrl?: string;
     experienceText?: string;
+    isExperienceApproved?: boolean;
     portfolioChoices?: string;
 }
 
@@ -632,7 +635,9 @@ export interface SiteSettings {
     statEventsCount?: string; statEventsLabel?: string;
     statVolunteersCount?: string; statVolunteersLabel?: string;
     statImpactCount?: string; statImpactLabel?: string;
-    aboutMission?: string; aboutHistory?: string; aboutText?: string; aboutTeamPhoto?: string;
+    statCampsCount?: string; statCampsLabel?: string;
+    statHoursCount?: string; statHoursLabel?: string;
+    aboutTitle?: string; aboutMission?: string; aboutHistory?: string; aboutText?: string; aboutTeamPhoto?: string;
     aboutDirectorMessage?: string; aboutDirectorName?: string; aboutDirectorPhoto?: string;
     aboutPoMessage?: string; aboutPoName?: string; aboutPoPhoto?: string;
     contactEmail?: string; contactPhone?: string; contactAddress?: string;
@@ -736,5 +741,60 @@ export interface AppNotification {
     createdAt: string;
 }
 
+// ── HOD Contacts ──────────────────────────────────────────────────────────────
+
+export interface HodContact {
+    id: number;
+    department: string;
+    name: string;
+    email: string;
+    isActive: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export const hodAPI = {
+    getAll: () => api.get<HodContact[]>('/hod-contacts'),
+    upsert: (department: string, name: string, email: string) =>
+        api.put<HodContact>(`/hod-contacts/${encodeURIComponent(department)}`, { name, email }),
+    update: (id: number, data: Partial<Pick<HodContact, 'name' | 'email' | 'isActive'>>) =>
+        api.patch<HodContact>(`/hod-contacts/${id}`, data),
+    delete: (id: number) => api.delete(`/hod-contacts/${id}`),
+};
+
+// ── Email Logs ────────────────────────────────────────────────────────────────
+
+export interface EmailLog {
+    id: number;
+    emailType: string;
+    subject: string;
+    recipientEmail: string;
+    recipientName?: string;
+    status: 'sent' | 'failed';
+    errorMessage?: string;
+    metadata?: Record<string, any>;
+    sentByAdminId?: number;
+    sentAt: string;
+}
+
+export interface EmailStats {
+    total: number;
+    totalSent: number;
+    totalFailed: number;
+    successRate: number;
+    byType: { emailType: string; total: number; sent: number; failed: number }[];
+    recentLogs: EmailLog[];
+    emailTypes: string[];
+}
+
+export const emailLogsAPI = {
+    getLogs: (params?: { emailType?: string; status?: string; page?: number; limit?: number }) =>
+        api.get<{ data: EmailLog[]; page: number; limit: number }>('/email/logs', { params }),
+    getStats: () => api.get<EmailStats>('/email/logs/stats'),
+    sendAttendanceReport: (ayId: number, eventId: number) =>
+        api.post<{ sent: number; failed: number; results: any[] }>('/email/send-attendance-report', { ayId, eventId }),
+};
+
 
 export default api;
+

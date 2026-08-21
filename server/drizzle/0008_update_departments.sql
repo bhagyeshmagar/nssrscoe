@@ -1,4 +1,0 @@
-ALTER TYPE department ADD VALUE IF NOT EXISTS 'Computer Science and Business Systems';
-ALTER TYPE department ADD VALUE IF NOT EXISTS 'Electronics and Telecommunication';
-ALTER TYPE department ADD VALUE IF NOT EXISTS 'Automation and Robotics';
-ALTER TYPE department ADD VALUE IF NOT EXISTS 'Bachelor of Computer Applications';

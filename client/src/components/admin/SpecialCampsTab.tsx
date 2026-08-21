@@ -237,7 +237,7 @@ export const SpecialCampsTab = ({ years, currentAY }: { years: AcademicYear[]; c
                         <div className="flex justify-between items-start">
                             <div>
                                 <div className="flex items-center gap-3 mb-1"><span className="font-bold text-gray-800">{c.name}</span>{c.isFinalized ? <span className="px-2 py-0.5 text-xs rounded-full bg-gray-200 text-gray-600">Finalized</span> : <span className="px-2 py-0.5 text-xs rounded-full bg-yellow-100 text-yellow-700">Draft</span>}</div>
-                                <p className="text-sm text-gray-500">{c.location} · {c.startDate} → {c.endDate}</p>
+                                <p className="text-sm text-gray-500">{c.location} · {c.startDate.split('T')[0]} → {c.endDate.split('T')[0]}</p>
                             </div>
                             {selectedAY && !selectedAY.isLocked && (
                                 <div className="flex gap-2">

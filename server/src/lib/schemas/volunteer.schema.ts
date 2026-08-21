@@ -1,25 +1,12 @@
 import { z } from 'zod';
-import { departmentEnum, volunteerStatusEnum } from '../../db/schema';
-
-// We extract enum values directly from the schema if possible, or redefine them here for zod
-const DEPARTMENTS = [
-    'Computer Engineering',
-    'Computer Science and Business Systems',
-    'Information Technology',
-    'Electronics and Telecommunication',
-    'Electrical Engineering',
-    'Automation and Robotics',
-    'Mechanical Engineering',
-    'Civil Engineering',
-    'Bachelor of Computer Applications',
-] as const;
+import { DEPARTMENTS } from '../db-constants';
 
 export const createVolunteerSchema = z.object({
     body: z.object({
         name: z.string().min(1, 'Name is required').max(255),
         email: z.string().email('Invalid email address'),
-        password: z.string().min(6, 'Password must be at least 6 characters'),
-        department: z.string().refine(val => DEPARTMENTS.includes(val as any), { message: 'Invalid department' }),
+        password: z.string().min(8, 'Password must be at least 8 characters'),
+        department: z.enum(DEPARTMENTS, { message: 'Invalid department' }),
         status: z.enum(['regular', 'backup']).optional(),
     }),
 });

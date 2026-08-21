@@ -2,100 +2,118 @@ import { Request, Response } from 'express';
 import { db } from '../db';
 import { eventImages } from '../db/schema';
 import { eq, and } from 'drizzle-orm';
-import { ok, created } from '../lib/response';
+import { ok, created, noContent, handleError } from '../lib/response';
+import { NotFoundError } from '../lib/errors';
 
 // Get all images for an event
 export const getEventImages = async (req: Request, res: Response) => {
-    const { eventId } = req.params;
     try {
+        const eventId = parseInt(req.params.eventId);
+        if (isNaN(eventId)) return res.status(400).json({ success: false, message: 'Invalid event ID.' });
+
         const images = await db.select().from(eventImages)
-            .where(eq(eventImages.eventId, parseInt(eventId)))
+            .where(eq(eventImages.eventId, eventId))
             .orderBy(eventImages.isMaster);
         ok(res, images);
     } catch (error) {
-        res.status(500).json({ message: 'Error fetching event images', error });
+        handleError(res, error);
     }
 };
 
-// Add images to an event
+// Add images to an event (validated via schema middleware in route)
 export const addEventImages = async (req: Request, res: Response) => {
-    const { eventId } = req.params;
-    const { images } = req.body; // Array of { url, isMaster, caption }
-
     try {
-        // If setting a new master, unset existing masters
-        const hasMaster = images.some((img: any) => img.isMaster);
-        if (hasMaster) {
+        const eventId = parseInt(req.params.eventId);
+        if (isNaN(eventId)) return res.status(400).json({ success: false, message: 'Invalid event ID.' });
+
+        const { images } = req.body as { images: Array<{ url: string; isMaster?: boolean; caption?: string | null }> };
+
+        // If any new image is master, clear all existing masters first
+        if (images.some(img => img.isMaster)) {
             await db.update(eventImages)
                 .set({ isMaster: false })
-                .where(eq(eventImages.eventId, parseInt(eventId)));
+                .where(eq(eventImages.eventId, eventId));
         }
 
-        const insertData = images.map((img: any) => ({
-            eventId: parseInt(eventId),
-            url: img.url,
-            isMaster: img.isMaster || false,
-            caption: img.caption || null,
+        const insertData = images.map(img => ({
+            eventId,
+            url:      String(img.url).trim(),
+            isMaster: img.isMaster ?? false,
+            caption:  img.caption ? String(img.caption).trim() : null,
         }));
 
-        const result = await db.insert(eventImages).values(insertData).returning();
+        const result = await db.insert(eventImages).output().values(insertData);
         created(res, result);
     } catch (error) {
-        res.status(500).json({ message: 'Error adding event images', error });
+        handleError(res, error);
     }
 };
 
-// Set an image as master
+// Set an image as master — scoped to eventId so cross-event tampering is prevented
 export const setMasterImage = async (req: Request, res: Response) => {
-    const { eventId, imageId } = req.params;
-
     try {
-        // Unset all masters for this event
+        const eventId = parseInt(req.params.eventId);
+        const imageId = parseInt(req.params.imageId);
+        if (isNaN(eventId) || isNaN(imageId)) {
+            return res.status(400).json({ success: false, message: 'Invalid ID.' });
+        }
+
+        // Verify the image belongs to this event
+        const [img] = await db.select({ id: eventImages.id })
+            .top(1).from(eventImages)
+            .where(and(eq(eventImages.id, imageId), eq(eventImages.eventId, eventId)));
+        if (!img) throw new NotFoundError('Image not found for this event.');
+
+        // Unset all masters, then set the requested one
         await db.update(eventImages)
             .set({ isMaster: false })
-            .where(eq(eventImages.eventId, parseInt(eventId)));
+            .where(eq(eventImages.eventId, eventId));
 
-        // Set new master
         await db.update(eventImages)
             .set({ isMaster: true })
-            .where(and(
-                eq(eventImages.id, parseInt(imageId)),
-                eq(eventImages.eventId, parseInt(eventId))
-            ));
+            .where(eq(eventImages.id, imageId));
 
-        ok(res, { message: 'Master image updated' });
+        ok(res, null, 'Master image updated.');
     } catch (error) {
-        res.status(500).json({ message: 'Error setting master image', error });
+        handleError(res, error);
     }
 };
 
 // Delete an event image
 export const deleteEventImage = async (req: Request, res: Response) => {
-    const { imageId } = req.params;
     try {
-        await db.delete(eventImages).where(eq(eventImages.id, parseInt(imageId)));
-        ok(res, { message: 'Image deleted successfully' });
+        const imageId = parseInt(req.params.imageId);
+        if (isNaN(imageId)) return res.status(400).json({ success: false, message: 'Invalid image ID.' });
+
+        await db.delete(eventImages).where(eq(eventImages.id, imageId));
+        noContent(res);
     } catch (error) {
-        res.status(500).json({ message: 'Error deleting image', error });
+        handleError(res, error);
     }
 };
 
-// Update image caption
+// Update image caption / master flag (validated via schema middleware in route)
 export const updateEventImage = async (req: Request, res: Response) => {
-    const { imageId } = req.params;
-    const { caption, isMaster } = req.body;
-
     try {
-        const updateData: any = {};
-        if (caption !== undefined) updateData.caption = caption;
+        const imageId = parseInt(req.params.imageId);
+        if (isNaN(imageId)) return res.status(400).json({ success: false, message: 'Invalid image ID.' });
+
+        const { caption, isMaster } = req.body as { caption?: string | null; isMaster?: boolean };
+
+        const updateData: Partial<typeof eventImages.$inferInsert> = {};
+        if (caption !== undefined)  updateData.caption  = caption ? String(caption).trim() : null;
         if (isMaster !== undefined) updateData.isMaster = isMaster;
+
+        if (Object.keys(updateData).length === 0) {
+            return res.status(400).json({ success: false, message: 'Nothing to update.' });
+        }
 
         await db.update(eventImages)
             .set(updateData)
-            .where(eq(eventImages.id, parseInt(imageId)));
+            .where(eq(eventImages.id, imageId));
 
-        ok(res, { message: 'Image updated successfully' });
+        ok(res, null, 'Image updated.');
     } catch (error) {
-        res.status(500).json({ message: 'Error updating image', error });
+        handleError(res, error);
     }
 };

@@ -394,7 +394,7 @@ const Register = () => {
                                         <XCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
                                         <div>
                                             <p className="font-semibold mb-1">Registration Not Approved</p>
-                                            <p>Unfortunately your registration was not approved. Please contact the NSS team at nss@jspmrscoe.edu.in for more information.</p>
+                                            <p>Unfortunately your registration was not approved. Please contact the NSS team at nssrscoe073@gmail.com for more information.</p>
                                         </div>
                                     </div>
                                 )}

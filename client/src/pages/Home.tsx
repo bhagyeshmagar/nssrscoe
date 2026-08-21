@@ -98,7 +98,7 @@ const Home = () => {
     return (
         <div className="bg-white">
             {/* Hero Section */}
-            <section className="relative h-[80vh] flex items-center justify-center bg-gradient-to-r from-nss-blue to-nss-red overflow-hidden">
+            <section className="relative h-[60vh] sm:h-[80vh] flex items-center justify-center bg-gradient-to-r from-nss-blue to-nss-red overflow-hidden">
 
                 {sliderImages.length > 0 ? (
                     <AnimatePresence mode="popLayout">
@@ -202,17 +202,19 @@ const Home = () => {
 
                 {/* Slider Controls */}
                 {sliderImages.length > 1 && (
-                    <div className="absolute bottom-6 left-0 right-0 flex justify-center gap-2 z-20">
+                    <div className="absolute bottom-4 sm:bottom-6 left-0 right-0 flex justify-center gap-1 sm:gap-2 z-20">
                         {sliderImages.map((_, index) => (
                             <button
                                 key={index}
                                 onClick={() => setCurrentSlideIndex(index)}
-                                className={`w-3 h-3 rounded-full transition-all duration-300 ${index === currentSlideIndex
+                                className="p-3 flex items-center justify-center"
+                                aria-label={`Go to slide ${index + 1}`}
+                            >
+                                <span className={`block w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full transition-all duration-300 ${index === currentSlideIndex
                                         ? 'bg-white scale-125'
                                         : 'bg-white/50 hover:bg-white/80'
-                                    }`}
-                                aria-label={`Go to slide ${index + 1}`}
-                            />
+                                    }`} />
+                            </button>
                         ))}
                     </div>
                 )}

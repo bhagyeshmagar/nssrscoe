@@ -1,5 +1,12 @@
 import { db } from '../db';
 import { auditLogs } from '../db/schema';
+import type { MsSqlTransaction } from 'drizzle-orm/mssql-core';
+import type { NodeMsSqlQueryResultHKT, NodeMsSqlPreparedQueryHKT } from 'drizzle-orm/node-mssql';
+
+// Covers both the top-level `db` and any transaction object from db.transaction().
+// The 4th generic matches what Drizzle infers: ExtractTablesWithRelations<Record<string, never>>.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Db = typeof db | MsSqlTransaction<NodeMsSqlQueryResultHKT, NodeMsSqlPreparedQueryHKT, Record<string, never>, any>;
 
 type LogActionParams = {
     adminId?: number | null;
@@ -10,12 +17,12 @@ type LogActionParams = {
     entityId?: number | null;
     performedByRole?: string;
     academicYearId?: number | null;
-    details?: any;
+    details?: Record<string, unknown>;
 };
 
-export const logAudit = async (params: LogActionParams) => {
+export const logAudit = async (params: LogActionParams, tx: Db = db) => {
     try {
-        await db.insert(auditLogs).values({
+        await tx.insert(auditLogs).values({
             action: params.action,
             entityType: params.entityType,
             entityId: params.entityId,
@@ -29,7 +36,7 @@ export const logAudit = async (params: LogActionParams) => {
     }
 };
 
-export const auditAYLock = (ayId: number, adminId: number, label: string) => logAudit({ action: 'LOCK_AY', entityType: 'AcademicYear', entityId: ayId, adminId, academicYearId: ayId, details: { label } });
-export const auditAYArchive = (ayId: number, adminId: number, label: string) => logAudit({ action: 'ARCHIVE_AY', entityType: 'AcademicYear', entityId: ayId, adminId, academicYearId: ayId, details: { label } });
-export const auditCampFinalize = (campId: number, adminId: number, ayId: number) => logAudit({ action: 'FINALIZE_CAMP', entityType: 'SpecialCamp', entityId: campId, adminId, academicYearId: ayId });
-export const auditVolunteerCreate = (volunteerId: number, adminId: number, ayId: number, name: string) => logAudit({ action: 'CREATE_VOLUNTEER', entityType: 'Volunteer', entityId: volunteerId, adminId, academicYearId: ayId, details: { name } });
+export const auditAYLock = (ayId: number, adminId: number, label: string, tx: Db = db) => logAudit({ action: 'academic_year.lock', entityType: 'academic_year', entityId: ayId, adminId, academicYearId: ayId, details: { label } }, tx);
+export const auditAYArchive = (ayId: number, adminId: number, label: string, tx: Db = db) => logAudit({ action: 'academic_year.archive', entityType: 'academic_year', entityId: ayId, adminId, academicYearId: ayId, details: { label } }, tx);
+export const auditCampFinalize = (campId: number, adminId: number, ayId: number, tx: Db = db) => logAudit({ action: 'special_camp.finalize', entityType: 'special_camp', entityId: campId, adminId, academicYearId: ayId }, tx);
+export const auditVolunteerCreate = (volunteerId: number, adminId: number, ayId: number, name: string, tx: Db = db) => logAudit({ action: 'volunteer.create', entityType: 'volunteer', entityId: volunteerId, adminId, academicYearId: ayId, details: { name } }, tx);

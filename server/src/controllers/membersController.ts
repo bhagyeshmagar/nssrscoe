@@ -13,8 +13,8 @@
 import { Request, Response } from 'express';
 import { db } from '../db';
 import { coreTeamAssignments, coreTeamRoles, academicYears, volunteers, volunteerProfiles } from '../db/schema';
-import { eq, desc, and } from 'drizzle-orm';
-import { ok, created, noContent } from '../lib/response';
+import { eq } from 'drizzle-orm';
+import { ok, created, noContent, handleError } from '../lib/response';
 
 /**
  * GET /api/members
@@ -26,9 +26,9 @@ export const getMembers = async (req: Request, res: Response) => {
         // Find the current AY
         const [currentAY] = await db
             .select({ id: academicYears.id, label: academicYears.label })
-            .from(academicYears)
+            .top(1).from(academicYears)
             .where(eq(academicYears.isCurrent, true))
-            .limit(1);
+            ;
 
         if (!currentAY) {
             // No current AY set — return empty list rather than error
@@ -83,7 +83,7 @@ export const getMembers = async (req: Request, res: Response) => {
 
         ok(res, members);
     } catch (error) {
-        res.status(500).json({ message: 'Error fetching members', error });
+        handleError(res, error);
     }
 };
 
@@ -98,9 +98,9 @@ export const createMember = async (req: Request, res: Response) => {
 
         const [currentAY] = await db
             .select({ id: academicYears.id })
-            .from(academicYears)
+            .top(1).from(academicYears)
             .where(eq(academicYears.isCurrent, true))
-            .limit(1);
+            ;
 
         if (!currentAY) {
             return res.status(400).json({ message: 'No active academic year is set. Create and activate an academic year first.' });
@@ -110,7 +110,7 @@ export const createMember = async (req: Request, res: Response) => {
         
         // Legacy support: if 'role' is provided as string
         if (!roleId && role) {
-            let coreRole = await db.select().from(coreTeamRoles).where(eq(coreTeamRoles.name, role)).limit(1).then(res => res[0]);
+            let coreRole = await db.select().top(1).from(coreTeamRoles).where(eq(coreTeamRoles.name, role)).then(res => res[0]);
             if (!coreRole) {
                 const code = role.toLowerCase().replace(/[^a-z0-9]+/g, '_').substring(0, 50);
                 let inferredCategory = 'Institute Officers';
@@ -119,12 +119,12 @@ export const createMember = async (req: Request, res: Response) => {
                 else if (role.toLowerCase().includes('representative')) inferredCategory = 'NSS Representatives';
                 else if (role.toLowerCase().includes('nss program officer') || role.toLowerCase().includes('nss po')) inferredCategory = 'NSS Program Officer';
 
-                const [newRole] = await db.insert(coreTeamRoles).values({
+                const [newRole] = await db.insert(coreTeamRoles).output().values({
                     name: role,
                     code: code,
                     category: inferredCategory,
                     roleType: role.toLowerCase().includes('coordinator') || role.toLowerCase().includes('lead') || role.toLowerCase().includes('representative') ? 'student' : 'institution',
-                }).returning();
+                });
                 coreRole = newRole;
             }
             roleId = coreRole.id;
@@ -132,18 +132,18 @@ export const createMember = async (req: Request, res: Response) => {
 
         if (!roleId) return res.status(400).json({ message: 'Role is required' });
 
-        const [newAssignment] = await db.insert(coreTeamAssignments).values({
+        const [newAssignment] = await db.insert(coreTeamAssignments).output().values({
             academicYearId: currentAY.id,
             coreTeamRoleId: roleId,
             volunteerId: volunteerId ? parseInt(volunteerId) : null,
             displayName: displayName ?? name ?? null,
             displayPhotoUrl: displayPhotoUrl ?? photoUrl ?? null,
             displayOrder: order !== undefined ? parseInt(order) : 0,
-        }).returning();
+        });
 
         created(res, newAssignment);
     } catch (error) {
-        res.status(500).json({ message: 'Error creating member', error });
+        handleError(res, error);
     }
 };
 
@@ -164,7 +164,7 @@ export const updateMember = async (req: Request, res: Response) => {
         };
 
         if (role) {
-            let coreRole = await db.select().from(coreTeamRoles).where(eq(coreTeamRoles.name, role)).limit(1).then(res => res[0]);
+            let coreRole = await db.select().top(1).from(coreTeamRoles).where(eq(coreTeamRoles.name, role)).then(res => res[0]);
             if (!coreRole) {
                 const code = role.toLowerCase().replace(/[^a-z0-9]+/g, '_').substring(0, 50);
                 let inferredCategory = 'Institute Officers';
@@ -173,12 +173,12 @@ export const updateMember = async (req: Request, res: Response) => {
                 else if (role.toLowerCase().includes('representative')) inferredCategory = 'NSS Representatives';
                 else if (role.toLowerCase().includes('nss program officer') || role.toLowerCase().includes('nss po')) inferredCategory = 'NSS Program Officer';
 
-                const [newRole] = await db.insert(coreTeamRoles).values({
+                const [newRole] = await db.insert(coreTeamRoles).output().values({
                     name: role,
                     code: code,
                     category: inferredCategory,
                     roleType: role.toLowerCase().includes('coordinator') || role.toLowerCase().includes('lead') || role.toLowerCase().includes('representative') ? 'student' : 'institution',
-                }).returning();
+                });
                 coreRole = newRole;
             }
             updateData.coreTeamRoleId = coreRole.id;
@@ -188,10 +188,10 @@ export const updateMember = async (req: Request, res: Response) => {
             .update(coreTeamAssignments)
             .set(updateData)
             .where(eq(coreTeamAssignments.id, Number(id)))
-            .returning();
+            .output();
         ok(res, updated);
     } catch (error) {
-        res.status(500).json({ message: 'Error updating member', error });
+        handleError(res, error);
     }
 };
 
@@ -205,6 +205,6 @@ export const deleteMember = async (req: Request, res: Response) => {
         await db.delete(coreTeamAssignments).where(eq(coreTeamAssignments.id, Number(id)));
         noContent(res);
     } catch (error) {
-        res.status(500).json({ message: 'Error deleting member', error });
+        handleError(res, error);
     }
 };

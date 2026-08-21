@@ -1,14 +1,23 @@
-import { drizzle } from 'drizzle-orm/node-postgres';
-import { Pool } from 'pg';
+import { drizzle } from 'drizzle-orm/node-mssql';
 import * as schema from './schema';
 import dotenv from 'dotenv';
 dotenv.config();
 
-const isLocal = !process.env.DATABASE_URL || process.env.DATABASE_URL.includes('localhost') || process.env.DATABASE_URL.includes('127.0.0.1');
+export const dbConfig = {
+    server:   process.env.DB_SERVER   || 'localhost',
+    database: process.env.DB_DATABASE || 'nss_db',
+    user:     process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    options: {
+        trustServerCertificate: process.env.DB_TRUST_CERT !== 'false',
+        encrypt: process.env.NODE_ENV === 'production',
+    },
+    pool: {
+        min:                2,
+        max:                10,
+        idleTimeoutMillis:  30_000,
+        acquireTimeoutMillis: 15_000,
+    },
+};
 
-export const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: isLocal ? false : { rejectUnauthorized: false },
-});
-
-export const db = drizzle(pool, { schema });
+export const db = drizzle({ connection: dbConfig as any, schema } as any);

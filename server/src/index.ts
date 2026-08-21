@@ -28,6 +28,8 @@ import activityCalendarRoutes from './routes/activityCalendarRoutes';
 import meetingRoutes from './routes/meetingRoutes';
 import notificationRoutes from './routes/notificationRoutes';
 import coreTeamDashboardRoutes from './routes/coreTeamDashboardRoutes';
+import hodRoutes from './routes/hodRoutes';
+import emailRoutes from './routes/emailRoutes';
 import { apiRateLimiter } from './middleware/rateLimiter';
 
 dotenv.config();
@@ -35,21 +37,42 @@ dotenv.config();
 if (!process.env.JWT_SECRET) {
     throw new Error('JWT_SECRET environment variable is required');
 }
+if (process.env.JWT_SECRET.length < 32) {
+    throw new Error('JWT_SECRET must be at least 32 characters long. Generate one with: node -e "console.log(require(\'crypto\').randomBytes(64).toString(\'hex\'))"');
+}
 
 const app: Express = express();
 app.set('trust proxy', 1);
 const port = process.env.PORT || 5000;
 
 // Security middleware
+app.use((req, res, next) => {
+    console.log('[API Request]', req.method, req.url);
+    next();
+});
 app.use(helmet({
     crossOriginResourcePolicy: { policy: 'cross-origin' }, // Allow serving images
+    contentSecurityPolicy: false, // handled by frontend
 }));
 
-// CORS configuration
+// CORS configuration — restrict to known origins
+const ALLOWED_ORIGINS = (() => {
+    const raw = process.env.ALLOWED_ORIGINS || process.env.CLIENT_URL || '';
+    return raw.split(',').map(s => s.trim()).filter(Boolean);
+})();
+
 app.use(cors({
     origin: (origin, callback) => {
-        // Allow requests with no origin (like mobile apps, curl) or any web origin
-        callback(null, true);
+        // Allow requests with no origin (e.g. same-origin, mobile apps, curl in dev)
+        if (!origin) return callback(null, true);
+        // In production only allow whitelisted origins; in dev allow all
+        if (process.env.NODE_ENV !== 'production' || ALLOWED_ORIGINS.length === 0) {
+            return callback(null, true);
+        }
+        if (ALLOWED_ORIGINS.includes(origin)) {
+            return callback(null, true);
+        }
+        return callback(new Error(`CORS: origin "${origin}" not allowed`));
     },
     credentials: true,
 }));
@@ -97,6 +120,8 @@ app.use('/api/special-camps', specialCampRoutes);   // /:campId, /:campId/partic
 app.use('/api/core-team-dashboard', coreTeamDashboardRoutes);
 app.use('/api',               meetingRoutes);       // handles both /academic-years/:ayId/meetings and /meetings/:id
 app.use('/api',               notificationRoutes);  // handles /volunteers/me/notifications
+app.use('/api/hod-contacts',  hodRoutes);           // HOD contact management
+app.use('/api/email',         emailRoutes);          // email logs, stats, send-report
 
 // Error handling middleware
 app.use(errorHandler);
@@ -118,5 +143,3 @@ if (process.env.NODE_ENV !== 'test') {
 }
 
 export default app;
-
-// force reload

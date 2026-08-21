@@ -1,32 +1,61 @@
-import { Request, Response } from 'express';
-import { ok } from '../lib/response';
+import { Response } from 'express';
+import { ok, handleError } from '../lib/response';
+import { ForbiddenError } from '../lib/errors';
 import * as notificationService from '../services/notificationService';
 import { AuthRequest } from '../middleware/auth';
 
-export const getMyNotifications = async (req: AuthRequest, res: Response) => {
-    const volunteerId = req.user!.id;
-    const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
-    const offset = req.query.offset ? parseInt(req.query.offset as string) : 0;
+/** Only volunteers have notifications; reject if called by an admin. */
+const requireVolunteerRole = (req: AuthRequest) => {
+    if (req.user!.role !== 'volunteer') {
+        throw new ForbiddenError('This endpoint is only available to volunteers.', 'FORBIDDEN');
+    }
+};
 
-    const notifications = await notificationService.getMyNotifications(volunteerId, limit, offset);
-    ok(res, { notifications });
+export const getMyNotifications = async (req: AuthRequest, res: Response) => {
+    try {
+        requireVolunteerRole(req);
+        const volunteerId = req.user!.id;
+
+        // Clamp limit/offset to sane bounds
+        const limit  = Math.min(100, Math.max(1, parseInt(req.query.limit  as string) || 50));
+        const offset = Math.max(0,               parseInt(req.query.offset as string) || 0);
+
+        const notifications = await notificationService.getMyNotifications(volunteerId, limit, offset);
+        ok(res, { notifications });
+    } catch (err) {
+        handleError(res, err);
+    }
 };
 
 export const getUnreadCount = async (req: AuthRequest, res: Response) => {
-    const volunteerId = req.user!.id;
-    const count = await notificationService.getUnreadCount(volunteerId);
-    ok(res, { count });
+    try {
+        requireVolunteerRole(req);
+        const count = await notificationService.getUnreadCount(req.user!.id);
+        ok(res, { count });
+    } catch (err) {
+        handleError(res, err);
+    }
 };
 
 export const markAsRead = async (req: AuthRequest, res: Response) => {
-    const volunteerId = req.user!.id;
-    const id = parseInt(req.params.id);
-    const updated = await notificationService.markAsRead(id, volunteerId);
-    ok(res, { notification: updated });
+    try {
+        requireVolunteerRole(req);
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) return res.status(400).json({ success: false, message: 'Invalid notification ID.' });
+
+        const updated = await notificationService.markAsRead(id, req.user!.id);
+        ok(res, { notification: updated });
+    } catch (err) {
+        handleError(res, err);
+    }
 };
 
 export const markAllAsRead = async (req: AuthRequest, res: Response) => {
-    const volunteerId = req.user!.id;
-    await notificationService.markAllAsRead(volunteerId);
-    ok(res, null, 'All notifications marked as read');
+    try {
+        requireVolunteerRole(req);
+        await notificationService.markAllAsRead(req.user!.id);
+        ok(res, null, 'All notifications marked as read.');
+    } catch (err) {
+        handleError(res, err);
+    }
 };

@@ -21,14 +21,14 @@ import { logAudit, auditCampFinalize } from './auditService';
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const requireUnlockedAY = async (ayId: number) => {
-    const [ay] = await db.select().from(academicYears).where(eq(academicYears.id, ayId)).limit(1);
+    const [ay] = await db.select().top(1).from(academicYears).where(eq(academicYears.id, ayId));
     if (!ay) throw new NotFoundError(`Academic year ${ayId} not found.`);
     if (ay.isLocked) throw new AYLockedError(ay.label);
     return ay;
 };
 
 const findCamp = async (campId: number) => {
-    const [camp] = await db.select().from(specialCamps).where(eq(specialCamps.id, campId)).limit(1);
+    const [camp] = await db.select().top(1).from(specialCamps).where(eq(specialCamps.id, campId));
     if (!camp) throw new NotFoundError(`Special camp ${campId} not found.`);
     return camp;
 };
@@ -43,7 +43,7 @@ const requireEditableCamp = async (campId: number) => {
 // ── List / Query ──────────────────────────────────────────────────────────────
 
 export const listCamps = async (ayId: number) => {
-    const [ay] = await db.select({ id: academicYears.id }).from(academicYears).where(eq(academicYears.id, ayId)).limit(1);
+    const [ay] = await db.select({ id: academicYears.id }).top(1).from(academicYears).where(eq(academicYears.id, ayId));
     if (!ay) throw new NotFoundError(`Academic year ${ayId} not found.`);
     return db.select().from(specialCamps).where(eq(specialCamps.academicYearId, ayId)).orderBy(specialCamps.startDate);
 };
@@ -84,16 +84,16 @@ export const createCamp = async (
 ) => {
     await requireUnlockedAY(ayId);
 
-    const [camp] = await db.insert(specialCamps).values({
+    const [camp] = await db.insert(specialCamps).output().values({
         academicYearId: ayId,
         name: input.name,
         location: input.location,
-        startDate: input.startDate,
-        endDate: input.endDate,
+        startDate: new Date(input.startDate),
+        endDate: new Date(input.endDate),
         description: input.description ?? null,
         volunteerCap: input.volunteerCap ?? 50,
         isFinalized: false,
-    }).returning();
+    });
 
     await logAudit({ action: 'special_camp.create', entityType: 'special_camp', entityId: camp.id, performedById: adminId, academicYearId: ayId });
 
@@ -107,11 +107,20 @@ export const updateCamp = async (
 ) => {
     const camp = await requireEditableCamp(campId);
 
+    const updateData: Partial<typeof specialCamps.$inferInsert> = {
+        name: input.name,
+        location: input.location,
+        description: input.description,
+        volunteerCap: input.volunteerCap,
+    };
+    if (input.startDate) updateData.startDate = new Date(input.startDate);
+    if (input.endDate) updateData.endDate = new Date(input.endDate);
+
     const [updated] = await db
         .update(specialCamps)
-        .set({ ...input })
+        .set(updateData)
         .where(eq(specialCamps.id, campId))
-        .returning();
+        .output();
 
     await logAudit({ action: 'special_camp.update', entityType: 'special_camp', entityId: campId, performedById: adminId, academicYearId: camp.academicYearId });
 
@@ -132,9 +141,9 @@ export const addParticipant = async (campId: number, volunteerId: number, adminI
     // Volunteer must be regular + active + same AY
     const [vol] = await db
         .select()
-        .from(volunteers)
+        .top(1).from(volunteers)
         .where(and(eq(volunteers.id, volunteerId), eq(volunteers.academicYearId, camp.academicYearId)))
-        .limit(1);
+        ;
 
     if (!vol) throw new NotFoundError(`Volunteer ${volunteerId} is not a member of this academic year's camp.`);
     if (!vol.isActive) throw new ForbiddenError('Inactive volunteers cannot be added to special camps.', 'VOLUNTEER_INACTIVE');
@@ -143,27 +152,27 @@ export const addParticipant = async (campId: number, volunteerId: number, adminI
     // Duplicate check
     const [dup] = await db
         .select({ id: specialCampParticipants.id })
-        .from(specialCampParticipants)
+        .top(1).from(specialCampParticipants)
         .where(and(
             eq(specialCampParticipants.specialCampId, campId),
             eq(specialCampParticipants.volunteerId, volunteerId),
         ))
-        .limit(1);
+        ;
     if (dup) throw new ConflictError('This volunteer is already added to the camp.');
 
     // Fetch profile for pre-filling (snapshot written at finalization, not now)
     const [profile] = await db
         .select()
-        .from(volunteerProfiles)
+        .top(1).from(volunteerProfiles)
         .where(eq(volunteerProfiles.volunteerId, volunteerId))
-        .limit(1);
+        ;
 
-    const [participant] = await db.insert(specialCampParticipants).values({
+    const [participant] = await db.insert(specialCampParticipants).output().values({
         specialCampId: campId,
         volunteerId,
         // Pre-fill name for display; snapshot columns finalized later
         snapName: profile?.fullName ?? vol.name,
-    }).returning();
+    });
 
     await logAudit({ action: 'special_camp.add_participant', entityType: 'special_camp', entityId: campId, performedById: adminId, academicYearId: camp.academicYearId, details: { volunteerId } });
 
@@ -217,7 +226,7 @@ export const setParticipantsBulk = async (campId: number, volunteerIds: number[]
             snapName: profileMap.get(vol.id)?.fullName ?? vol.name,
         }));
 
-        await db.insert(specialCampParticipants).values(values);
+        await db.insert(specialCampParticipants).output().values(values);
     }
 
     await logAudit({ action: 'special_camp.set_participants_bulk', entityType: 'special_camp', entityId: campId, performedById: adminId, academicYearId: camp.academicYearId, details: { count: volunteerIds.length } });
@@ -268,8 +277,7 @@ export const finalizeCamp = async (campId: number, adminId: number) => {
     const [updated] = await db
         .update(specialCamps)
         .set({ isFinalized: true, finalizedAt: now, finalizedById: adminId })
-        .where(eq(specialCamps.id, campId))
-        .returning();
+        .where(eq(specialCamps.id, campId)).output();
 
     await auditCampFinalize(campId, adminId, camp.academicYearId);
 
@@ -281,7 +289,7 @@ export const unlockCamp = async (campId: number, passwordStr: string, adminId: n
     if (!camp.isFinalized) throw new ConflictError('Camp is not locked.');
     await requireUnlockedAY(camp.academicYearId);
 
-    const [admin] = await db.select().from(admins).where(eq(admins.id, adminId)).limit(1);
+    const [admin] = await db.select().top(1).from(admins).where(eq(admins.id, adminId));
     if (!admin) throw new NotFoundError('Admin not found.');
 
     const isValid = await bcrypt.compare(passwordStr, admin.passwordHash);
@@ -291,7 +299,7 @@ export const unlockCamp = async (campId: number, passwordStr: string, adminId: n
         .update(specialCamps)
         .set({ isFinalized: false, finalizedAt: null, finalizedById: null })
         .where(eq(specialCamps.id, campId))
-        .returning();
+        .output();
 
     await logAudit({ action: 'special_camp.unlock', entityType: 'special_camp', entityId: campId, performedById: adminId, academicYearId: camp.academicYearId });
 

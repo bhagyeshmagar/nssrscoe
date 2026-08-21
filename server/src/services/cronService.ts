@@ -1,7 +1,7 @@
 import cron from 'node-cron';
 import { eq, and, gt, lt } from 'drizzle-orm';
 import { db } from '../db';
-import { meetings, volunteers, coreTeamAssignments } from '../db/schema';
+import { meetings, volunteers, coreTeamAssignments, specialCampParticipants } from '../db/schema';
 import { createBulkNotifications } from './notificationService';
 import { sendMeetingNotificationEmail } from './emailService';
 
@@ -37,11 +37,18 @@ export const startCronJobs = () => {
                         .where(and(eq(volunteers.academicYearId, meeting.academicYearId), eq(volunteers.isActive, true)));
                     targetVolunteerIds = vols.map(v => v.id);
                     targetVolunteerEmails = vols.map(v => v.email);
-                } else {
+                } else if (meeting.meetingType === 'core_team') {
                     const vols = await db.select({ volunteerId: coreTeamAssignments.volunteerId, email: volunteers.email })
                         .from(coreTeamAssignments)
                         .innerJoin(volunteers, eq(coreTeamAssignments.volunteerId, volunteers.id))
-                        .where(and(eq(coreTeamAssignments.academicYearId, meeting.academicYearId)));
+                        .where(eq(coreTeamAssignments.academicYearId, meeting.academicYearId));
+                    targetVolunteerIds = vols.map(v => v.volunteerId).filter((id): id is number => id !== null);
+                    targetVolunteerEmails = vols.map(v => v.email);
+                } else if (meeting.meetingType === 'special_camp' && meeting.specialCampId) {
+                    const vols = await db.select({ volunteerId: specialCampParticipants.volunteerId, email: volunteers.email })
+                        .from(specialCampParticipants)
+                        .innerJoin(volunteers, eq(specialCampParticipants.volunteerId, volunteers.id))
+                        .where(eq(specialCampParticipants.specialCampId, meeting.specialCampId));
                     targetVolunteerIds = vols.map(v => v.volunteerId).filter((id): id is number => id !== null);
                     targetVolunteerEmails = vols.map(v => v.email);
                 }

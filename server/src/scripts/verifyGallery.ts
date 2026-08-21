@@ -14,19 +14,23 @@ const createToken = (id: number, role: string) => {
 async function runTests() {
     console.log('Running End-to-End API Verification for Gallery...\n');
 
+    let superadmin: any, regularAdmin: any;
+    let pendingId: number | null = null;
+    let saId: number | null = null;
+
     try {
         // 1. Setup Test Admins
-        const [superadmin] = await db.insert(admins).values({
+        [superadmin] = await db.insert(admins).output().values({
             username: 'test_superadmin',
             passwordHash: 'mock',
             isSuperadmin: true
-        }).returning();
+        });
 
-        const [regularAdmin] = await db.insert(admins).values({
+        [regularAdmin] = await db.insert(admins).output().values({
             username: 'test_admin',
             passwordHash: 'mock',
             isSuperadmin: false
-        }).returning();
+        });
 
         const saToken = createToken(superadmin.id, 'superadmin');
         const adminToken = createToken(regularAdmin.id, 'admin');
@@ -47,7 +51,7 @@ async function runTests() {
             throw new Error(`Expected admin upload to be pending, got ${rAdminUpload.body.data.status}`);
         }
         console.log('✔ Regular admin upload defaults to "pending".');
-        const pendingId = rAdminUpload.body.data.id;
+        pendingId = rAdminUpload.body.data.id;
 
         // 3. Pending Item Hidden from Public
         const publicGet1 = await request(app).get('/api/gallery');
@@ -69,7 +73,7 @@ async function runTests() {
             throw new Error(`Expected superadmin upload to be approved, got ${saUpload.body.data.status}`);
         }
         console.log('✔ Superadmin upload automatically defaults to "approved".');
-        const saId = saUpload.body.data.id;
+        saId = saUpload.body.data.id;
 
         // 5. Approved Item Visible to Public
         const publicGet2 = await request(app).get('/api/gallery');
@@ -115,18 +119,18 @@ async function runTests() {
         }
         console.log('✔ Regular admin edit successfully resets rejected item to pending and clears rejection reason.');
 
-        // Cleanup
-        await db.delete(gallery).where(eq(gallery.id, pendingId));
-        await db.delete(gallery).where(eq(gallery.id, saId));
-        await db.delete(admins).where(eq(admins.id, superadmin.id));
-        await db.delete(admins).where(eq(admins.id, regularAdmin.id));
-        
         console.log('\n🎉 All checks passed! The Gallery workflow is definitively hardened.');
-        process.exit(0);
-
     } catch (err) {
         console.error('\n❌ Test failed:', err);
-        process.exit(1);
+        process.exitCode = 1;
+    } finally {
+        // Cleanup
+        console.log('\nCleaning up test data...');
+        if (pendingId) await db.delete(gallery).where(eq(gallery.id, pendingId));
+        if (saId) await db.delete(gallery).where(eq(gallery.id, saId));
+        if (superadmin) await db.delete(admins).where(eq(admins.id, superadmin.id));
+        if (regularAdmin) await db.delete(admins).where(eq(admins.id, regularAdmin.id));
+        process.exit();
     }
 }
 

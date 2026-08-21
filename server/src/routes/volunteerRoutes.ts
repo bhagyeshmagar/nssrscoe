@@ -58,6 +58,12 @@ ayVolunteerRouter.patch(
     volCtrl.toggleVolunteerActive,
 );
 
+ayVolunteerRouter.patch(
+    '/:id/approve-experience',
+    authenticateToken, requireAdmin, requireAYUnlocked,
+    volCtrl.approveVolunteerExperience,
+);
+
 // ── Volunteer self-service (flat routes under /api/volunteers) ─────────────────
 // Mounted at /api/volunteers
 

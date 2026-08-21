@@ -48,7 +48,7 @@ export interface AssignRoleInput {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const requireUnlockedAY = async (ayId: number) => {
-    const [ay] = await db.select().from(academicYears).where(eq(academicYears.id, ayId)).limit(1);
+    const [ay] = await db.select().top(1).from(academicYears).where(eq(academicYears.id, ayId));
     if (!ay) throw new NotFoundError(`Academic year ${ayId} not found.`);
     if (ay.isLocked) throw new AYLockedError(ay.label);
     return ay;
@@ -57,7 +57,7 @@ const requireUnlockedAY = async (ayId: number) => {
 // ── Queries ───────────────────────────────────────────────────────────────────
 
 export const getCoreTeamByAY = async (ayId: number) => {
-    const [ay] = await db.select({ id: academicYears.id }).from(academicYears).where(eq(academicYears.id, ayId)).limit(1);
+    const [ay] = await db.select({ id: academicYears.id }).top(1).from(academicYears).where(eq(academicYears.id, ayId));
     if (!ay) throw new NotFoundError(`Academic year ${ayId} not found.`);
 
     const rows = await db
@@ -128,27 +128,27 @@ export const assignRole = async (ayId: number, input: AssignRoleInput, adminId: 
     if (input.coreTeamRoleId === -1 && input.customRoleName && input.customCategory) {
         // Create custom role
         const code = input.customRoleName.toLowerCase().replace(/[^a-z0-9]+/g, '_').substring(0, 50);
-        const [existing] = await db.select().from(coreTeamRoles).where(eq(coreTeamRoles.code, code)).limit(1);
+        const [existing] = await db.select().top(1).from(coreTeamRoles).where(eq(coreTeamRoles.code, code));
         if (existing) {
             role = existing;
         } else {
             const roleType = (input.customCategory === 'Institute Officers' || input.customCategory === 'NSS Program Officer') ? 'institution' : 'student';
-            const [newRole] = await db.insert(coreTeamRoles).values({
+            const [newRole] = await db.insert(coreTeamRoles).output().values({
                 name: input.customRoleName,
                 code: code,
                 roleType: roleType,
                 category: input.customCategory,
                 isUniquePerAy: false,
-            }).returning();
+            });
             role = newRole;
         }
     } else {
         // Resolve the role definition
         const [foundRole] = await db
             .select()
-            .from(coreTeamRoles)
+            .top(1).from(coreTeamRoles)
             .where(eq(coreTeamRoles.id, input.coreTeamRoleId))
-            .limit(1);
+            ;
         if (!foundRole) throw new NotFoundError(`Core team role ${input.coreTeamRoleId} not found.`);
         role = foundRole;
     }
@@ -174,9 +174,9 @@ export const assignRole = async (ayId: number, input: AssignRoleInput, adminId: 
         // Verify the volunteer belongs to this AY and is active
         const [vol] = await db
             .select()
-            .from(volunteers)
+            .top(1).from(volunteers)
             .where(and(eq(volunteers.id, input.volunteerId), eq(volunteers.academicYearId, ayId)))
-            .limit(1);
+            ;
 
         if (!vol) {
             throw new RoleAssignmentError(`Volunteer ${input.volunteerId} is not a member of academic year "${ay.label}".`);
@@ -192,12 +192,12 @@ export const assignRole = async (ayId: number, input: AssignRoleInput, adminId: 
         if (role.isUniquePerAy) {
             const [existing] = await db
                 .select({ id: coreTeamAssignments.id })
-                .from(coreTeamAssignments)
+                .top(1).from(coreTeamAssignments)
                 .where(and(
                     eq(coreTeamAssignments.academicYearId, ayId),
                     eq(coreTeamAssignments.coreTeamRoleId, role.id),
                 ))
-                .limit(1);
+                ;
             if (existing) {
                 throw new ConflictError(`Role "${role.name}" is already assigned in academic year "${ay.label}".`);
             }
@@ -205,7 +205,7 @@ export const assignRole = async (ayId: number, input: AssignRoleInput, adminId: 
     }
 
     // ── Insert assignment ──────────────────────────────────────────────────────
-    const [assignment] = await db.insert(coreTeamAssignments).values({
+    const [assignment] = await db.insert(coreTeamAssignments).output().values({
         academicYearId: ayId,
         coreTeamRoleId: role.id,
         volunteerId: input.volunteerId ?? null,
@@ -213,7 +213,7 @@ export const assignRole = async (ayId: number, input: AssignRoleInput, adminId: 
         displayPhotoUrl: input.displayPhotoUrl ?? null,
         department: input.department ?? null,
         displayOrder: input.displayOrder ?? 0,
-    }).returning();
+    });
 
     await logAudit({
         action: 'core_team.assign',
@@ -232,9 +232,9 @@ export const assignRole = async (ayId: number, input: AssignRoleInput, adminId: 
 export const updateAssignment = async (assignmentId: number, input: Partial<AssignRoleInput>, adminId: number) => {
     const [existing] = await db
         .select()
-        .from(coreTeamAssignments)
+        .top(1).from(coreTeamAssignments)
         .where(eq(coreTeamAssignments.id, assignmentId))
-        .limit(1);
+        ;
     if (!existing) throw new NotFoundError(`Core team assignment ${assignmentId} not found.`);
 
     await requireUnlockedAY(existing.academicYearId);
@@ -248,7 +248,7 @@ export const updateAssignment = async (assignmentId: number, input: Partial<Assi
             ...(input.volunteerId !== undefined && { volunteerId: input.volunteerId }),
         })
         .where(eq(coreTeamAssignments.id, assignmentId))
-        .returning();
+        .output();
 
     await logAudit({ action: 'core_team.update', entityType: 'core_team_assignment', entityId: assignmentId, performedById: adminId, academicYearId: existing.academicYearId });
 
@@ -260,9 +260,9 @@ export const updateAssignment = async (assignmentId: number, input: Partial<Assi
 export const removeAssignment = async (assignmentId: number, adminId: number) => {
     const [existing] = await db
         .select()
+        .top(1)
         .from(coreTeamAssignments)
-        .where(eq(coreTeamAssignments.id, assignmentId))
-        .limit(1);
+        .where(eq(coreTeamAssignments.id, assignmentId));
     if (!existing) throw new NotFoundError(`Core team assignment ${assignmentId} not found.`);
 
     await requireUnlockedAY(existing.academicYearId);
@@ -273,19 +273,22 @@ export const removeAssignment = async (assignmentId: number, adminId: number) =>
 };
 
 export const deleteCustomRole = async (roleId: number, adminId: number) => {
-    const [existing] = await db.select().from(coreTeamRoles).where(eq(coreTeamRoles.id, roleId)).limit(1);
+    const [existing] = await db.select().top(1).from(coreTeamRoles).where(eq(coreTeamRoles.id, roleId));
     if (!existing) throw new NotFoundError(`Core team role ${roleId} not found.`);
 
     // Protect predefined roles
     const predefinedCodes = Object.values(ROLE_CODES) as string[];
     if (predefinedCodes.includes(existing.code)) {
-        throw new Error("Cannot delete predefined standard roles.");
+        throw new ForbiddenError('Cannot delete predefined standard roles.', 'PREDEFINED_ROLE');
     }
 
     // Check if there are assignments using this role
-    const assignmentsCount = await db.select().from(coreTeamAssignments).where(eq(coreTeamAssignments.coreTeamRoleId, roleId));
-    if (assignmentsCount.length > 0) {
-        throw new Error("Cannot delete this role because there are active assignments using it. Please remove them first.");
+    const [assignmentUsage] = await db
+        .select({ n: count() })
+        .from(coreTeamAssignments)
+        .where(eq(coreTeamAssignments.coreTeamRoleId, roleId));
+    if (Number(assignmentUsage.n) > 0) {
+        throw new ConflictError('Cannot delete this role because there are active assignments using it. Please remove them first.');
     }
 
     await db.delete(coreTeamRoles).where(eq(coreTeamRoles.id, roleId));

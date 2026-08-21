@@ -14,14 +14,14 @@ export interface CreateNotificationInput {
 }
 
 export const createNotification = async (input: CreateNotificationInput) => {
-    const [notification] = await db.insert(notifications).values({
+    const [notification] = await db.insert(notifications).output().values({
         volunteerId: input.volunteerId,
         type: input.type,
         title: input.title,
         body: input.body,
         referenceType: input.referenceType,
         referenceId: input.referenceId,
-    }).returning();
+    });
     
     // Emit via WebSocket
     emitToVolunteer(input.volunteerId, 'new_notification', notification);
@@ -31,7 +31,7 @@ export const createNotification = async (input: CreateNotificationInput) => {
 
 export const createBulkNotifications = async (inputs: CreateNotificationInput[]) => {
     if (inputs.length === 0) return [];
-    const created = await db.insert(notifications).values(inputs).returning();
+    const created = await db.insert(notifications).output().values(inputs);
     
     // Emit to each volunteer
     for (const notif of created) {
@@ -46,8 +46,7 @@ export const getMyNotifications = async (volunteerId: number, limit = 50, offset
         .from(notifications)
         .where(eq(notifications.volunteerId, volunteerId))
         .orderBy(desc(notifications.createdAt))
-        .limit(limit)
-        .offset(offset);
+        .offset(offset).fetch(limit);
 };
 
 export const getUnreadCount = async (volunteerId: number) => {
@@ -61,7 +60,7 @@ export const markAsRead = async (id: number, volunteerId: number) => {
     const [updated] = await db.update(notifications)
         .set({ isRead: true })
         .where(and(eq(notifications.id, id), eq(notifications.volunteerId, volunteerId)))
-        .returning();
+        .output();
     if (!updated) throw new NotFoundError('Notification not found');
     return updated;
 };

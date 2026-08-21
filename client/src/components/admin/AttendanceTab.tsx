@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { attendanceAPI, eventsAPI, volunteersAPI } from '../../services/api';
+import { attendanceAPI, eventsAPI, volunteersAPI, emailLogsAPI } from '../../services/api';
 import type { AcademicYear, VolunteerWithProfile, EventData } from '../../services/api';
 import { useFlash, useAYSelector } from './Shared';
-import { FileSpreadsheet } from 'lucide-react';
+import { FileSpreadsheet, Mail } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import toast from 'react-hot-toast';
 
@@ -13,6 +13,7 @@ export const AttendanceTab = ({ years, currentAY }: { years: AcademicYear[]; cur
     const [selectedEvent, setSelectedEvent] = useState<EventData | null>(null);
     const [attendanceMap, setAttendanceMap] = useState<Record<number, boolean>>({});
     const [exportingId, setExportingId] = useState<number | null>(null);
+    const [sendingReportId, setSendingReportId] = useState<number | null>(null);
     const [managingId, setManagingId] = useState<number | null>(null);
     const [saving, setSaving] = useState(false);
     const [sortBy, setSortBy] = useState<'name' | 'department'>('department');
@@ -130,6 +131,27 @@ export const AttendanceTab = ({ years, currentAY }: { years: AcademicYear[]; cur
         }
     };
 
+    const handleEmailHodReport = async (event: EventData) => {
+        if (!selectedAyId) return;
+        setSendingReportId(event.id);
+        try {
+            const res = await emailLogsAPI.sendAttendanceReport(selectedAyId, event.id);
+            const { sent, failed } = res.data.data as any;
+            if (sent > 0) {
+                toast.success(`✅ Reports emailed to ${sent} HOD${sent > 1 ? 's' : ''}${failed > 0 ? ` (${failed} failed)` : ''}!`);
+            } else if (failed > 0) {
+                toast.error(`All ${failed} emails failed. Check email config.`);
+            } else {
+                toast(`No HOD contacts matched the departments in this attendance data. Add HOD contacts in the Email Service tab.`, { icon: '⚠️' });
+            }
+        } catch (e: any) {
+            const msg = e.response?.data?.message;
+            toast.error(msg ?? 'Failed to send HOD reports.');
+        } finally {
+            setSendingReportId(null);
+        }
+    };
+
     const handleSave = async () => {
         if (!selectedEvent || saving) return;
         setSaving(true);
@@ -193,6 +215,15 @@ export const AttendanceTab = ({ years, currentAY }: { years: AcademicYear[]; cur
                                             >
                                                 <FileSpreadsheet className="w-3.5 h-3.5" />
                                                 {exportingId === e.id ? 'Exporting...' : 'Export'}
+                                            </button>
+                                            <button
+                                                onClick={() => handleEmailHodReport(e)}
+                                                disabled={sendingReportId === e.id}
+                                                className="flex items-center gap-1 text-xs px-3 py-1.5 rounded bg-violet-100 text-violet-700 hover:bg-violet-200 font-medium disabled:opacity-50"
+                                                title="Email attendance report to HODs"
+                                            >
+                                                <Mail className="w-3.5 h-3.5" />
+                                                {sendingReportId === e.id ? 'Sending...' : 'Email HODs'}
                                             </button>
                                         </div>
                                     </td>

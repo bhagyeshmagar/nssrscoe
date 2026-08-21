@@ -39,7 +39,7 @@ const fetchAY = async (id: number): Promise<AYRow | null> => {
         })
         .from(academicYears)
         .where(eq(academicYears.id, id))
-        .limit(1);
+        ;
     return row ?? null;
 };
 

@@ -33,14 +33,14 @@ export const createGalleryItem = async (req: Request, res: Response) => {
         const isSuperadmin = authReq.user!.isSuperadmin;
         const status = isSuperadmin ? 'approved' : 'pending';
 
-        const [item] = await db.insert(gallery).values({
+        const [item] = await db.insert(gallery).output().values({
             title,
             description,
             url,
             type,
             status,
             submittedById: authReq.user!.id,
-        }).returning();
+        });
 
         created(res, item, status === 'pending' 
             ? 'Submitted for superadmin approval.' 
@@ -54,10 +54,17 @@ export const updateGalleryItem = async (req: Request, res: Response) => {
     try {
         const authReq = req as AuthRequest;
         const id = Number(req.params.id);
-        
-        const updates: any = { ...req.body };
-        
+
+        // Whitelist updatable fields — never spread req.body directly
+        const { title, description, url, type } = req.body;
+        const updates: Partial<typeof gallery.$inferInsert> = {};
+        if (title !== undefined)       updates.title = String(title).trim() || null;
+        if (description !== undefined) updates.description = String(description);
+        if (url !== undefined)         updates.url = String(url).trim();
+        if (type !== undefined)        updates.type = type;
+
         if (!authReq.user!.isSuperadmin) {
+            // Non-superadmin edits must go back to pending review
             updates.status = 'pending';
             updates.rejectionReason = null;
         }
@@ -65,8 +72,8 @@ export const updateGalleryItem = async (req: Request, res: Response) => {
         const [item] = await db.update(gallery)
             .set(updates)
             .where(eq(gallery.id, id))
-            .returning();
-            
+            .output();
+
         ok(res, item);
     } catch (error) {
         handleError(res, error);
@@ -90,7 +97,7 @@ export const approveGalleryItem = async (req: Request, res: Response) => {
         const [item] = await db.update(gallery)
             .set({ status: 'approved', reviewedById: authReq.user!.id, rejectionReason: null })
             .where(eq(gallery.id, id))
-            .returning();
+            .output();
         ok(res, item, 'Item approved and published.');
     } catch (error) {
         handleError(res, error);
@@ -105,7 +112,7 @@ export const rejectGalleryItem = async (req: Request, res: Response) => {
         const [item] = await db.update(gallery)
             .set({ status: 'rejected', reviewedById: authReq.user!.id, rejectionReason: reason || null })
             .where(eq(gallery.id, id))
-            .returning();
+            .output();
         ok(res, item, 'Item rejected.');
     } catch (error) {
         handleError(res, error);

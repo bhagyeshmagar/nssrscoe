@@ -46,7 +46,7 @@ const VolunteerDashboard = () => {
             <div className="max-w-5xl mx-auto px-4">
                 {/* Header */}
                 <Card className="mb-6 border-gray-100 shadow-sm">
-                    <CardHeader className="flex flex-row items-center justify-between pb-4">
+                    <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-4">
                         <div>
                             <CardTitle className="text-2xl font-bold text-nss-blue">Volunteer Dashboard</CardTitle>
                             <CardDescription className="text-base mt-1">Welcome, <span className="font-semibold text-gray-700">{userName}</span></CardDescription>
@@ -72,16 +72,16 @@ const VolunteerDashboard = () => {
                 {/* Tabs */}
                 <Tabs defaultValue="profile" className="w-full">
                     <TabsList className="w-full justify-start overflow-x-auto bg-white border border-gray-100 shadow-sm rounded-lg p-1 h-auto mb-6 flex-wrap md:flex-nowrap">
-                        <TabsTrigger value="profile" className="flex-1 md:flex-none py-3 px-6 data-[state=active]:bg-blue-50 data-[state=active]:text-nss-blue">
-                            📋 My Profile
+                        <TabsTrigger value="profile" className="flex-1 md:flex-none text-xs sm:text-sm py-2.5 sm:py-3 px-3 sm:px-6 data-[state=active]:bg-blue-50 data-[state=active]:text-nss-blue min-h-[44px]">
+                            📋 <span className="hidden xs:inline">My </span>Profile
                         </TabsTrigger>
-                        <TabsTrigger value="volunteers" className="flex-1 md:flex-none py-3 px-6 data-[state=active]:bg-blue-50 data-[state=active]:text-nss-blue">
-                            👥 Fellow Volunteers
+                        <TabsTrigger value="volunteers" className="flex-1 md:flex-none text-xs sm:text-sm py-2.5 sm:py-3 px-3 sm:px-6 data-[state=active]:bg-blue-50 data-[state=active]:text-nss-blue min-h-[44px]">
+                            👥 Volunteers
                         </TabsTrigger>
-                        <TabsTrigger value="notifications" className="flex-1 md:flex-none py-3 px-6 data-[state=active]:bg-blue-50 data-[state=active]:text-nss-blue">
-                            🔔 Notifications
+                        <TabsTrigger value="notifications" className="flex-1 md:flex-none text-xs sm:text-sm py-2.5 sm:py-3 px-3 sm:px-6 data-[state=active]:bg-blue-50 data-[state=active]:text-nss-blue min-h-[44px]">
+                            🔔 Alerts
                         </TabsTrigger>
-                        <TabsTrigger value="attendance" className="flex-1 md:flex-none py-3 px-6 data-[state=active]:bg-blue-50 data-[state=active]:text-nss-blue">
+                        <TabsTrigger value="attendance" className="flex-1 md:flex-none text-xs sm:text-sm py-2.5 sm:py-3 px-3 sm:px-6 data-[state=active]:bg-blue-50 data-[state=active]:text-nss-blue min-h-[44px]">
                             📅 Attendance
                         </TabsTrigger>
                     </TabsList>

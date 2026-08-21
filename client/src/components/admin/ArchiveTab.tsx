@@ -11,7 +11,7 @@ export const ArchiveTab = ({ years }: { years: AcademicYear[] }) => {
                 {archived.map(ay => (
                     <div key={ay.id} className="bg-white rounded-xl shadow p-5 border-l-4 border-gray-300">
                         <div className="flex items-center gap-3 mb-1"><span className="text-lg font-bold text-gray-600">{ay.label}</span><AYStatusBadge ay={ay} /></div>
-                        <p className="text-sm text-gray-500">{ay.startDate} → {ay.endDate}</p>
+                        <p className="text-sm text-gray-500">{ay.startDate.split('T')[0]} → {ay.endDate.split('T')[0]}</p>
                         <p className="text-xs text-gray-400 mt-1">All data preserved and read-only</p>
                     </div>
                 ))}

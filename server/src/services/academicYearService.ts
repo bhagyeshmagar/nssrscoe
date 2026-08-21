@@ -1,4 +1,5 @@
 import { eq, ne, and, count, sql } from 'drizzle-orm';
+import bcrypt from 'bcryptjs';
 import { db } from '../db';
 import {
     academicYears,
@@ -38,8 +39,8 @@ export interface UpdateAYInput {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 /** Returns the AY or throws 404 */
-const findAY = async (id: number) => {
-    const [ay] = await db.select().from(academicYears).where(eq(academicYears.id, id)).limit(1);
+const findAY = async (id: number, tx: any = db) => {
+    const [ay] = await tx.select().top(1).from(academicYears).where(eq(academicYears.id, id));
     if (!ay) throw new NotFoundError(`Academic year with id ${id} not found.`);
     return ay;
 };
@@ -61,33 +62,35 @@ export const createAcademicYear = async (input: CreateAYInput, adminId: number) 
         throw new ValidationError('start_date must be before end_date.');
     }
 
-    const [existing] = await db
-        .select({ id: academicYears.id })
-        .from(academicYears)
-        .where(eq(academicYears.label, input.label))
-        .limit(1);
-    if (existing) throw new ConflictError(`Academic year "${input.label}" already exists.`);
+    try {
+        return await db.transaction(async (tx) => {
+            const [ay] = await tx.insert(academicYears).output().values({
+                label: input.label,
+                startDate: new Date(input.startDate),
+                endDate: new Date(input.endDate),
+                volunteerCap: input.volunteerCap ?? 100,
+                isCurrent: false,
+                isLocked: false,
+                isArchived: false,
+            });
 
-    const [ay] = await db.insert(academicYears).values({
-        label: input.label,
-        startDate: input.startDate,
-        endDate: input.endDate,
-        volunteerCap: input.volunteerCap ?? 100,
-        isCurrent: false,
-        isLocked: false,
-        isArchived: false,
-    }).returning();
+            await logAudit({
+                action: 'academic_year.create',
+                entityType: 'academic_year',
+                entityId: ay.id,
+                performedById: adminId,
+                academicYearId: ay.id,
+                details: { label: ay.label },
+            }, tx);
 
-    await logAudit({
-        action: 'academic_year.create',
-        entityType: 'academic_year',
-        entityId: ay.id,
-        performedById: adminId,
-        academicYearId: ay.id,
-        details: { label: ay.label },
-    });
-
-    return ay;
+            return ay;
+        });
+    } catch (err: any) {
+        if (err?.number === 2627 || err?.number === 2601 || String(err).includes('UNIQUE KEY')) {
+            throw new ConflictError(`Academic year "${input.label}" already exists.`);
+        }
+        throw err;
+    }
 };
 
 export const getAllAcademicYears = async () =>
@@ -98,9 +101,9 @@ export const getAcademicYearById = async (id: number) => findAY(id);
 export const getCurrentAcademicYear = async () => {
     const [ay] = await db
         .select()
-        .from(academicYears)
+        .top(1).from(academicYears)
         .where(eq(academicYears.isCurrent, true))
-        .limit(1);
+        ;
     return ay ?? null;
 };
 
@@ -123,29 +126,38 @@ export const updateAcademicYear = async (id: number, input: UpdateAYInput, admin
         throw new ValidationError('start_date must be before end_date.');
     }
 
-    const [updated] = await db
-        .update(academicYears)
-        .set({
-            ...(input.label && { label: input.label }),
-            ...(input.startDate && { startDate: input.startDate }),
-            ...(input.endDate && { endDate: input.endDate }),
-            ...(input.volunteerCap !== undefined && { volunteerCap: input.volunteerCap }),
-            ...(input.regularActivityReportUrl !== undefined && { regularActivityReportUrl: input.regularActivityReportUrl }),
-            ...(input.specialCampReportUrl !== undefined && { specialCampReportUrl: input.specialCampReportUrl }),
-        })
-        .where(eq(academicYears.id, id))
-        .returning();
+    try {
+        return await db.transaction(async (tx) => {
+            const [updated] = await tx
+                .update(academicYears)
+                .set({
+                    ...(input.label && { label: input.label }),
+                    ...(input.startDate && { startDate: new Date(input.startDate) }),
+                    ...(input.endDate && { endDate: new Date(input.endDate) }),
+                    ...(input.volunteerCap !== undefined && { volunteerCap: input.volunteerCap }),
+                    ...(input.regularActivityReportUrl !== undefined && { regularActivityReportUrl: input.regularActivityReportUrl }),
+                    ...(input.specialCampReportUrl !== undefined && { specialCampReportUrl: input.specialCampReportUrl }),
+                })
+                .where(eq(academicYears.id, id))
+                .output();
 
-    await logAudit({
-        action: 'academic_year.update',
-        entityType: 'academic_year',
-        entityId: id,
-        performedById: adminId,
-        academicYearId: id,
-        details: input as unknown as Record<string, unknown>,
-    });
+            await logAudit({
+                action: 'academic_year.update',
+                entityType: 'academic_year',
+                entityId: id,
+                performedById: adminId,
+                academicYearId: id,
+                details: input as unknown as Record<string, unknown>,
+            }, tx);
 
-    return updated;
+            return updated;
+        });
+    } catch (err: any) {
+        if (err?.number === 2627 || err?.number === 2601 || String(err).includes('UNIQUE KEY')) {
+            throw new ConflictError(`Academic year label already exists.`);
+        }
+        throw err;
+    }
 };
 
 // ── State transitions ──────────────────────────────────────────────────────────
@@ -155,35 +167,44 @@ export const updateAcademicYear = async (id: number, input: UpdateAYInput, admin
  * Deactivates the currently active AY first (within a transaction).
  */
 export const activateAcademicYear = async (id: number, adminId: number) => {
-    const ay = await findAY(id);
+    try {
+        return await db.transaction(async (tx) => {
+            const ay = await findAY(id, tx);
 
-    if (ay.isLocked)   throw new AYLockedError(ay.label);
-    if (ay.isArchived) throw new ForbiddenError(`Academic year "${ay.label}" is archived and cannot be activated.`, 'AY_ARCHIVED');
-    if (ay.isCurrent)  throw new ConflictError(`Academic year "${ay.label}" is already the current year.`);
+            if (ay.isLocked)   throw new AYLockedError(ay.label);
+            if (ay.isArchived) throw new ForbiddenError(`Academic year "${ay.label}" is archived and cannot be activated.`, 'AY_ARCHIVED');
+            if (ay.isCurrent)  throw new ConflictError(`Academic year "${ay.label}" is already the current year.`);
 
-    // Deactivate any existing current AY, then activate this one — in a transaction
-    await db.transaction(async (tx) => {
-        await tx
-            .update(academicYears)
-            .set({ isCurrent: false })
-            .where(eq(academicYears.isCurrent, true));
+            // Deactivate any existing current AY
+            await tx
+                .update(academicYears)
+                .set({ isCurrent: false })
+                .where(eq(academicYears.isCurrent, true));
 
-        await tx
-            .update(academicYears)
-            .set({ isCurrent: true })
-            .where(eq(academicYears.id, id));
-    });
+            // Activate new AY
+            const [updated] = await tx
+                .update(academicYears)
+                .set({ isCurrent: true })
+                .where(eq(academicYears.id, id))
+                .output();
 
-    await logAudit({
-        action: 'academic_year.activate',
-        entityType: 'academic_year',
-        entityId: id,
-        performedById: adminId,
-        academicYearId: id,
-        details: { label: ay.label },
-    });
+            await logAudit({
+                action: 'academic_year.activate',
+                entityType: 'academic_year',
+                entityId: id,
+                performedById: adminId,
+                academicYearId: id,
+                details: { label: ay.label },
+            }, tx);
 
-    return findAY(id);
+            return updated;
+        });
+    } catch (err: any) {
+        if (err?.number === 2601 || err?.number === 2627 || String(err).includes('unique index')) {
+            throw new ConflictError('Another academic year was activated concurrently.');
+        }
+        throw err;
+    }
 };
 
 /**
@@ -192,57 +213,63 @@ export const activateAcademicYear = async (id: number, adminId: number) => {
  * This is irreversible.
  */
 export const lockAcademicYear = async (id: number, adminId: number) => {
-    const ay = await findAY(id);
+    return await db.transaction(async (tx) => {
+        const ay = await findAY(id, tx);
 
-    if (ay.isLocked)   throw new ConflictError(`Academic year "${ay.label}" is already locked.`);
-    if (ay.isArchived) throw new ForbiddenError(`Academic year "${ay.label}" is archived.`, 'AY_ARCHIVED');
+        if (ay.isLocked)   throw new ConflictError(`Academic year "${ay.label}" is already locked.`);
+        if (ay.isArchived) throw new ForbiddenError(`Academic year "${ay.label}" is archived.`, 'AY_ARCHIVED');
 
-    await db
-        .update(academicYears)
-        .set({
-            isLocked: true,
-            isCurrent: false,
-            lockedAt: new Date(),
-            lockedById: adminId,
-        })
-        .where(eq(academicYears.id, id));
+        const [locked] = await tx
+            .update(academicYears)
+            .set({
+                isLocked: true,
+                isCurrent: false,
+                lockedAt: new Date(),
+                lockedById: adminId,
+            })
+            .where(eq(academicYears.id, id))
+            .output();
 
-    await auditAYLock(id, adminId, ay.label);
+        await auditAYLock(id, adminId, ay.label, tx);
 
-    return findAY(id);
+        return locked;
+    });
 };
 
 export const unlockAcademicYear = async (id: number, passwordStr: string, adminId: number) => {
-    const ay = await findAY(id);
+    return await db.transaction(async (tx) => {
+        const ay = await findAY(id, tx);
 
-    if (!ay.isLocked) throw new ConflictError(`Academic year "${ay.label}" is not locked.`);
-    if (ay.isArchived) throw new ForbiddenError(`Academic year "${ay.label}" is archived and cannot be unlocked.`, 'AY_ARCHIVED');
+        if (!ay.isLocked) throw new ConflictError(`Academic year "${ay.label}" is not locked.`);
+        if (ay.isArchived) throw new ForbiddenError(`Academic year "${ay.label}" is archived and cannot be unlocked.`, 'AY_ARCHIVED');
 
-    const [admin] = await db.select().from(admins).where(eq(admins.id, adminId)).limit(1);
-    if (!admin) throw new NotFoundError('Admin not found.');
+        const [admin] = await tx.select().top(1).from(admins).where(eq(admins.id, adminId));
+        if (!admin) throw new NotFoundError('Admin not found.');
 
-    const isValid = await require('bcryptjs').compare(passwordStr, admin.passwordHash);
-    if (!isValid) throw new ForbiddenError('Invalid admin password.');
+        const isValid = await bcrypt.compare(passwordStr, admin.passwordHash);
+        if (!isValid) throw new ForbiddenError('Invalid admin password.');
 
-    await db
-        .update(academicYears)
-        .set({
-            isLocked: false,
-            lockedAt: null,
-            lockedById: null,
-        })
-        .where(eq(academicYears.id, id));
+        const [unlocked] = await tx
+            .update(academicYears)
+            .set({
+                isLocked: false,
+                lockedAt: null,
+                lockedById: null,
+            })
+            .where(eq(academicYears.id, id))
+            .output();
 
-    await logAudit({
-        action: 'academic_year.unlock',
-        entityType: 'academic_year',
-        entityId: id,
-        performedById: adminId,
-        academicYearId: id,
-        details: { label: ay.label },
+        await logAudit({
+            action: 'academic_year.unlock',
+            entityType: 'academic_year',
+            entityId: id,
+            performedById: adminId,
+            academicYearId: id,
+            details: { label: ay.label },
+        }, tx);
+
+        return unlocked;
     });
-
-    return findAY(id);
 };
 
 /**
@@ -251,61 +278,76 @@ export const unlockAcademicYear = async (id: number, passwordStr: string, adminI
  * but remain fully queryable for historical reporting.
  */
 export const archiveAcademicYear = async (id: number, adminId: number) => {
-    const ay = await findAY(id);
+    return await db.transaction(async (tx) => {
+        const ay = await findAY(id, tx);
 
-    if (!ay.isLocked)  throw new ForbiddenError(`Academic year "${ay.label}" must be locked before archiving.`, 'AY_NOT_LOCKED');
-    if (ay.isArchived) throw new ConflictError(`Academic year "${ay.label}" is already archived.`);
+        if (!ay.isLocked)  throw new ForbiddenError(`Academic year "${ay.label}" must be locked before archiving.`, 'AY_NOT_LOCKED');
+        if (ay.isArchived) throw new ConflictError(`Academic year "${ay.label}" is already archived.`);
 
-    await db
-        .update(academicYears)
-        .set({ isArchived: true })
-        .where(eq(academicYears.id, id));
+        const [archived] = await tx
+            .update(academicYears)
+            .set({ isArchived: true })
+            .where(eq(academicYears.id, id))
+            .output();
 
-    await auditAYArchive(id, adminId, ay.label);
+        await auditAYArchive(id, adminId, ay.label, tx);
 
-    return findAY(id);
+        return archived;
+    });
 };
 
 /**
  * Unarchive: transition an archived AY back to unarchived (still locked).
  */
 export const unarchiveAcademicYear = async (id: number, adminId: number) => {
-    const ay = await findAY(id);
+    return await db.transaction(async (tx) => {
+        const ay = await findAY(id, tx);
 
-    if (!ay.isLocked) throw new ForbiddenError(`Academic year "${ay.label}" must be locked before unarchiving.`, 'AY_NOT_LOCKED');
-    if (!ay.isArchived) throw new ConflictError(`Academic year "${ay.label}" is not archived.`);
+        if (!ay.isLocked) throw new ForbiddenError(`Academic year "${ay.label}" must be locked before unarchiving.`, 'AY_NOT_LOCKED');
+        if (!ay.isArchived) throw new ConflictError(`Academic year "${ay.label}" is not archived.`);
 
-    await db
-        .update(academicYears)
-        .set({ isArchived: false })
-        .where(eq(academicYears.id, id));
+        const [unarchived] = await tx
+            .update(academicYears)
+            .set({ isArchived: false })
+            .where(eq(academicYears.id, id))
+            .output();
 
-    await logAudit({
-        action: 'academic_year.unarchive',
-        entityType: 'academic_year',
-        entityId: id,
-        performedById: adminId,
-        academicYearId: id,
-        details: { label: ay.label },
+        await logAudit({
+            action: 'academic_year.unarchive',
+            entityType: 'academic_year',
+            entityId: id,
+            performedById: adminId,
+            academicYearId: id,
+            details: { label: ay.label },
+        }, tx);
+
+        return unarchived;
     });
-
-    return findAY(id);
 };
 
 export const deleteAcademicYear = async (id: number, adminId: number) => {
-    const ay = await findAY(id);
-    if (ay.isCurrent) throw new ForbiddenError('Cannot delete the currently active academic year.');
+    try {
+        await db.transaction(async (tx) => {
+            const ay = await findAY(id, tx);
+            if (ay.isCurrent) throw new ForbiddenError('Cannot delete the currently active academic year.');
 
-    await db.delete(academicYears).where(eq(academicYears.id, id));
+            await tx.delete(academicYears).where(eq(academicYears.id, id));
 
-    await logAudit({
-        action: 'academic_year.delete',
-        entityType: 'academic_year',
-        entityId: id,
-        performedById: adminId,
-        academicYearId: id,
-        details: { label: ay.label },
-    });
+            await logAudit({
+                action: 'academic_year.delete',
+                entityType: 'academic_year',
+                entityId: id,
+                performedById: adminId,
+                academicYearId: id,
+                details: { label: ay.label },
+            }, tx);
+        });
+    } catch (err: any) {
+        if (err?.number === 547 || String(err).includes('REFERENCE constraint')) {
+            throw new ConflictError('Cannot delete this academic year because it has linked records (volunteers, events, etc).');
+        }
+        throw err;
+    }
 };
 
 // ── Stats ──────────────────────────────────────────────────────────────────────
@@ -313,45 +355,44 @@ export const deleteAcademicYear = async (id: number, adminId: number) => {
 export const getAcademicYearStats = async (id: number) => {
     await findAY(id); // validates existence
 
-    // Total volunteers, regular count, backup count
-    const [totals] = await db
-        .select({
-            total: count(),
-            regular: sql<number>`SUM(CASE WHEN ${volunteers.status} = 'regular' THEN 1 ELSE 0 END)`,
-            backup:  sql<number>`SUM(CASE WHEN ${volunteers.status} = 'backup'  THEN 1 ELSE 0 END)`,
-            active:  sql<number>`SUM(CASE WHEN ${volunteers.isActive} = true    THEN 1 ELSE 0 END)`,
-        })
-        .from(volunteers)
-        .where(eq(volunteers.academicYearId, id));
-
-    // Per-department breakdown
-    const deptRows = await db
-        .select({
-            department: volunteers.department,
-            total:   sql<number>`COUNT(*)`,
-            regular: sql<number>`SUM(CASE WHEN ${volunteers.status} = 'regular' THEN 1 ELSE 0 END)`,
-        })
-        .from(volunteers)
-        .where(eq(volunteers.academicYearId, id))
-        .groupBy(volunteers.department);
-
-    // Core team count
-    const [coreTeamCount] = await db
-        .select({ n: count() })
-        .from(coreTeamAssignments)
-        .where(eq(coreTeamAssignments.academicYearId, id));
-
-    // Special camp count
-    const [campCount] = await db
-        .select({ n: count() })
-        .from(specialCamps)
-        .where(eq(specialCamps.academicYearId, id));
-
-    // Event count (optional link)
-    const [eventCount] = await db
-        .select({ n: count() })
-        .from(events)
-        .where(eq(events.academicYearId, id));
+    const [
+        [totals],
+        deptRows,
+        [coreTeamCount],
+        [campCount],
+        [eventCount]
+    ] = await Promise.all([
+        db
+            .select({
+                total: count(),
+                regular: sql<number>`SUM(CASE WHEN ${volunteers.status} = 'regular' THEN 1 ELSE 0 END)`,
+                backup:  sql<number>`SUM(CASE WHEN ${volunteers.status} = 'backup'  THEN 1 ELSE 0 END)`,
+                active:  sql<number>`SUM(CASE WHEN ${volunteers.isActive} = 1    THEN 1 ELSE 0 END)`,
+            })
+            .from(volunteers)
+            .where(eq(volunteers.academicYearId, id)),
+        db
+            .select({
+                department: volunteers.department,
+                total:   sql<number>`COUNT(*)`,
+                regular: sql<number>`SUM(CASE WHEN ${volunteers.status} = 'regular' THEN 1 ELSE 0 END)`,
+            })
+            .from(volunteers)
+            .where(eq(volunteers.academicYearId, id))
+            .groupBy(volunteers.department),
+        db
+            .select({ n: count() })
+            .from(coreTeamAssignments)
+            .where(eq(coreTeamAssignments.academicYearId, id)),
+        db
+            .select({ n: count() })
+            .from(specialCamps)
+            .where(eq(specialCamps.academicYearId, id)),
+        db
+            .select({ n: count() })
+            .from(events)
+            .where(eq(events.academicYearId, id)),
+    ]);
 
     return {
         volunteers: {

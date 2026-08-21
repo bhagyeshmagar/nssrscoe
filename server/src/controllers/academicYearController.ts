@@ -1,101 +1,94 @@
 import { Request, Response } from 'express';
 import * as ayService from '../services/academicYearService';
-import { ok, created, handleError } from '../lib/response';
+import { ok, created } from '../lib/response';
 import { AuthRequest } from '../middleware/auth';
+import { asyncHandler } from '../lib/asyncHandler';
+import { positiveIntParam, createAYSchema, updateAYSchema, unlockAYSchema } from '../lib/schemas';
+import { AppError } from '../lib/errors';
 
-export const listAcademicYears = async (req: Request, res: Response) => {
-    try {
-        const data = await ayService.getAllAcademicYears();
-        ok(res, data);
-    } catch (err) { handleError(res, err); }
+const getAdminId = (req: Request): number => {
+    const user = (req as AuthRequest).user;
+    if (!user) throw new AppError('Unauthorized access', 401, 'UNAUTHORIZED');
+    return user.id;
 };
 
-export const createAcademicYear = async (req: Request, res: Response) => {
-    try {
-        const adminId = (req as AuthRequest).user!.id;
-        const ay = await ayService.createAcademicYear(req.body, adminId);
-        created(res, ay, `Academic year "${ay.label}" created.`);
-    } catch (err) { handleError(res, err); }
-};
+export const listAcademicYears = asyncHandler(async (req: Request, res: Response) => {
+    const data = await ayService.getAllAcademicYears();
+    ok(res, data);
+});
 
-export const getCurrentAcademicYear = async (req: Request, res: Response) => {
-    try {
-        const ay = await ayService.getCurrentAcademicYear();
-        if (!ay) return res.status(404).json({ success: false, code: 'NO_CURRENT_AY', message: 'No academic year is currently active.' });
-        ok(res, ay);
-    } catch (err) { handleError(res, err); }
-};
+export const createAcademicYear = asyncHandler(async (req: Request, res: Response) => {
+    const adminId = getAdminId(req);
+    const { body } = createAYSchema.parse({ body: req.body });
+    const ay = await ayService.createAcademicYear(body, adminId);
+    created(res, ay, `Academic year "${ay.label}" created.`);
+});
 
-export const getAcademicYear = async (req: Request, res: Response) => {
-    try {
-        const ay = await ayService.getAcademicYearById(Number(req.params.id));
-        ok(res, ay);
-    } catch (err) { handleError(res, err); }
-};
+export const getCurrentAcademicYear = asyncHandler(async (req: Request, res: Response) => {
+    const ay = await ayService.getCurrentAcademicYear();
+    if (!ay) throw new AppError('No academic year is currently active.', 404, 'NO_CURRENT_AY');
+    ok(res, ay);
+});
 
-export const updateAcademicYear = async (req: Request, res: Response) => {
-    try {
-        const adminId = (req as AuthRequest).user!.id;
-        const ay = await ayService.updateAcademicYear(Number(req.params.id), req.body, adminId);
-        ok(res, ay, 'Academic year updated.');
-    } catch (err) { handleError(res, err); }
-};
+export const getAcademicYear = asyncHandler(async (req: Request, res: Response) => {
+    const id = positiveIntParam.parse(req.params.id);
+    const ay = await ayService.getAcademicYearById(id);
+    ok(res, ay);
+});
 
-export const activateAcademicYear = async (req: Request, res: Response) => {
-    try {
-        const adminId = (req as AuthRequest).user!.id;
-        const ay = await ayService.activateAcademicYear(Number(req.params.id), adminId);
-        ok(res, ay, `Academic year "${ay.label}" is now active.`);
-    } catch (err) { handleError(res, err); }
-};
+export const updateAcademicYear = asyncHandler(async (req: Request, res: Response) => {
+    const adminId = getAdminId(req);
+    const id = positiveIntParam.parse(req.params.id);
+    const { body } = updateAYSchema.parse({ body: req.body });
+    const ay = await ayService.updateAcademicYear(id, body, adminId);
+    ok(res, ay, 'Academic year updated.');
+});
 
-export const lockAcademicYear = async (req: Request, res: Response) => {
-    try {
-        const adminId = (req as AuthRequest).user!.id;
-        const ay = await ayService.lockAcademicYear(Number(req.params.id), adminId);
-        ok(res, ay, `Academic year "${ay.label}" has been locked.`);
-    } catch (err) { handleError(res, err); }
-};
+export const activateAcademicYear = asyncHandler(async (req: Request, res: Response) => {
+    const adminId = getAdminId(req);
+    const id = positiveIntParam.parse(req.params.id);
+    const ay = await ayService.activateAcademicYear(id, adminId);
+    ok(res, ay, `Academic year "${ay.label}" is now active.`);
+});
 
-export const unlockAcademicYear = async (req: Request, res: Response) => {
-    try {
-        const adminId = (req as AuthRequest).user!.id;
-        const { password } = req.body;
-        if (!password) {
-            return res.status(400).json({ success: false, message: 'Password is required to unlock.' });
-        }
-        const ay = await ayService.unlockAcademicYear(Number(req.params.id), password, adminId);
-        ok(res, ay, `Academic year "${ay.label}" has been unlocked.`);
-    } catch (err) { handleError(res, err); }
-};
+export const lockAcademicYear = asyncHandler(async (req: Request, res: Response) => {
+    const adminId = getAdminId(req);
+    const id = positiveIntParam.parse(req.params.id);
+    const ay = await ayService.lockAcademicYear(id, adminId);
+    ok(res, ay, `Academic year "${ay.label}" has been locked.`);
+});
 
-export const archiveAcademicYear = async (req: Request, res: Response) => {
-    try {
-        const adminId = (req as AuthRequest).user!.id;
-        const ay = await ayService.archiveAcademicYear(Number(req.params.id), adminId);
-        ok(res, ay, `Academic year "${ay.label}" has been archived.`);
-    } catch (err) { handleError(res, err); }
-};
+export const unlockAcademicYear = asyncHandler(async (req: Request, res: Response) => {
+    const adminId = getAdminId(req);
+    const id = positiveIntParam.parse(req.params.id);
+    const { body } = unlockAYSchema.parse({ body: req.body });
+    const ay = await ayService.unlockAcademicYear(id, body.password, adminId);
+    ok(res, ay, `Academic year "${ay.label}" has been unlocked.`);
+});
 
-export const unarchiveAcademicYear = async (req: Request, res: Response) => {
-    try {
-        const adminId = (req as AuthRequest).user!.id;
-        const ay = await ayService.unarchiveAcademicYear(Number(req.params.id), adminId);
-        ok(res, ay, `Academic year "${ay.label}" has been unarchived.`);
-    } catch (err) { handleError(res, err); }
-};
+export const archiveAcademicYear = asyncHandler(async (req: Request, res: Response) => {
+    const adminId = getAdminId(req);
+    const id = positiveIntParam.parse(req.params.id);
+    const ay = await ayService.archiveAcademicYear(id, adminId);
+    ok(res, ay, `Academic year "${ay.label}" has been archived.`);
+});
 
-export const deleteAcademicYear = async (req: Request, res: Response) => {
-    try {
-        const adminId = (req as AuthRequest).user!.id;
-        await ayService.deleteAcademicYear(Number(req.params.id), adminId);
-        ok(res, null, `Academic year deleted.`);
-    } catch (err) { handleError(res, err); }
-};
+export const unarchiveAcademicYear = asyncHandler(async (req: Request, res: Response) => {
+    const adminId = getAdminId(req);
+    const id = positiveIntParam.parse(req.params.id);
+    const ay = await ayService.unarchiveAcademicYear(id, adminId);
+    ok(res, ay, `Academic year "${ay.label}" has been unarchived.`);
+});
 
-export const getAcademicYearStats = async (req: Request, res: Response) => {
-    try {
-        const stats = await ayService.getAcademicYearStats(Number(req.params.id));
-        ok(res, stats);
-    } catch (err) { handleError(res, err); }
-};
+export const deleteAcademicYear = asyncHandler(async (req: Request, res: Response) => {
+    const adminId = getAdminId(req);
+    const id = positiveIntParam.parse(req.params.id);
+    await ayService.deleteAcademicYear(id, adminId);
+    ok(res, null, `Academic year deleted.`);
+});
+
+export const getAcademicYearStats = asyncHandler(async (req: Request, res: Response) => {
+    const id = positiveIntParam.parse(req.params.id);
+    const stats = await ayService.getAcademicYearStats(id);
+    ok(res, stats);
+});

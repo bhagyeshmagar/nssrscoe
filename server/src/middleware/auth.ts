@@ -20,9 +20,9 @@ export const authenticateToken = (req: Request, res: Response, next: NextFunctio
 
     if (token == null) return res.status(401).json({ success: false, message: 'No authentication token provided.' });
 
-    jwt.verify(token, process.env.JWT_SECRET as string, (err: any, user: any) => {
+    jwt.verify(token, process.env.JWT_SECRET as string, (err: jwt.VerifyErrors | null, decoded: jwt.JwtPayload | string | undefined) => {
         if (err) return res.status(401).json({ success: false, message: 'Token is invalid or expired.' });
-        (req as AuthRequest).user = user;
+        (req as AuthRequest).user = decoded as AuthRequest['user'];
         next();
     });
 };
@@ -31,10 +31,10 @@ export const authenticateToken = (req: Request, res: Response, next: NextFunctio
 export const requireAdmin = async (req: Request, res: Response, next: NextFunction) => {
     const authReq = req as AuthRequest;
     if (!authReq.user || (authReq.user.role !== 'admin' && authReq.user.role !== 'superadmin')) {
-        return res.status(403).json({ message: 'Admin access required' });
+        return res.status(403).json({ success: false, code: 'FORBIDDEN', message: 'Admin access required.' });
     }
     try {
-        const [admin] = await db.select().from(admins).where(eq(admins.id, authReq.user.id)).limit(1);
+        const [admin] = await db.select().top(1).from(admins).where(eq(admins.id, authReq.user.id));
         if (!admin) {
             return res.status(403).json({ message: 'Admin account no longer exists' });
         }
@@ -58,7 +58,7 @@ export const requireSuperAdmin = async (req: Request, res: Response, next: NextF
         return res.status(403).json({ success: false, message: 'Superadmin access required' });
     }
     try {
-        const [admin] = await db.select().from(admins).where(eq(admins.id, authReq.user.id)).limit(1);
+        const [admin] = await db.select().top(1).from(admins).where(eq(admins.id, authReq.user.id));
         if (!admin || !admin.isSuperadmin) {
             return res.status(403).json({ success: false, message: 'Superadmin access required' });
         }
@@ -77,7 +77,7 @@ export const requireVolunteer = async (req: Request, res: Response, next: NextFu
     }
     
     try {
-        const [volunteer] = await db.select().from(volunteers).where(eq(volunteers.id, authReq.user.id)).limit(1);
+        const [volunteer] = await db.select().top(1).from(volunteers).where(eq(volunteers.id, authReq.user.id));
         if (!volunteer || !volunteer.isActive) {
             return res.status(403).json({ success: false, message: 'Volunteer account no longer exists or is inactive' });
         }

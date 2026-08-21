@@ -7,6 +7,7 @@ import { useAuthStore } from '../stores/authStore';
 const Navbar = () => {
     const [isOpen, setIsOpen] = useState(false);
     const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
+    const [mobileExpandedDropdown, setMobileExpandedDropdown] = useState<string | null>(null);
     const location = useLocation();
     const navigate = useNavigate();
     const { token, userRole, clearAuth } = useAuthStore();
@@ -65,28 +66,50 @@ const Navbar = () => {
         setActiveDropdown(null);
     }
 
+    const toggleMobileDropdown = (name: string) => {
+        setMobileExpandedDropdown(prev => prev === name ? null : name);
+    };
+
     return (
         <>
             {/* Top Header with Logos and College Info */}
-            <div className="bg-white py-2 border-b border-gray-200">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4">
-                    <div className="flex items-center gap-4">
-                        <img src="/assets/jspm_logo.jpg" alt="JSPM Logo" className="h-16 w-auto object-contain" />
-                        <img src="/assets/rscoe_logo.png" alt="RSCOE Logo" className="h-16 w-auto object-contain" />
+            <div className="bg-white border-b border-gray-200">
+                {/* Mobile: compact single-row header ~50px */}
+                <div className="flex md:hidden items-center justify-between px-3 py-2 h-[52px]">
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                        <img src="/assets/jspm_logo.jpg" alt="JSPM" className="h-8 w-auto object-contain" />
+                        <img src="/assets/rscoe_logo.png" alt="RSCOE" className="h-8 w-auto object-contain" />
                     </div>
-                    <div className="text-center flex-1 mx-4">
-                        <h1 className="text-nss-red font-bold text-lg md:text-xl lg:text-2xl leading-tight">
+                    <div className="flex-1 text-center px-2 min-w-0">
+                        <p className="text-nss-red font-bold text-[9px] leading-tight">
                             JSPM's Rajarshi Shahu College of Engineering
-                        </h1>
-                        <p className="text-xs md:text-sm text-gray-600 mt-1">
-                            An Empowered Autonomous Institute Affiliated to Savitribai Phule Pune University
                         </p>
-                        <p className="text-[10px] md:text-xs text-gray-500">
-                            Approved by AICTE, Accredited by NBA (UG Programs), Accredited by NAAC With "A" Grade | MHRD-NIRF Rank: 151-200
-                        </p>
+                        <p className="text-gray-500 text-[8px] leading-tight mt-0.5">NSS Unit · Tathawade, Pune</p>
                     </div>
-                    <div className="flex items-center">
-                        <img src="/assets/nss_logo.jpg" alt="NSS Logo" className="h-16 w-16 md:h-20 md:w-20 object-contain rounded-full" />
+                    <img src="/assets/nss_logo.jpg" alt="NSS" className="h-8 w-8 object-contain rounded-full flex-shrink-0" />
+                </div>
+
+                {/* Desktop: full header */}
+                <div className="hidden md:block">
+                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4 py-2">
+                        <div className="flex items-center gap-4">
+                            <img src="/assets/jspm_logo.jpg" alt="JSPM Logo" className="h-16 w-auto object-contain" />
+                            <img src="/assets/rscoe_logo.png" alt="RSCOE Logo" className="h-16 w-auto object-contain" />
+                        </div>
+                        <div className="text-center flex-1 mx-4">
+                            <h1 className="text-nss-red font-bold text-lg md:text-xl lg:text-2xl leading-tight">
+                                JSPM's Rajarshi Shahu College of Engineering
+                            </h1>
+                            <p className="text-xs md:text-sm text-gray-600 mt-1">
+                                An Empowered Autonomous Institute Affiliated to Savitribai Phule Pune University
+                            </p>
+                            <p className="text-[10px] md:text-xs text-gray-500">
+                                Approved by AICTE, Accredited by NBA (UG Programs), Accredited by NAAC With "A" Grade | MHRD-NIRF Rank: 151-200
+                            </p>
+                        </div>
+                        <div className="flex items-center">
+                            <img src="/assets/nss_logo.jpg" alt="NSS Logo" className="h-16 w-16 md:h-20 md:w-20 object-contain rounded-full" />
+                        </div>
                     </div>
                 </div>
             </div>
@@ -147,11 +170,14 @@ const Navbar = () => {
                                 </div>
                             </div>
                         </div>
+
+                        {/* Mobile hamburger row */}
                         <div className="-mr-2 flex md:hidden w-full justify-between items-center">
-                            <span className="font-bold">NSS MENU</span>
+                            <span className="font-bold text-sm">NSS MENU</span>
                             <button
                                 onClick={() => setIsOpen(!isOpen)}
-                                className="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-white hover:bg-nss-red focus:outline-none"
+                                className="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-white hover:bg-nss-red focus:outline-none min-h-[44px] min-w-[44px]"
+                                aria-label="Toggle menu"
                             >
                                 {isOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
                             </button>
@@ -171,57 +197,78 @@ const Navbar = () => {
                             <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
                                 {navLinks.map((link) => (
                                     <div key={link.name}>
-                                        <Link
-                                            to={link.path}
-                                            className={`block px-3 py-2 rounded-md text-base font-medium ${isActive(link.path) ? 'bg-nss-red' : 'hover:bg-nss-red'
-                                                }`}
-                                            onClick={() => !link.dropdown && setIsOpen(false)}
-                                        >
-                                            {link.name}
-                                        </Link>
-                                        {link.dropdown && (
-                                            <div className="pl-4 space-y-1">
-                                                {link.dropdown.map(subItem => (
-                                                    <Link
-                                                        key={subItem.name}
-                                                        to={subItem.path}
-                                                        className="block hover:bg-blue-800 px-3 py-2 rounded-md text-sm font-medium text-gray-300 hover:text-white"
-                                                        onClick={() => setIsOpen(false)}
-                                                    >
-                                                        - {subItem.name}
-                                                    </Link>
-                                                ))}
-                                            </div>
+                                        {link.dropdown ? (
+                                            <>
+                                                {/* Accordion toggle for links with dropdowns */}
+                                                <button
+                                                    onClick={() => toggleMobileDropdown(link.name)}
+                                                    className={`w-full text-left flex items-center justify-between px-3 py-3 rounded-md text-base font-medium min-h-[44px] ${isActive(link.path) ? 'bg-nss-red' : 'hover:bg-nss-red'}`}
+                                                >
+                                                    <span>{link.name}</span>
+                                                    <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${mobileExpandedDropdown === link.name ? 'rotate-180' : ''}`} />
+                                                </button>
+                                                <AnimatePresence>
+                                                    {mobileExpandedDropdown === link.name && (
+                                                        <motion.div
+                                                            initial={{ opacity: 0, height: 0 }}
+                                                            animate={{ opacity: 1, height: 'auto' }}
+                                                            exit={{ opacity: 0, height: 0 }}
+                                                            className="pl-4 space-y-0.5 overflow-hidden"
+                                                        >
+                                                            {link.dropdown.map(subItem => (
+                                                                <Link
+                                                                    key={subItem.name}
+                                                                    to={subItem.path}
+                                                                    className="flex items-center min-h-[44px] hover:bg-blue-800 px-3 py-2.5 rounded-md text-sm font-medium text-gray-300 hover:text-white"
+                                                                    onClick={() => { setIsOpen(false); setMobileExpandedDropdown(null); }}
+                                                                >
+                                                                    › {subItem.name}
+                                                                </Link>
+                                                            ))}
+                                                        </motion.div>
+                                                    )}
+                                                </AnimatePresence>
+                                            </>
+                                        ) : (
+                                            <Link
+                                                to={link.path}
+                                                className={`flex items-center min-h-[44px] px-3 py-3 rounded-md text-base font-medium ${isActive(link.path) ? 'bg-nss-red' : 'hover:bg-nss-red'}`}
+                                                onClick={() => setIsOpen(false)}
+                                            >
+                                                {link.name}
+                                            </Link>
                                         )}
                                     </div>
                                 ))}
-                                {isLoggedIn && (
-                                    <Link
-                                        to={userRole === 'admin' ? '/admin' : '/volunteer'}
-                                        className="block w-full bg-blue-800 text-white hover:bg-blue-700 px-3 py-2 rounded-md text-base font-medium mt-4 mx-2 text-center"
-                                        onClick={() => setIsOpen(false)}
-                                    >
-                                        Dashboard
-                                    </Link>
-                                )}
-                                {isLoggedIn ? (
-                                    <>
+
+                                {/* Auth buttons */}
+                                <div className="pt-2 space-y-2">
+                                    {isLoggedIn && (
+                                        <Link
+                                            to={userRole === 'admin' ? '/admin' : '/volunteer'}
+                                            className="flex items-center justify-center min-h-[44px] w-full bg-blue-800 text-white hover:bg-blue-700 px-3 py-2.5 rounded-md text-base font-medium"
+                                            onClick={() => setIsOpen(false)}
+                                        >
+                                            Dashboard
+                                        </Link>
+                                    )}
+                                    {isLoggedIn ? (
                                         <button
                                             onClick={handleLogout}
-                                            className="block w-[calc(100%-16px)] bg-nss-red text-white hover:bg-red-700 px-3 py-2 rounded-md text-base font-medium mt-2 mx-2 text-center"
+                                            className="flex items-center justify-center min-h-[44px] w-full bg-nss-red text-white hover:bg-red-700 px-3 py-2.5 rounded-md text-base font-medium"
                                         >
                                             Logout
                                         </button>
-                                    </>
-                                ) : (
-                                    <Link
-                                        to="/login"
-                                        className="block bg-white text-nss-blue hover:bg-gray-200 px-3 py-2 rounded-md text-base font-medium mt-4 mx-2 text-center"
-                                        onClick={() => setIsOpen(false)}
-                                    >
-                                        NSS Login
-                                    </Link>
-                                )}
+                                    ) : (
+                                        <Link
+                                            to="/login"
+                                            className="flex items-center justify-center min-h-[44px] bg-white text-nss-blue hover:bg-gray-200 px-3 py-2.5 rounded-md text-base font-medium"
+                                            onClick={() => setIsOpen(false)}
+                                        >
+                                            NSS Login
+                                        </Link>
+                                    )}
+                                </div>
                             </div>
                         </motion.div>
                     )}

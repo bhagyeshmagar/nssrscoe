@@ -1,22 +1,23 @@
 import { Request, Response } from 'express';
+import { randomBytes } from 'crypto';
 import { db } from '../db';
-import { eventRegistrations, events, admins } from '../db/schema';
-import { eq } from 'drizzle-orm';
-import { ok, created } from '../lib/response';
+import { eventRegistrations, events } from '../db/schema';
+import { eq, and } from 'drizzle-orm';
+import { ok, created, handleError } from '../lib/response';
 import { AuthRequest } from '../middleware/auth';
+import { ConflictError, NotFoundError } from '../lib/errors';
 import { sendVolunteeringPassEmail } from '../services/emailService';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const generateVisitorId = () =>
-    `NSS-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
+/** Cryptographically random pass ID: NSS-XXXXXX (6 hex chars = 16M combinations) */
+const generateVisitorPassId = (): string =>
+    `NSS-${randomBytes(3).toString('hex').toUpperCase()}`;
 
-const getClientOrigin = (req: Request) => {
-    // Prefer the configured origin, then infer from request
+const getClientOrigin = (req: Request): string => {
     if (process.env.CLIENT_URL) return process.env.CLIENT_URL;
-    if (process.env.ALLOWED_ORIGINS) return process.env.ALLOWED_ORIGINS.split(',')[0].trim();
-    const proto = req.headers['x-forwarded-proto'] || req.protocol;
-    const host  = req.headers['x-forwarded-host']  || req.headers.host;
+    const proto = (req.headers['x-forwarded-proto'] as string) || req.protocol;
+    const host  = (req.headers['x-forwarded-host']  as string) || req.headers.host;
     return `${proto}://${host}`;
 };
 
@@ -26,47 +27,54 @@ export const createRegistration = async (req: Request, res: Response) => {
     try {
         const { eventId, name, email, phone, department, year } = req.body;
 
-        if (!email) {
-            return res.status(400).json({ message: 'Email address is required.' });
+        if (!eventId || !name || !email || !phone || !department || !year) {
+            return res.status(400).json({ success: false, message: 'All fields are required.' });
         }
 
-        // Generate a unique visitor pass ID
-        let uniqueId = generateVisitorId();
-        let isUnique = false;
-        let retries = 0;
-        while (!isUnique && retries < 5) {
-            const existing = await db
+        const normalizedEmail = String(email).toLowerCase().trim();
+
+        if (typeof normalizedEmail !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+            return res.status(400).json({ success: false, message: 'Invalid email address.' });
+        }
+
+        // Prevent duplicate registrations for the same email + event
+        const [dupe] = await db
+            .select({ id: eventRegistrations.id })
+            .top(1).from(eventRegistrations)
+            .where(and(
+                eq(eventRegistrations.eventId, Number(eventId)),
+                eq(eventRegistrations.email, normalizedEmail),
+            ));
+        if (dupe) throw new ConflictError('You have already registered for this event.');
+
+        // Generate a unique visitor pass ID (retry up to 5 times on collision — extremely rare)
+        let visitorPassId = generateVisitorPassId();
+        for (let attempt = 0; attempt < 5; attempt++) {
+            const [existing] = await db
                 .select({ id: eventRegistrations.id })
-                .from(eventRegistrations)
-                .where(eq(eventRegistrations.visitorPassId, uniqueId))
-                .limit(1);
-            if (existing.length === 0) {
-                isUnique = true;
-            } else {
-                uniqueId = generateVisitorId();
-                retries++;
-            }
+                .top(1).from(eventRegistrations)
+                .where(eq(eventRegistrations.visitorPassId, visitorPassId));
+            if (!existing) break;
+            visitorPassId = generateVisitorPassId();
         }
 
-        const newRegistration = await db
+        const [newRegistration] = await db
             .insert(eventRegistrations)
-            .values({
+            .output().values({
                 eventId: Number(eventId),
-                name,
-                email,
-                phone,
-                department,
-                year,
-                visitorPassId: uniqueId,
+                name: String(name).trim(),
+                email: normalizedEmail,
+                phone: String(phone).trim(),
+                department: String(department).trim(),
+                year: String(year).trim(),
+                visitorPassId,
                 status: 'pending',
-            })
-            .returning();
+            });
 
-        // Return the new registration; status is 'pending' until admin approves
-        created(res, newRegistration[0]);
+        created(res, newRegistration, 'Registration submitted successfully. Awaiting admin approval.');
     } catch (error) {
-        console.error('Error creating registration:', error);
-        res.status(500).json({ message: 'Error creating registration', error });
+        console.error('[createRegistration] Error:', error);
+        handleError(res, error);
     }
 };
 
@@ -75,20 +83,24 @@ export const createRegistration = async (req: Request, res: Response) => {
 export const getRegistrationByVisitorId = async (req: Request, res: Response) => {
     try {
         const { visitorId } = req.params;
-        const results = await db
+
+        if (!visitorId || typeof visitorId !== 'string') {
+            return res.status(400).json({ success: false, message: 'Visitor ID is required.' });
+        }
+
+        const [result] = await db
             .select({ registration: eventRegistrations, event: events })
             .from(eventRegistrations)
             .leftJoin(events, eq(eventRegistrations.eventId, events.id))
             .where(eq(eventRegistrations.visitorPassId, visitorId));
 
-        if (results.length === 0) {
-            return res.status(404).json({ message: 'Registration not found' });
+        if (!result) {
+            throw new NotFoundError('Registration not found.');
         }
 
-        ok(res, results[0]);
+        ok(res, result);
     } catch (error) {
-        console.error('Error fetching registration:', error);
-        res.status(500).json({ message: 'Error fetching registration', error });
+        handleError(res, error);
     }
 };
 
@@ -104,8 +116,7 @@ export const getRegistrationsByEventId = async (req: Request, res: Response) => 
 
         ok(res, results);
     } catch (error) {
-        console.error('Error fetching event registrations:', error);
-        res.status(500).json({ message: 'Error fetching event registrations', error });
+        handleError(res, error);
     }
 };
 
@@ -116,47 +127,31 @@ export const approveRegistration = async (req: Request, res: Response) => {
         const { id } = req.params;
         const adminId = (req as AuthRequest).user?.id;
 
-        // Fetch registration
         const [reg] = await db
             .select()
-            .from(eventRegistrations)
-            .where(eq(eventRegistrations.id, Number(id)))
-            .limit(1);
+            .top(1).from(eventRegistrations)
+            .where(eq(eventRegistrations.id, Number(id)));
 
-        if (!reg) {
-            return res.status(404).json({ message: 'Registration not found' });
-        }
-        if (reg.status === 'approved') {
-            return res.status(409).json({ message: 'Registration is already approved.' });
-        }
+        if (!reg) throw new NotFoundError('Registration not found.');
+        if (reg.status === 'approved') throw new ConflictError('Registration is already approved.');
 
-        // Fetch the linked event for email details
         const [event] = await db
             .select()
-            .from(events)
-            .where(eq(events.id, reg.eventId))
-            .limit(1);
+            .top(1).from(events)
+            .where(eq(events.id, reg.eventId));
 
-        if (!event) {
-            return res.status(404).json({ message: 'Associated event not found.' });
-        }
+        if (!event) throw new NotFoundError('Associated event not found.');
 
-        // Update status in DB
         const [updated] = await db
             .update(eventRegistrations)
-            .set({
-                status: 'approved',
-                approvedAt: new Date(),
-                approvedById: adminId ?? null,
-            })
+            .set({ status: 'approved', approvedAt: new Date(), approvedById: adminId ?? null })
             .where(eq(eventRegistrations.id, Number(id)))
-            .returning();
+            .output();
 
-        // Build the public pass download URL
         const clientOrigin = getClientOrigin(req);
         const passDownloadUrl = `${clientOrigin}/events/pass/${reg.visitorPassId}`;
 
-        // Send approval email with the pass (fire-and-forget so the response is instant)
+        // Fire-and-forget — don't let email failure block the response
         sendVolunteeringPassEmail({
             name: reg.name,
             email: reg.email,
@@ -167,12 +162,11 @@ export const approveRegistration = async (req: Request, res: Response) => {
             department: reg.department,
             year: reg.year,
             passDownloadUrl,
-        }).catch(err => console.error('Failed to send pass email:', err));
+        }).catch(err => console.error('[approveRegistration] Failed to send pass email:', err));
 
         ok(res, updated, 'Registration approved and pass email sent.');
     } catch (error) {
-        console.error('Error approving registration:', error);
-        res.status(500).json({ message: 'Error approving registration', error });
+        handleError(res, error);
     }
 };
 
@@ -184,23 +178,19 @@ export const rejectRegistration = async (req: Request, res: Response) => {
 
         const [reg] = await db
             .select({ id: eventRegistrations.id, status: eventRegistrations.status })
-            .from(eventRegistrations)
-            .where(eq(eventRegistrations.id, Number(id)))
-            .limit(1);
+            .top(1).from(eventRegistrations)
+            .where(eq(eventRegistrations.id, Number(id)));
 
-        if (!reg) {
-            return res.status(404).json({ message: 'Registration not found' });
-        }
+        if (!reg) throw new NotFoundError('Registration not found.');
 
         const [updated] = await db
             .update(eventRegistrations)
             .set({ status: 'rejected' })
             .where(eq(eventRegistrations.id, Number(id)))
-            .returning();
+            .output();
 
         ok(res, updated, 'Registration rejected.');
     } catch (error) {
-        console.error('Error rejecting registration:', error);
-        res.status(500).json({ message: 'Error rejecting registration', error });
+        handleError(res, error);
     }
 };

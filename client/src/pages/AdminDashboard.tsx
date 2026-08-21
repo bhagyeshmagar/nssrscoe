@@ -6,12 +6,13 @@ import {
 import type { SiteSettings, AcademicYear, EventData, GalleryItem, MemberData } from '../services/api';
 
 import { AYStatusBadge } from '../components/admin/Shared';
+
 import { useAuthStore } from '../stores/authStore';
 const OverviewTab = lazy(() => import('../components/admin/OverviewTab').then(m => ({ default: m.OverviewTab })));
 const AcademicYearsTab = lazy(() => import('../components/admin/AcademicYearsTab').then(m => ({ default: m.AcademicYearsTab })));
 const ActivityCalendarTab = lazy(() => import('../components/admin/ActivityCalendarTab').then(m => ({ default: m.ActivityCalendarTab })));
-const MeetingsTab = lazy(() => import('../components/admin/MeetingsTab').then(m => ({ default: m.MeetingsTab })));
-const AYVolunteersTab = lazy(() => import('../components/admin/AYVolunteersTab').then(m => ({ default: m.AYVolunteersTab })));
+const MeetingsTab = lazy(() => import('../components/admin/meetings/MeetingsTab').then(m => ({ default: m.MeetingsTab })));
+const AYVolunteersTab = lazy(() => import('../components/admin/volunteers/AYVolunteersTab').then(m => ({ default: m.AYVolunteersTab })));
 const CoreTeamTab = lazy(() => import('../components/admin/CoreTeamTab').then(m => ({ default: m.CoreTeamTab })));
 const AttendanceTab = lazy(() => import('../components/admin/AttendanceTab').then(m => ({ default: m.AttendanceTab })));
 const SpecialCampsTab = lazy(() => import('../components/admin/SpecialCampsTab').then(m => ({ default: m.SpecialCampsTab })));
@@ -19,15 +20,17 @@ const ArchiveTab = lazy(() => import('../components/admin/ArchiveTab').then(m =>
 const EventsTab = lazy(() => import('../components/admin/EventsTab').then(m => ({ default: m.EventsTab })));
 const RegistrationsTab = lazy(() => import('../components/admin/RegistrationsTab').then(m => ({ default: m.RegistrationsTab })));
 const GalleryTab = lazy(() => import('../components/admin/GalleryTab').then(m => ({ default: m.GalleryTab })));
-const SettingsTab = lazy(() => import('../components/admin/SettingsTab').then(m => ({ default: m.SettingsTab })));
+const SettingsTab = lazy(() => import('../components/admin/settings/SettingsTab').then(m => ({ default: m.SettingsTab })));
+const SliderTab = lazy(() => import('../components/admin/SliderTab').then(m => ({ default: m.SliderTab })));
 const AdminsTab = lazy(() => import('../components/admin/AdminsTab').then(m => ({ default: m.AdminsTab })));
 const ProfileTab = lazy(() => import('../components/admin/ProfileTab').then(m => ({ default: m.ProfileTab })));
 const AuditLogTab = lazy(() => import('../components/admin/AuditLogTab'));
+const EmailServiceTab = lazy(() => import('../components/admin/EmailServiceTab').then(m => ({ default: m.EmailServiceTab })));
 
 type TabType =
     | 'overview' | 'academic-years' | 'volunteers' | 'core-team'
     | 'attendance' | 'special-camps' | 'archive' | 'activity-calendar'
-    | 'events' | 'registrations' | 'gallery' | 'members' | 'settings' | 'admins' | 'profile' | 'meetings' | 'audit-logs';
+    | 'events' | 'registrations' | 'gallery' | 'members' | 'settings' | 'slider' | 'admins' | 'profile' | 'meetings' | 'audit-logs' | 'email-service';
 
 const getTabGroups = (isSuperadmin: boolean) => [
     {
@@ -49,6 +52,8 @@ const getTabGroups = (isSuperadmin: boolean) => [
             { id: 'events', label: 'Events', icon: '🎯' },
             { id: 'registrations', label: 'Registrations', icon: '📝' },
             { id: 'gallery', label: 'Gallery', icon: '🖼️' },
+            { id: 'slider', label: 'Home Slider', icon: '🖼️' },
+            { id: 'email-service', label: 'Email Service', icon: '📧' },
             { id: 'settings', label: 'Settings', icon: '⚙️' },
             ...(isSuperadmin ? [{ id: 'admins', label: 'Admins', icon: '🔑' }] : []),
         ]
@@ -97,7 +102,7 @@ const AdminDashboard = () => {
     useEffect(() => { loadYears(); }, [loadYears]);
 
     const fetchSiteData = useCallback(async () => {
-        const siteTabs = ['overview', 'events', 'gallery', 'members', 'settings'];
+        const siteTabs = ['overview', 'events', 'gallery', 'members', 'settings', 'slider'];
         if (!siteTabs.includes(activeTab)) return;
         setLoading(true);
         try {
@@ -107,6 +112,7 @@ const AdminDashboard = () => {
                 case 'gallery': { const r = await galleryAPI.getAdminAll(); setGallery((r.data.data as GalleryItem[]) || []); break; }
                 case 'members': { const r = await membersAPI.getAll(); setMembers((r.data.data as MemberData[]) || []); break; }
                 case 'settings': { const r = await settingsAPI.get(); setSettings(r.data.data as SiteSettings); break; }
+                case 'slider': { const [sR, eR] = await Promise.all([settingsAPI.get(), eventsAPI.getAll()]); setSettings(sR.data.data as SiteSettings); setEvents((eR.data.data as EventData[]) || []); break; }
             }
         } catch (e) { console.error('fetchSiteData:', e); }
         setLoading(false);
@@ -166,7 +172,7 @@ const AdminDashboard = () => {
                     </nav>
                 </aside>
 
-                <main className="flex-1 overflow-y-auto p-6">
+                <main className="flex-1 overflow-y-auto p-3 sm:p-6">
                     {loading ? (
                         <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600" /></div>
                     ) : (
@@ -184,9 +190,11 @@ const AdminDashboard = () => {
                             {activeTab === 'events' && <EventsTab events={events} onRefresh={fetchSiteData} showForm={showEventForm} setShowForm={setShowEventForm} editingItem={editingItem} setEditingItem={setEditingItem} years={years} currentAY={currentAY} isSuperadmin={isSuperadmin} />}
                             {activeTab === 'registrations' && <RegistrationsTab events={events} />}
                             {activeTab === 'gallery' && <GalleryTab gallery={gallery} onRefresh={fetchSiteData} showForm={showGalleryForm} setShowForm={setShowGalleryForm} editingItem={editingItem} setEditingItem={setEditingItem} isSuperadmin={isSuperadmin} />}
-                            {activeTab === 'settings' && <SettingsTab settings={settings} events={events} onRefresh={fetchSiteData} />}
+                            {activeTab === 'slider' && <SliderTab settings={settings} events={events} onRefresh={fetchSiteData} />}
+                            {activeTab === 'settings' && <SettingsTab settings={settings} onRefresh={fetchSiteData} />}
                             {activeTab === 'admins' && <AdminsTab />}
                             {activeTab === 'profile' && <ProfileTab />}
+                            {activeTab === 'email-service' && <EmailServiceTab />}
                         </Suspense>
                     )}
                 </main>

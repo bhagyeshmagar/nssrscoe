@@ -1,6 +1,6 @@
 import { eq, and, desc, count } from 'drizzle-orm';
 import { db } from '../db';
-import { meetings, meetingAttendance, volunteers, volunteerProfiles, coreTeamAssignments, specialCampParticipants, admins } from '../db/schema';
+import { meetings, meetingAttendance, volunteers, volunteerProfiles, coreTeamAssignments, specialCampParticipants } from '../db/schema';
 import { NotFoundError, ConflictError } from '../lib/errors';
 import { logAudit } from './auditService';
 import { createBulkNotifications } from './notificationService';
@@ -16,7 +16,7 @@ export interface CreateMeetingInput {
 }
 
 export const createMeeting = async (ayId: number, input: CreateMeetingInput, adminId: number) => {
-    const [meeting] = await db.insert(meetings).values({
+    const [meeting] = await db.insert(meetings).output().values({
         academicYearId: ayId,
         title: input.title,
         description: input.description,
@@ -26,7 +26,7 @@ export const createMeeting = async (ayId: number, input: CreateMeetingInput, adm
         location: input.location,
         createdById: adminId,
         specialCampId: input.specialCampId ?? null,
-    }).returning();
+    });
 
     await logAudit({ action: 'meeting.create', entityType: 'meeting', entityId: meeting.id, performedById: adminId, academicYearId: ayId });
 
@@ -86,10 +86,10 @@ export const createMeeting = async (ayId: number, input: CreateMeetingInput, adm
 };
 
 export const listMeetings = async (ayId: number, type?: string, status?: string) => {
-    let query = db.select().from(meetings).where(eq(meetings.academicYearId, ayId)).$dynamic();
-    if (type) query = query.where(eq(meetings.meetingType, type as 'regular' | 'core_team' | 'special_camp'));
-    if (status) query = query.where(eq(meetings.status, status as 'scheduled' | 'active' | 'ended'));
-    return await query.orderBy(desc(meetings.scheduledDate));
+    const conditions = [eq(meetings.academicYearId, ayId)];
+    if (type)   conditions.push(eq(meetings.meetingType, type as 'regular' | 'core_team' | 'special_camp'));
+    if (status) conditions.push(eq(meetings.status, status as 'scheduled' | 'active' | 'ended'));
+    return db.select().from(meetings).where(and(...conditions)).orderBy(desc(meetings.scheduledDate));
 };
 
 export const getMeeting = async (id: number) => {
@@ -101,12 +101,10 @@ export const getMeeting = async (id: number) => {
 export const updateMeeting = async (id: number, input: Partial<CreateMeetingInput>, adminId: number) => {
     const [existing] = await db.select().from(meetings).where(eq(meetings.id, id));
     if (!existing) throw new NotFoundError('Meeting not found');
-    
-    // Check if scheduled
-    const [admin] = await db.select({ isSuperadmin: admins.isSuperadmin }).from(admins).where(eq(admins.id, adminId));
-    // Superadmin is allowed to edit ended meetings but normal admins can only edit scheduled. Wait, I'll pass isSuperadmin flag to the service instead of querying here.
-    
-    const [updated] = await db.update(meetings).set(input).where(eq(meetings.id, id)).returning();
+
+    const updateData: Partial<typeof meetings.$inferInsert> = { ...input };
+
+    const [updated] = await db.update(meetings).set(updateData).where(eq(meetings.id, id)).output();
     await logAudit({ action: 'meeting.update', entityType: 'meeting', entityId: id, performedById: adminId });
     return updated;
 };
@@ -119,7 +117,7 @@ export const startMeeting = async (id: number, adminId: number) => {
     const [updated] = await db.update(meetings).set({
         status: 'active',
         startedAt: new Date(),
-    }).where(eq(meetings.id, id)).returning();
+    }).where(eq(meetings.id, id)).output();
     
     await logAudit({ action: 'meeting.start', entityType: 'meeting', entityId: id, performedById: adminId });
     return updated;
@@ -137,7 +135,7 @@ export const endMeeting = async (id: number, adminId: number) => {
         status: 'ended',
         endedAt,
         durationMinutes,
-    }).where(eq(meetings.id, id)).returning();
+    }).where(eq(meetings.id, id)).output();
     
     await logAudit({ action: 'meeting.end', entityType: 'meeting', entityId: id, performedById: adminId });
     return updated;
@@ -152,14 +150,14 @@ export const reopenMeeting = async (id: number, adminId: number) => {
         status: 'active',
         endedAt: null,
         durationMinutes: null,
-    }).where(eq(meetings.id, id)).returning();
+    }).where(eq(meetings.id, id)).output();
     
     await logAudit({ action: 'meeting.reopen', entityType: 'meeting', entityId: id, performedById: adminId });
     return updated;
 };
 
 export const deleteMeeting = async (id: number, adminId: number) => {
-    const [deleted] = await db.delete(meetings).where(eq(meetings.id, id)).returning();
+    const [deleted] = await db.delete(meetings).where(eq(meetings.id, id)).output();
     if (!deleted) throw new NotFoundError('Meeting not found');
     await logAudit({ action: 'meeting.delete', entityType: 'meeting', entityId: id, performedById: adminId });
     return deleted;
@@ -168,10 +166,10 @@ export const deleteMeeting = async (id: number, adminId: number) => {
 export const getMeetingAttendance = async (meetingId: number) => {
     const meeting = await getMeeting(meetingId);
 
-    let baseVolunteers: { id: number; name: string; department: string; status: 'regular' | 'backup'; prnNo?: string | null }[] = [];
+    let baseVolunteersPromise;
 
     if (meeting.meetingType === 'core_team') {
-        baseVolunteers = await db.select({
+        baseVolunteersPromise = db.select({
             id: volunteers.id,
             name: volunteers.name,
             department: volunteers.department,
@@ -183,7 +181,7 @@ export const getMeetingAttendance = async (meetingId: number) => {
         .leftJoin(volunteerProfiles, eq(volunteers.id, volunteerProfiles.volunteerId))
         .where(eq(volunteers.academicYearId, meeting.academicYearId));
     } else if (meeting.meetingType === 'special_camp' && meeting.specialCampId) {
-        baseVolunteers = await db.select({
+        baseVolunteersPromise = db.select({
             id: volunteers.id,
             name: volunteers.name,
             department: volunteers.department,
@@ -195,7 +193,7 @@ export const getMeetingAttendance = async (meetingId: number) => {
         .leftJoin(volunteerProfiles, eq(volunteers.id, volunteerProfiles.volunteerId))
         .where(eq(specialCampParticipants.specialCampId, meeting.specialCampId));
     } else {
-        baseVolunteers = await db.select({
+        baseVolunteersPromise = db.select({
             id: volunteers.id,
             name: volunteers.name,
             department: volunteers.department,
@@ -207,7 +205,10 @@ export const getMeetingAttendance = async (meetingId: number) => {
         .where(eq(volunteers.academicYearId, meeting.academicYearId));
     }
 
-    const existingAttendance = await db.select().from(meetingAttendance).where(eq(meetingAttendance.meetingId, meetingId));
+    const [baseVolunteers, existingAttendance] = await Promise.all([
+        baseVolunteersPromise,
+        db.select().from(meetingAttendance).where(eq(meetingAttendance.meetingId, meetingId))
+    ]);
     const attendanceMap = new Map(existingAttendance.map(a => [a.volunteerId, a]));
 
     return baseVolunteers.map(v => ({
@@ -252,9 +253,9 @@ export const markMeetingAttendance = async (meetingId: number, volunteerId: numb
             markedAt: new Date(),
             markedById: adminId,
             volunteerType: vol.status,
-        }).where(eq(meetingAttendance.id, existing.id)).returning();
+        }).where(eq(meetingAttendance.id, existing.id)).output();
     } else {
-        return await db.insert(meetingAttendance).values({
+        return await db.insert(meetingAttendance).output().values({
             meetingId,
             volunteerId,
             status,
@@ -262,7 +263,7 @@ export const markMeetingAttendance = async (meetingId: number, volunteerId: numb
             markedAt: new Date(),
             markedById: adminId,
             volunteerType: vol.status,
-        }).returning();
+        });
     }
 };
 
