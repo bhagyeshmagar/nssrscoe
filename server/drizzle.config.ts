@@ -17,6 +17,7 @@ export default defineConfig({
         password: process.env.DB_PASSWORD || '',
         options: {
             trustServerCertificate: true,
+            encrypt: process.env.NODE_ENV === 'production',
         },
     },
 });

@@ -89,9 +89,9 @@ test.describe('Image Cropper Flow', () => {
         // Should redirect to /admin
         await expect(page).toHaveURL(/\/admin/);
 
-        // Click on the Settings tab
-        const settingsTab = page.locator('button:has-text("Settings")');
-        await settingsTab.click();
+        // Click on the Home Slider tab
+        const sliderTab = page.locator('button:has-text("Home Slider")');
+        await sliderTab.click();
 
         // Click on the upload button in Settings Tab (Home Slider)
         // Playwright can't easily trigger the OS file picker, so we set the file on the input directly

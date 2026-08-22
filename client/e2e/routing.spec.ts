@@ -29,7 +29,7 @@ test.describe('Routing and Navigation', () => {
     await page.goto('/');
 
     // Check if Navbar renders the NSS logo text (assuming it has it)
-    await expect(page.getByText('NSS', { exact: false }).first()).toBeVisible();
+    await expect(page.getByAltText(/NSS Logo/i).first()).toBeVisible();
 
     // Click the "Events" or "Gallery" link. Let's try Gallery.
     // If the navbar uses a hamburger menu on mobile, Playwright runs desktop by default

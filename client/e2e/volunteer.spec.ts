@@ -76,8 +76,8 @@ test.describe('Volunteer Dashboard Flow', () => {
 
         // Check if essential tabs are present
         const profileTab = page.getByRole('tab', { name: /Profile/i });
-        const volunteersTab = page.getByRole('tab', { name: /Fellow Volunteers/i });
-        const notificationsTab = page.getByRole('tab', { name: /Notifications/i });
+        const volunteersTab = page.getByRole('tab', { name: /Volunteers/i });
+        const notificationsTab = page.getByRole('tab', { name: /Alerts/i });
 
         await expect(profileTab).toBeVisible();
         await expect(volunteersTab).toBeVisible();
