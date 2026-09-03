@@ -68,11 +68,22 @@ const upload = multer({
     limits: { fileSize: 100 * 1024 * 1024 }, // 100 MB global limit (restricted for non-videos below)
 });
 
+import rateLimit from 'express-rate-limit';
+
+// Strict rate limiter for uploads — prevents DoS from bulk large file uploads
+const uploadRateLimiter = rateLimit({
+    windowMs: 5 * 60 * 1000, // 5 minutes
+    max: 50, // 50 uploads per 5 minutes per IP
+    message: { success: false, message: 'Too many file uploads. Please wait a few minutes before trying again.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+
 // All upload routes require authentication
 router.use(authenticateToken);
 
 // Upload single file
-router.post('/single', (req, res, next) => {
+router.post('/single', uploadRateLimiter, (req, res, next) => {
     upload.single('file')(req, res, (err: any) => {
         if (err) {
             console.error('[upload] Error:', err);
@@ -109,7 +120,7 @@ router.post('/single', (req, res, next) => {
 });
 
 // Upload multiple files
-router.post('/multiple', (req, res) => {
+router.post('/multiple', uploadRateLimiter, (req, res) => {
     upload.array('files', 10)(req, res, (err: any) => {
         if (err) {
             console.error('[upload] Error:', err);

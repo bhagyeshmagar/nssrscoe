@@ -56,10 +56,24 @@ app.use((req, res, next) => {
     console.log('[API Request]', req.method, req.url);
     next();
 });
+
+import hpp from 'hpp';
 app.use(helmet({
     crossOriginResourcePolicy: { policy: 'cross-origin' }, // Allow serving images
-    contentSecurityPolicy: false, // handled by frontend
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc: ["'self'"],
+            scriptSrc: ["'self'", "'unsafe-inline'"], // unsafe-inline for some React dev tools, ideally removed in prod
+            styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+            fontSrc: ["'self'", "https://fonts.gstatic.com"],
+            imgSrc: ["'self'", "data:", "blob:"],
+            connectSrc: ["'self'"],
+            objectSrc: ["'none'"],
+            upgradeInsecureRequests: [],
+        },
+    },
 }));
+app.use(hpp()); // Protect against HTTP Parameter Pollution attacks
 
 // CORS configuration — restrict to known origins
 const ALLOWED_ORIGINS = (() => {
