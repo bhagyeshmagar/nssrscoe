@@ -8,10 +8,13 @@ test.describe('Image Cropper Flow', () => {
                 status: 200,
                 contentType: 'application/json',
                 body: JSON.stringify({
-                    token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwidXNlcm5hbWUiOiJhZG1pbkBlbWFpbC5jb20iLCJyb2xlIjoiYWRtaW4iLCJpc1N1cGVyYWRtaW4iOnRydWUsImV4cCI6MjY3ODQwMDAwMH0.fake_signature',
-                    role: 'admin',
-                    isSuperadmin: true,
-                    user: { id: 1, username: 'admin@email.com', isSuperadmin: true }
+                    success: true,
+                    data: {
+                        token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwidXNlcm5hbWUiOiJhZG1pbkBlbWFpbC5jb20iLCJyb2xlIjoiYWRtaW4iLCJpc1N1cGVyYWRtaW4iOnRydWUsImV4cCI6MjY3ODQwMDAwMH0.fake_signature',
+                        role: 'admin',
+                        isSuperadmin: true,
+                        user: { id: 1, username: 'admin@email.com', isSuperadmin: true }
+                    }
                 })
             });
         });
@@ -123,8 +126,8 @@ test.describe('Image Cropper Flow', () => {
         const rotateButton = page.getByRole('button', { name: /Rotate 90°/i });
         await expect(rotateButton).toBeVisible();
         
-        // The instructions for freeform crop should be visible
-        await expect(page.getByText(/Drag borders and corners to freely adjust crop area/i)).toBeVisible();
+        // The instructions for fixed-ratio crop should be visible
+        await expect(page.getByText(/Drag corners to resize/i)).toBeVisible();
         
         // Cancel the crop
         await page.getByRole('button', { name: 'Cancel' }).click();

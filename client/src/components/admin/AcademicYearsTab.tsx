@@ -23,9 +23,9 @@ const AcademicYearReports = ({ ay, busy, handleUploadReport }: AcademicYearRepor
     };
 
     return (
-        <div className="mt-4 pt-4 border-t border-gray-100">
-            <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Activity Reports</h4>
-            <div className="grid grid-cols-2 gap-4">
+        <div className="mt-4 border-t pt-4">
+            <h4 className="font-semibold text-gray-700 mb-3">Activity Reports (max 10MB)</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">
                     <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 mb-2">
                         <span className="text-sm font-medium text-gray-700">Regular Activity Report</span>

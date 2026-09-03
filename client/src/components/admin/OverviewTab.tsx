@@ -25,7 +25,7 @@ export const OverviewTab = () => {
     const { data: events = [] } = useEvents();
     const { data: gallery = [] } = useGallery();
     const { data: members = [] } = useMembers();
-    const { data: pending = { totalPending: 0 } } = usePendingApprovals({ enabled: isSuperadmin });
+    const { data: pending = { totalPending: 0, events: [], sliderImages: [], innovativeIdeas: [], gallery: [] } } = usePendingApprovals({ enabled: isSuperadmin });
 
     const loading = statsLoading;
 
@@ -65,7 +65,17 @@ export const OverviewTab = () => {
                         <AlertCircle className="h-6 w-6 text-amber-500 mr-3" />
                         <div>
                             <h3 className="text-amber-800 font-semibold">Pending Approvals Required</h3>
-                            <p className="text-amber-700 text-sm">You have {pending.totalPending} items waiting for your approval before they go live.</p>
+                            <p className="text-amber-700 text-sm">
+                                You have {pending.totalPending} items waiting for your approval
+                                {pending.totalPending > 0 && ' ('}
+                                {[
+                                    pending.events?.length ? `${pending.events.length} Events` : null,
+                                    pending.sliderImages?.length ? `${pending.sliderImages.length} Slider Images` : null,
+                                    pending.innovativeIdeas?.length ? `${pending.innovativeIdeas.length} Innovative Ideas` : null,
+                                    pending.gallery?.length ? `${pending.gallery.length} Gallery Items` : null
+                                ].filter(Boolean).join(', ')}
+                                {pending.totalPending > 0 && ')'}
+                            </p>
                         </div>
                     </div>
                     <Link to="/admin/approvals" className="flex items-center text-amber-800 font-medium hover:text-amber-900 bg-amber-100/50 px-4 py-2 rounded transition-colors">

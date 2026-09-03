@@ -44,7 +44,7 @@ describe('Gallery API Integration Tests', () => {
 
     describe('POST /api/gallery', () => {
         it('should create a gallery item as admin', async () => {
-            const newItem = { title: 'New Photo', imageUrl: '/uploads/new.jpg', description: 'New' };
+            const newItem = { title: 'New Photo', url: '/uploads/new.jpg', type: 'image', description: 'New' };
             
             const mockValues = vi.fn().mockResolvedValue([{ id: 2, ...newItem }]);
             const mockOutput = vi.fn().mockReturnValue({ values: mockValues });
@@ -63,8 +63,14 @@ describe('Gallery API Integration Tests', () => {
 
     describe('DELETE /api/gallery/:id', () => {
         it('should delete a gallery item as admin', async () => {
-            const mockWhere = vi.fn().mockResolvedValue([]);
-            (db.delete as any) = vi.fn().mockReturnValue({ where: mockWhere });
+            const mockWhere = vi.fn().mockResolvedValue([{ submittedById: 1 }]);
+            const mockFrom = vi.fn().mockReturnValue({ where: mockWhere });
+            const mockTop = vi.fn().mockReturnValue({ from: mockFrom });
+            const mockSelect = vi.fn().mockReturnValue({ top: mockTop });
+            (db.select as any) = mockSelect;
+            
+            // Mock delete
+            (db.delete as any) = vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue([]) });
 
             const res = await request(app)
                 .delete('/api/gallery/1')

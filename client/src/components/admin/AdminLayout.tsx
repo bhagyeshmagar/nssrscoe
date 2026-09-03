@@ -4,6 +4,7 @@ import { useAuthStore } from '../../stores/authStore';
 import { decodeToken } from '../../services/api';
 import ErrorBoundary from '../common/ErrorBoundary';
 import { useCurrentAcademicYear } from '../../hooks/useAcademicYears';
+import { usePendingApprovals } from '../../hooks/useApprovals';
 import { AYStatusBadge } from './Shared';
 
 const getTabGroups = (isSuperadmin: boolean) => [
@@ -59,6 +60,7 @@ export const AdminLayout = () => {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     
     const { data: currentAY } = useCurrentAcademicYear();
+    const { data: pendingData } = usePendingApprovals({ enabled: isSuperadmin }); // Only fetch if superadmin
     const tabGroups = useMemo(() => getTabGroups(isSuperadmin), [isSuperadmin]);
 
     return (
@@ -103,9 +105,16 @@ export const AdminLayout = () => {
                                 <p className="px-4 py-2 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">{group.label}</p>
                                 {group.tabs.map(tab => (
                                     <NavLink key={tab.id} to={`/admin/${tab.id}`} onClick={() => setIsSidebarOpen(false)}
-                                        className={({ isActive }) => `w-full text-left px-4 py-2.5 flex items-center gap-2.5 text-sm transition ${isActive ? 'bg-blue-50 text-blue-700 border-r-4 border-blue-600 font-semibold' : 'text-gray-600 hover:bg-gray-50'}`}>
-                                        <span className="inline-flex items-center justify-center w-5 h-5 rounded text-[10px] font-bold bg-gray-200 text-gray-600 flex-shrink-0">{tab.icon}</span>
-                                        {tab.label}
+                                        className={({ isActive }) => `w-full text-left px-4 py-2.5 flex items-center justify-between text-sm transition ${isActive ? 'bg-blue-50 text-blue-700 border-r-4 border-blue-600 font-semibold' : 'text-gray-600 hover:bg-gray-50'}`}>
+                                        <div className="flex items-center gap-2.5">
+                                            <span className="inline-flex items-center justify-center w-5 h-5 rounded text-[10px] font-bold bg-gray-200 text-gray-600 flex-shrink-0">{tab.icon}</span>
+                                            {tab.label}
+                                        </div>
+                                        {tab.id === 'approvals' && pendingData && pendingData.totalPending > 0 && (
+                                            <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full min-w-[20px] text-center">
+                                                {pendingData.totalPending}
+                                            </span>
+                                        )}
                                     </NavLink>
                                 ))}
                             </div>

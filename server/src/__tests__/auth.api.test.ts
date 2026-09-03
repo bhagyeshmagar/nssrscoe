@@ -62,8 +62,9 @@ describe('Auth API Integration Tests', () => {
                 .send({ email: 'test@example.com', password: 'password123' });
 
             expect(res.status).toBe(200);
-            expect(res.body).toHaveProperty('token');
-            expect(res.body.role).toBe('volunteer');
+            expect(res.body.success).toBe(true);
+            expect(res.body.data).toHaveProperty('token');
+            expect(res.body.data.role).toBe('volunteer');
         });
     });
 });

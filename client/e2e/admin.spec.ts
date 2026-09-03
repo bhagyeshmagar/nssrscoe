@@ -8,10 +8,13 @@ test.describe('Admin Dashboard Flow', () => {
                 status: 200,
                 contentType: 'application/json',
                 body: JSON.stringify({
-                    token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwidXNlcm5hbWUiOiJhZG1pbkBlbWFpbC5jb20iLCJyb2xlIjoiYWRtaW4iLCJpc1N1cGVyYWRtaW4iOnRydWUsImV4cCI6MjY3ODQwMDAwMH0.fake_signature',
-                    role: 'admin',
-                    isSuperadmin: true,
-                    user: { id: 1, username: 'admin@email.com', isSuperadmin: true }
+                    success: true,
+                    data: {
+                        token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwidXNlcm5hbWUiOiJhZG1pbkBlbWFpbC5jb20iLCJyb2xlIjoiYWRtaW4iLCJpc1N1cGVyYWRtaW4iOnRydWUsImV4cCI6MjY3ODQwMDAwMH0.fake_signature',
+                        role: 'admin',
+                        isSuperadmin: true,
+                        user: { id: 1, username: 'admin@email.com', isSuperadmin: true }
+                    }
                 })
             });
         });

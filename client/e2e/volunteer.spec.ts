@@ -16,9 +16,12 @@ test.describe('Volunteer Dashboard Flow', () => {
                     status: 200,
                     contentType: 'application/json',
                     body: JSON.stringify({
-                        token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MiwibmFtZSI6IlZvbHVudGVlciBUZXN0IiwiZW1haWwiOiJ2b2x1bnRlZXJAZW1haWwuY29tIiwicm9sZSI6InZvbHVudGVlciIsImV4cCI6MjY3ODQwMDAwMH0.fake_signature',
-                        role: 'volunteer',
-                        user: { id: 2, name: 'Volunteer Test', email: 'volunteer@email.com' }
+                        success: true,
+                        data: {
+                            token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MiwibmFtZSI6IlZvbHVudGVlciBUZXN0IiwiZW1haWwiOiJ2b2x1bnRlZXJAZW1haWwuY29tIiwicm9sZSI6InZvbHVudGVlciIsImV4cCI6MjY3ODQwMDAwMH0.fake_signature',
+                            role: 'volunteer',
+                            user: { id: 2, name: 'Volunteer Test', email: 'volunteer@email.com' }
+                        }
                     })
                 });
             } else if (url.includes('/auth/verify')) {
