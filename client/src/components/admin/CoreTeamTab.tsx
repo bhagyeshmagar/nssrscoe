@@ -7,7 +7,7 @@ import ImageCropperModal from '../common/ImageCropperModal';
 import { Download, Trash2 } from 'lucide-react';
 import { useAcademicYears } from '../../hooks/useAcademicYears';
 
-export const CoreTeamTab = ({ }: { isSuperadmin: boolean }) => {
+export const CoreTeamTab = (_props: { isSuperadmin: boolean }) => {
     const { data: years = [] } = useAcademicYears();
     const { selectedAyId, setSelectedAyId, selectedAY } = useAYSelector(years, null);
     

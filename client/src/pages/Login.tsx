@@ -43,9 +43,9 @@ const Login = () => {
             toast.success('Login successful!');
             // Redirect based on role (using window.location to force Navbar reload)
             if (payload.role === 'admin') {
-                window.location.href = '/admin';
+                window.location.assign('/admin');
             } else {
-                window.location.href = '/volunteer';
+                window.location.assign('/volunteer');
             }
         } catch (err: unknown) {
             console.error('Login failed', err);

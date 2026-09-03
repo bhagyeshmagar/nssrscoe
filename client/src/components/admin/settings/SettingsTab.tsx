@@ -69,6 +69,7 @@ export const SettingsTab = () => {
             };
             await updateSettings.mutateAsync(dataToSave);
         } catch (error) {
+            console.error(error);
         } finally {
             setSaving(false);
         }

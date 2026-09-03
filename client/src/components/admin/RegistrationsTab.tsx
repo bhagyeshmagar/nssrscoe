@@ -44,6 +44,7 @@ export const RegistrationsTab = () => {
         try {
             await approveRegistration.mutateAsync(id);
         } catch (err: any) {
+            console.error(err);
         }
         setActionLoading(null);
     };
@@ -54,6 +55,7 @@ export const RegistrationsTab = () => {
         try {
             await rejectRegistration.mutateAsync(id);
         } catch (err: any) {
+            console.error(err);
         }
         setActionLoading(null);
     };
@@ -63,6 +65,7 @@ export const RegistrationsTab = () => {
         try {
             await toggleAttendance.mutateAsync({ id, hasAttended: !currentStatus });
         } catch (err: any) {
+            console.error(err);
         }
         setActionLoading(null);
     };
