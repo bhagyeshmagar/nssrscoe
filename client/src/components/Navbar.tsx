@@ -44,6 +44,7 @@ const Navbar = () => {
                 { name: 'Previous Events', path: '/events/past' },
                 { name: 'Upcoming Events', path: '/events/upcoming' },
                 { name: 'Activity Reports', path: '/events/reports' },
+                { name: 'Innovative Ideas', path: '/innovative-ideas' },
             ]
         },
         {
@@ -55,6 +56,7 @@ const Navbar = () => {
             ]
         },
         { name: 'Volunteering', path: '/volunteering' },
+        { name: 'Achievements', path: '/achievements' },
         { name: 'Register', path: '/register' },
     ];
 

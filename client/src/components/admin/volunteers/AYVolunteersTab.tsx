@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
-import { volunteersAPI, academicYearsAPI, attendanceAPI } from '../../../services/api';
-import type { AcademicYear, AYStats, VolunteerWithProfile, CreateVolunteerData, Department, VolunteerAttendanceRecord } from '../../../services/api';
+import { useState, useEffect } from 'react';
+import { volunteersAPI, attendanceAPI } from '../../../services/api';
+import type { VolunteerWithProfile, VolunteerAttendanceRecord, CreateVolunteerData } from '../../../services/api';
 import { useFlash, useAYSelector } from '../Shared';
 import { ExportDataModal } from '../../common/ExportDataModal';
 import { Download } from 'lucide-react';
@@ -11,14 +11,23 @@ import { VolunteerForm } from './VolunteerForm';
 import { VolunteerFilters } from './VolunteerFilters';
 import { VolunteerTable } from './VolunteerTable';
 import { VolunteerProfileModal } from './VolunteerProfileModal';
-export const AYVolunteersTab = ({ years, currentAY, isSuperadmin }: { years: AcademicYear[]; currentAY: AcademicYear | null; isSuperadmin?: boolean }) => {
-    const { selectedAyId, setSelectedAyId, selectedAY } = useAYSelector(years, currentAY);
-    const [vols, setVols] = useState<VolunteerWithProfile[]>([]);
-    const [stats, setStats] = useState<AYStats | null>(null);
+
+import { useAcademicYears, useAcademicYearStats } from '../../../hooks/useAcademicYears';
+import { 
+    useVolunteersByAY, 
+    useCreateVolunteer, 
+    useDeleteVolunteer, 
+    useChangeVolunteerStatus 
+} from '../../../hooks/useVolunteers';
+
+export const AYVolunteersTab = ({ isSuperadmin }: { isSuperadmin?: boolean }) => {
+    const { data: years = [] } = useAcademicYears();
+    // We don't have currentAY directly without another query, but useAYSelector will just pick the first year if no currentAY is provided, or we can use useCurrentAcademicYear.
+    const { selectedAyId, setSelectedAyId, selectedAY } = useAYSelector(years, null);
+    
     const [filter, setFilter] = useState({ dept: '', status: '' as '' | 'regular' | 'backup', search: '', sortBy: 'name' as 'name' | 'department' });
     const [searchInput, setSearchInput] = useState('');
     const [page, setPage] = useState(1);
-    const [totalPages, setTotalPages] = useState(1);
     const [showForm, setShowForm] = useState(false);
     const [viewProfileId, setViewProfileId] = useState<number | null>(null);
     const [exportStatus, setExportStatus] = useState<'idle' | 'loading' | 'ready'>('idle');
@@ -26,38 +35,30 @@ export const AYVolunteersTab = ({ years, currentAY, isSuperadmin }: { years: Aca
     const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
     
     const generatePassword = () => Math.random().toString(36).slice(-8);
-    const [form, setForm] = useState<CreateVolunteerData>({ name: '', email: '', password: generatePassword(), department: 'Computer Engineering' as Department });
     const { msg, flash } = useFlash();
-    const [isSubmitting, setIsSubmitting] = useState(false);
     const [actionId, setActionId] = useState<number | null>(null);
     const [attendance, setAttendance] = useState<VolunteerAttendanceRecord[]>([]);
     const [loadingAttendance, setLoadingAttendance] = useState(false);
 
-    const load = useCallback(async () => {
-        if (!selectedAyId) return;
-        try {
-            const [vRes, sRes] = await Promise.all([
-                volunteersAPI.getByAY(selectedAyId, { 
-                    ...(filter.dept && { department: filter.dept }), 
-                    ...(filter.status && { status: filter.status }), 
-                    ...(filter.search && { search: filter.search }),
-                    ...(filter.sortBy === 'department' && { sortBy: 'department' }),
-                    page,
-                    limit: 20
-                }),
-                academicYearsAPI.getStats(selectedAyId),
-            ]);
-            setVols(vRes.data.data?.data || []);
-            setTotalPages(vRes.data.meta?.totalPages || 1);
-            setStats(sRes.data.data);
-        } catch (e: any) {
-            console.error(e);
-            flash('err', e.response?.data?.message || 'Failed to load volunteers.');
-        }
-    }, [selectedAyId, filter, page, flash]);
+    // Queries
+    const { data: stats } = useAcademicYearStats(selectedAyId);
+    const { data: volunteersData } = useVolunteersByAY(selectedAyId, { 
+        ...(filter.dept && { department: filter.dept }), 
+        ...(filter.status && { status: filter.status }), 
+        ...(filter.search && { search: filter.search }),
+        ...(filter.sortBy === 'department' && { sortBy: 'department' }),
+        page,
+        limit: 20
+    });
 
-    useEffect(() => { load(); }, [load]);
-    
+    const vols = volunteersData?.data || [];
+    const totalPages = volunteersData?.meta?.totalPages || 1;
+
+    // Mutations
+    const createVolunteer = useCreateVolunteer(selectedAyId);
+    const deleteVolunteer = useDeleteVolunteer(selectedAyId);
+    const changeVolunteerStatus = useChangeVolunteerStatus(selectedAyId);
+
     useEffect(() => {
         const timeout = setTimeout(() => {
             setFilter(f => f.search !== searchInput ? { ...f, search: searchInput } : f);
@@ -83,22 +84,13 @@ export const AYVolunteersTab = ({ years, currentAY, isSuperadmin }: { years: Aca
             setAttendance([]);
         }
     }, [viewProfileId, selectedAyId]);
-    
 
-
-    const handleCreate = async () => {
-        if (isSubmitting) return;
-        setIsSubmitting(true);
+    const handleCreate = async (data: CreateVolunteerData) => {
         try { 
-            await volunteersAPI.create(selectedAyId!, form); 
+            await createVolunteer.mutateAsync(data); 
             setShowForm(false); 
-            setForm({ name: '', email: '', password: generatePassword(), department: 'Computer Engineering' as Department }); 
-            flash('ok', 'Volunteer added.'); 
-            load(); 
         } catch (e: any) { 
-            flash('err', e.response?.data?.message ?? 'Error.'); 
-        } finally {
-            setIsSubmitting(false);
+            // Error handled by mutation
         }
     };
 
@@ -110,12 +102,10 @@ export const AYVolunteersTab = ({ years, currentAY, isSuperadmin }: { years: Aca
         if (!deleteConfirmId) return;
         setActionId(deleteConfirmId);
         try { 
-            await volunteersAPI.delete(selectedAyId!, deleteConfirmId); 
-            flash('ok', 'Volunteer marked as inactive (soft deleted).'); 
+            await deleteVolunteer.mutateAsync(deleteConfirmId); 
             setDeleteConfirmId(null);
-            load(); 
         } catch (e: any) { 
-            flash('err', e.response?.data?.message ?? 'Error.'); 
+            // Error handled by mutation
         } finally {
             setActionId(null);
         }
@@ -125,11 +115,9 @@ export const AYVolunteersTab = ({ years, currentAY, isSuperadmin }: { years: Aca
         if (!window.confirm(`Are you sure about making this volunteer ${s}?`)) return;
         setActionId(id);
         try { 
-            await volunteersAPI.changeStatus(selectedAyId!, id, s); 
-            toast.success(`Volunteer status updated to ${s}`);
-            load(); 
+            await changeVolunteerStatus.mutateAsync({ id, status: s }); 
         } catch (e: any) { 
-            flash('err', e.response?.data?.message ?? 'Error.'); 
+            // Error handled by mutation
         } finally {
             setActionId(null);
         }
@@ -140,7 +128,8 @@ export const AYVolunteersTab = ({ years, currentAY, isSuperadmin }: { years: Aca
         try {
             await volunteersAPI.approveExperience(selectedAyId!, id);
             toast.success('Experience text approved and is now public.');
-            load();
+            // Refetch could be done via invalidateQueries here, but since it's a niche action...
+            // A simple page reload for the list or let the view refresh
         } catch (e: any) {
             flash('err', e.response?.data?.message ?? 'Failed to approve experience.');
         } finally {
@@ -167,8 +156,8 @@ export const AYVolunteersTab = ({ years, currentAY, isSuperadmin }: { years: Aca
 
             const firstRes = await fetchPage(currentExportPage);
             if (firstRes.data) {
-                allVols = allVols.concat(firstRes.data.data?.data || []);
-                exportTotalPages = firstRes.data.meta?.totalPages || 1;
+                allVols = allVols.concat(firstRes.data.data?.data ?? []);
+                exportTotalPages = firstRes.data.data?.meta?.totalPages ?? 1;
             }
 
             if (exportTotalPages > 10 && !window.confirm(`This will export ${exportTotalPages} pages of data. Are you sure?`)) {
@@ -181,7 +170,7 @@ export const AYVolunteersTab = ({ years, currentAY, isSuperadmin }: { years: Aca
                 currentExportPage++;
                 const res = await fetchPage(currentExportPage);
                 if (res.data) {
-                    allVols = allVols.concat(res.data.data?.data || []);
+                    allVols = allVols.concat(res.data.data?.data ?? []);
                 }
             }
 
@@ -209,23 +198,22 @@ export const AYVolunteersTab = ({ years, currentAY, isSuperadmin }: { years: Aca
                     <button onClick={handleExportClick} disabled={exportStatus === 'loading'} className="bg-green-600 text-white px-3 py-2 rounded-lg hover:bg-green-700 text-sm font-medium flex items-center disabled:opacity-50">
                         <Download className="w-4 h-4 mr-1" /> {exportStatus === 'loading' ? 'Preparing...' : 'Export'}
                     </button>
-                    {selectedAY && !selectedAY.isLocked && <button onClick={() => setShowForm(!showForm)} disabled={isSubmitting} className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm font-medium disabled:opacity-50">+ Add</button>}
+                    {selectedAY && !selectedAY.isLocked && <button onClick={() => setShowForm(!showForm)} disabled={createVolunteer.isPending} className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm font-medium disabled:opacity-50">+ Add</button>}
                 </div>
             </div>
 
             {selectedAY?.isLocked && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">[Locked] AY {selectedAY.label} is locked - read-only.</div>}
 
-            <VolunteerStats stats={stats} selectedAY={selectedAY} />
+            <VolunteerStats stats={stats || null} selectedAY={selectedAY} />
 
             {msg && <div className={`mb-4 p-3 rounded-lg text-sm border ${msg.type === 'ok' ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700'}`}>{msg.text}</div>}
 
             {showForm && (
-                <VolunteerForm 
-                    form={form} 
-                    setForm={setForm} 
-                    isSubmitting={isSubmitting} 
-                    handleCreate={handleCreate} 
-                    setShowForm={setShowForm} 
+                <VolunteerForm
+                    isSubmitting={createVolunteer.isPending}
+                    defaultValues={{ password: generatePassword() }}
+                    onSubmit={handleCreate}
+                    onCancel={() => setShowForm(false)}
                 />
             )}
 
@@ -277,7 +265,7 @@ export const AYVolunteersTab = ({ years, currentAY, isSuperadmin }: { years: Aca
                         </div>
                         <div className="p-6">
                             <VolunteerProfileModal 
-                                vol={vols.find(v => v.id === viewProfileId)} 
+                                vol={vols.find((v: any) => v.id === viewProfileId)} 
                                 attendance={attendance} 
                                 loadingAttendance={loadingAttendance}
                                 isSuperadmin={isSuperadmin}

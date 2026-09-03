@@ -9,13 +9,13 @@ import * as ctCtrl from '../controllers/coreTeamController';
 export const ayCoreTeamRouter = Router({ mergeParams: true });
 
 ayCoreTeamRouter.get('/',    authenticateToken, requireAdmin, ctCtrl.getCoreTeam);
-ayCoreTeamRouter.post('/',   authenticateToken, requireSuperAdmin, requireAYUnlocked, validateRequest(assignRoleSchema), ctCtrl.assignRole);
-ayCoreTeamRouter.put('/:id', authenticateToken, requireSuperAdmin, requireAYUnlocked, validateRequest(updateAssignmentSchema), ctCtrl.updateAssignment);
-ayCoreTeamRouter.delete('/:id', authenticateToken, requireSuperAdmin, requireAYUnlocked, ctCtrl.removeAssignment);
+ayCoreTeamRouter.post('/',   authenticateToken, requireAdmin, requireAYUnlocked, validateRequest(assignRoleSchema), ctCtrl.assignRole);
+ayCoreTeamRouter.put('/:id', authenticateToken, requireAdmin, requireAYUnlocked, validateRequest(updateAssignmentSchema), ctCtrl.updateAssignment);
+ayCoreTeamRouter.delete('/:id', authenticateToken, requireAdmin, requireAYUnlocked, ctCtrl.removeAssignment);
 
 // ── Flat role reference router (mounted under /api/core-team) ─────────────────
 const router = Router();
 router.get('/roles', ctCtrl.listRoles);
-router.delete('/roles/:id', authenticateToken, requireSuperAdmin, ctCtrl.deleteCustomRole);
+router.delete('/roles/:id', authenticateToken, requireAdmin, ctCtrl.deleteCustomRole);
 
 export default router;

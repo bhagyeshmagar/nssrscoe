@@ -19,10 +19,9 @@ async function main() {
             // ── 1. Admins ──────────────────────────────────────────────────────────────
             console.log('── Seeding admins...');
             const adminEntries = [
-                { username: 'admin@email.com',   password: defaultPassword, isSuperadmin: true  },
-                { username: 'superadmin',        password: defaultPassword, isSuperadmin: true  },
-                { username: 'nsspo@email.com',   password: defaultPassword, isSuperadmin: false },
-                { username: 'website@email.com', password: defaultPassword, isSuperadmin: false },
+                { username: 'bhagyeshgmagar007@gmail.com', password: defaultPassword, isSuperadmin: true  },
+                { username: 'nsspo@email.com',             password: defaultPassword, isSuperadmin: false },
+                { username: 'website@email.com',           password: defaultPassword, isSuperadmin: false },
             ];
 
             for (const a of adminEntries) {

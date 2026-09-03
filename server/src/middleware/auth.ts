@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { db } from '../db';
 import { admins, volunteers } from '../db/schema';
 import { eq } from 'drizzle-orm';
+import { AppError } from '../lib/errors';
 
 export interface AuthRequest extends Request {
     user?: {
@@ -23,6 +24,19 @@ export const authenticateToken = (req: Request, res: Response, next: NextFunctio
     jwt.verify(token, process.env.JWT_SECRET as string, (err: jwt.VerifyErrors | null, decoded: jwt.JwtPayload | string | undefined) => {
         if (err) return res.status(401).json({ success: false, message: 'Token is invalid or expired.' });
         (req as AuthRequest).user = decoded as AuthRequest['user'];
+        next();
+    });
+};
+export const optionalAuth = (req: Request, res: Response, next: NextFunction) => {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (!token) return next();
+
+    jwt.verify(token, process.env.JWT_SECRET as string, (err: jwt.VerifyErrors | null, decoded: jwt.JwtPayload | string | undefined) => {
+        if (!err && decoded) {
+            (req as AuthRequest).user = decoded as AuthRequest['user'];
+        }
         next();
     });
 };
@@ -86,4 +100,10 @@ export const requireVolunteer = async (req: Request, res: Response, next: NextFu
         console.error('[requireVolunteer] Error:', err);
         return res.status(500).json({ success: false, message: 'Error verifying volunteer permissions' });
     }
+};
+
+export const getAdminId = (req: Request): number => {
+    const user = (req as AuthRequest).user;
+    if (!user) throw new AppError('Unauthorized', 401, 'UNAUTHORIZED');
+    return user.id;
 };

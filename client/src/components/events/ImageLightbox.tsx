@@ -1,13 +1,7 @@
 import { X, ChevronLeft, ArrowRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { uploadAPI } from '../../services/api';
-
-interface EventImage {
-    id: number;
-    url: string;
-    isMaster: boolean;
-    caption?: string;
-}
+import type { EventImage } from '../../services/api';
 
 interface ImageLightboxProps {
     isOpen: boolean;

@@ -12,7 +12,7 @@ interface Event {
     location: string;
     imageUrl?: string;
     driveLink?: string;
-    type: 'upcoming' | 'today' | 'past';
+    type?: 'upcoming' | 'today' | 'past';
     reportUrl?: string;
 }
 

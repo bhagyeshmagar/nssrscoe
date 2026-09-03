@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { specialCampsAPI, volunteersAPI, DEPARTMENTS, decodeToken } from '../../services/api';
-import type { AcademicYear, SpecialCamp, VolunteerWithProfile } from '../../services/api';
+import type { SpecialCamp, VolunteerWithProfile } from '../../services/api';
 import { useFlash, useAYSelector, PasswordPromptModal } from './Shared';
 import { useAuthStore } from '../../stores/authStore';
+import { useAcademicYears } from '../../hooks/useAcademicYears';
 
 type Participant = {
     id: number;
@@ -23,10 +24,13 @@ type SpecialCampWithParticipants = SpecialCamp & {
     participants?: Participant[];
 };
 
-export const SpecialCampsTab = ({ years, currentAY }: { years: AcademicYear[]; currentAY: AcademicYear | null }) => {
+export const SpecialCampsTab = () => {
     const { token } = useAuthStore();
     const isSuperadmin = token ? decodeToken(token)?.isSuperadmin : false;
-    const { selectedAyId, setSelectedAyId, selectedAY } = useAYSelector(years, currentAY);
+    
+    const { data: years = [] } = useAcademicYears();
+    const { selectedAyId, setSelectedAyId, selectedAY } = useAYSelector(years, null);
+    
     const [camps, setCamps] = useState<SpecialCampWithParticipants[]>([]);
     const [showForm, setShowForm] = useState(false);
     const [form, setForm] = useState({ name: '', location: '', startDate: '', endDate: '', description: '', volunteerCap: 50 });
@@ -58,10 +62,10 @@ export const SpecialCampsTab = ({ years, currentAY }: { years: AcademicYear[]; c
     useEffect(() => { load(); }, [load]);
     
     useEffect(() => {
-        if (!selectedAyId && years.length > 0) {
-            setSelectedAyId(currentAY?.id ?? years[0].id);
+        if (!selectedAyId && selectedAY) {
+            setSelectedAyId(selectedAY.id);
         }
-    }, [currentAY, years, selectedAyId, setSelectedAyId]);
+    }, [selectedAY, selectedAyId, setSelectedAyId]);
     
     const handleCreate = async () => {
         try { 
@@ -222,9 +226,9 @@ export const SpecialCampsTab = ({ years, currentAY }: { years: AcademicYear[]; c
             {showForm && (
                 <div className="mb-6 bg-white rounded-xl shadow p-6 border border-blue-100">
                     <div className="grid grid-cols-2 gap-4 mb-4">
-                        {[{ k: 'name', l: 'Camp Name' }, { k: 'location', l: 'Location' }].map(f => <div key={f.k}><label className="block text-sm text-gray-600 mb-1">{f.l}</label><input value={(form as Record<string, any>)[f.k]} onChange={e => setForm({ ...form, [f.k]: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" /></div>)}
-                        {[{ k: 'startDate', l: 'Start' }, { k: 'endDate', l: 'End' }].map(f => <div key={f.k}><label className="block text-sm text-gray-600 mb-1">{f.l}</label><input type="date" value={(form as Record<string, any>)[f.k]} onChange={e => setForm({ ...form, [f.k]: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" /></div>)}
-                        <div><label className="block text-sm text-gray-600 mb-1">Volunteer Cap</label><input type="number" min="1" value={form.volunteerCap} onChange={e => setForm({ ...form, volunteerCap: Number(e.target.value) })} className="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" /></div>
+                        {[{ k: 'name', l: 'Camp Name *' }, { k: 'location', l: 'Location *' }].map(f => <div key={f.k}><label className="block text-sm text-gray-600 mb-1">{f.l}</label><input value={(form as Record<string, any>)[f.k]} onChange={e => setForm({ ...form, [f.k]: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" /></div>)}
+                        {[{ k: 'startDate', l: 'Start Date *' }, { k: 'endDate', l: 'End Date *' }].map(f => <div key={f.k}><label className="block text-sm text-gray-600 mb-1">{f.l}</label><input type="date" value={(form as Record<string, any>)[f.k]} onChange={e => setForm({ ...form, [f.k]: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" /></div>)}
+                        <div><label className="block text-sm text-gray-600 mb-1">Volunteer Cap *</label><input type="number" min="1" value={form.volunteerCap} onChange={e => setForm({ ...form, volunteerCap: Number(e.target.value) })} className="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" /></div>
                         <div><label className="block text-sm text-gray-600 mb-1">Description</label><input value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" /></div>
                     </div>
                     <div className="flex gap-3"><button onClick={handleCreate} className="bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700 text-sm font-medium">Create</button><button onClick={() => setShowForm(false)} className="border px-5 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button></div>

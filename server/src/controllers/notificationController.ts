@@ -2,7 +2,9 @@ import { Response } from 'express';
 import { ok, handleError } from '../lib/response';
 import { ForbiddenError } from '../lib/errors';
 import * as notificationService from '../services/notificationService';
-import { AuthRequest } from '../middleware/auth';
+import { AuthRequest, getAdminId } from '../middleware/auth';
+import { positiveIntParam } from '../lib/schemas';
+import { z } from 'zod';
 
 /** Only volunteers have notifications; reject if called by an admin. */
 const requireVolunteerRole = (req: AuthRequest) => {
@@ -14,11 +16,13 @@ const requireVolunteerRole = (req: AuthRequest) => {
 export const getMyNotifications = async (req: AuthRequest, res: Response) => {
     try {
         requireVolunteerRole(req);
-        const volunteerId = req.user!.id;
+        const volunteerId = getAdminId(req);
 
-        // Clamp limit/offset to sane bounds
-        const limit  = Math.min(100, Math.max(1, parseInt(req.query.limit  as string) || 50));
-        const offset = Math.max(0,               parseInt(req.query.offset as string) || 0);
+        // Clamp limit/offset to sane bounds using zod
+        const { limit, offset } = z.object({
+            limit: z.coerce.number().int().min(1).max(100).default(50),
+            offset: z.coerce.number().int().min(0).default(0)
+        }).parse(req.query);
 
         const notifications = await notificationService.getMyNotifications(volunteerId, limit, offset);
         ok(res, { notifications });
@@ -30,7 +34,7 @@ export const getMyNotifications = async (req: AuthRequest, res: Response) => {
 export const getUnreadCount = async (req: AuthRequest, res: Response) => {
     try {
         requireVolunteerRole(req);
-        const count = await notificationService.getUnreadCount(req.user!.id);
+        const count = await notificationService.getUnreadCount(getAdminId(req));
         ok(res, { count });
     } catch (err) {
         handleError(res, err);
@@ -40,10 +44,9 @@ export const getUnreadCount = async (req: AuthRequest, res: Response) => {
 export const markAsRead = async (req: AuthRequest, res: Response) => {
     try {
         requireVolunteerRole(req);
-        const id = parseInt(req.params.id);
-        if (isNaN(id)) return res.status(400).json({ success: false, message: 'Invalid notification ID.' });
+        const id = positiveIntParam.parse(req.params.id);
 
-        const updated = await notificationService.markAsRead(id, req.user!.id);
+        const updated = await notificationService.markAsRead(id, getAdminId(req));
         ok(res, { notification: updated });
     } catch (err) {
         handleError(res, err);
@@ -53,7 +56,7 @@ export const markAsRead = async (req: AuthRequest, res: Response) => {
 export const markAllAsRead = async (req: AuthRequest, res: Response) => {
     try {
         requireVolunteerRole(req);
-        await notificationService.markAllAsRead(req.user!.id);
+        await notificationService.markAllAsRead(getAdminId(req));
         ok(res, null, 'All notifications marked as read.');
     } catch (err) {
         handleError(res, err);

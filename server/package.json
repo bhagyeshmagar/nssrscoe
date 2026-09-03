@@ -15,7 +15,8 @@
     "db:studio": "drizzle-kit studio",
     "db:seed:roles": "tsx src/scripts/seedCoreTeamRoles.ts",
     "db:seed": "tsx src/scripts/seedAll.ts",
-    "db:seed:all": "tsx src/scripts/seedAll.ts"
+    "db:seed:all": "tsx src/scripts/seedAll.ts",
+    "db:setup": "tsx src/scripts/migrate.ts && tsx src/scripts/seedAll.ts"
   },
   "keywords": [],
   "author": "",

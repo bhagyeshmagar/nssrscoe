@@ -80,3 +80,6 @@ Thumbs.db
 nss-key.pem
 secrets.json
 *.key
+
+# Agent customizations
+.agents/

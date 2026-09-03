@@ -1,27 +1,19 @@
-import { useState, useEffect, useCallback } from 'react';
-import { adminsAPI } from '../../services/api';
+import { useState, useEffect } from 'react';
 import { useFlash } from './Shared';
+import { useProfile, useUpdateProfile } from '../../hooks/useAdmins';
 
 export const ProfileTab = () => {
+    const { data: profile, isLoading: loading } = useProfile();
+    const { mutateAsync: updateProfile, isPending: isSubmitting } = useUpdateProfile();
+    
     const [form, setForm] = useState({ username: '', password: '' });
-    const [loading, setLoading] = useState(true);
-    const [isSubmitting, setIsSubmitting] = useState(false);
     const { msg, flash } = useFlash();
 
-    const loadProfile = useCallback(async () => {
-        try {
-            setLoading(true);
-            const { data } = await adminsAPI.getMe();
-            setForm({ username: data.data.username, password: '' });
-        } catch (err) {
-            console.error("Failed to load profile", err);
-            flash('err', 'Failed to load profile');
-        } finally {
-            setLoading(false);
+    useEffect(() => {
+        if (profile) {
+            setForm({ username: profile.username, password: '' });
         }
-    }, [flash]);
-
-    useEffect(() => { loadProfile(); }, [loadProfile]);
+    }, [profile]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -35,15 +27,12 @@ export const ProfileTab = () => {
             return;
         }
 
-        setIsSubmitting(true);
         try {
-            await adminsAPI.updateMe(form);
+            await updateProfile(form);
             flash('ok', 'Profile updated successfully');
             setForm(prev => ({ ...prev, password: '' }));
         } catch (err: any) {
             flash('err', err.response?.data?.message || 'Error updating profile');
-        } finally {
-            setIsSubmitting(false);
         }
     };
 

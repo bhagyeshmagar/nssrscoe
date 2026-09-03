@@ -6,6 +6,7 @@ import Footer from './components/Footer';
 import ProtectedRoute from './components/ProtectedRoute';
 import SplashScreen from './components/SplashScreen';
 import PWAPrompt from './components/PWAPrompt';
+import ErrorBoundary from './components/common/ErrorBoundary';
 
 // Lazy loaded pages for performance optimization
 const Home = lazy(() => import('./pages/Home'));
@@ -16,7 +17,6 @@ const Register = lazy(() => import('./pages/Register'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 const Login = lazy(() => import('./pages/Login'));
 const VolunteerDashboard = lazy(() => import('./pages/VolunteerDashboard'));
-const CoreTeamDashboard = lazy(() => import('./pages/CoreTeamDashboard'));
 const Mission = lazy(() => import('./pages/Mission'));
 const History = lazy(() => import('./pages/History'));
 const Reports = lazy(() => import('./pages/Reports'));
@@ -27,6 +27,9 @@ const UpcomingEvents = lazy(() => import('./pages/UpcomingEvents'));
 const PastEvents = lazy(() => import('./pages/PastEvents'));
 const EventDetail = lazy(() => import('./pages/EventDetail'));
 const VolunteeringPassPage = lazy(() => import('./pages/VolunteeringPassPage'));
+const InnovativeIdeas = lazy(() => import('./pages/InnovativeIdeas'));
+const InnovativeIdeaDetail = lazy(() => import('./pages/InnovativeIdeaDetail'));
+const Achievements = lazy(() => import('./pages/Achievements'));
 
 // Loading fallback component
 const PageLoader = () => (
@@ -36,81 +39,81 @@ const PageLoader = () => (
 );
 
 function App() {
-  const [showSplash, setShowSplash] = useState(true);
+  const [showSplash, setShowSplash] = useState(() => !sessionStorage.getItem('splashShown'));
+
+  const handleSplashComplete = () => {
+    sessionStorage.setItem('splashShown', 'true');
+    setShowSplash(false);
+  };
 
   return (
     <Router>
       <AnimatePresence>
-        {showSplash && <SplashScreen onComplete={() => setShowSplash(false)} />}
+        {showSplash && <SplashScreen onComplete={handleSplashComplete} />}
       </AnimatePresence>
       <div className="flex flex-col min-h-screen">
         <PWAPrompt />
         <Navbar />
         <main className="flex-grow">
-          <Suspense fallback={<PageLoader />}>
-            <Routes>
-              <Route path="/" element={<Home />} />
+          <ErrorBoundary>
+            <Suspense fallback={<PageLoader />}>
+              <Routes>
+                <Route path="/" element={<Home />} />
 
-              {/* About Routes */}
-              <Route path="/about" element={<About />} />
-              <Route path="/about/mission" element={<Mission />} />
-              <Route path="/about/history" element={<History />} />
+                {/* About Routes */}
+                <Route path="/about" element={<About />} />
+                <Route path="/about/mission" element={<Mission />} />
+                <Route path="/about/history" element={<History />} />
 
-              {/* Activity/Event Routes */}
-              <Route path="/events" element={<UpcomingEvents />} />
-              <Route path="/events/upcoming" element={<UpcomingEvents />} />
-              <Route path="/events/past" element={<PastEvents />} />
-              <Route path="/events/:id" element={<EventDetail />} />
-              <Route path="/events/pass/:visitorId" element={<VolunteeringPassPage />} />
+                {/* Activity/Event Routes */}
+                <Route path="/events" element={<UpcomingEvents />} />
+                <Route path="/events/upcoming" element={<UpcomingEvents />} />
+                <Route path="/events/past" element={<PastEvents />} />
+                <Route path="/events/:id" element={<EventDetail />} />
+                <Route path="/events/pass/:visitorId" element={<VolunteeringPassPage />} />
 
-              <Route path="/events/reports" element={<Reports />} />
-              <Route path="/events/calendar" element={<Calendar />} />
+                <Route path="/events/reports" element={<Reports />} />
+                <Route path="/events/calendar" element={<Calendar />} />
 
-              {/* Gallery Routes */}
-              <Route path="/gallery" element={<Gallery />} />
-              <Route path="/gallery/videos" element={<Videos />} />
+                {/* Gallery Routes */}
+                <Route path="/gallery" element={<Gallery />} />
+                <Route path="/gallery/videos" element={<Videos />} />
 
-              {/* Other Routes */}
-              <Route path="/members" element={<Members />} />
-              <Route path="/volunteering" element={<Volunteering />} />
-              <Route path="/register" element={<Register />} />
+                {/* Other Routes */}
+                <Route path="/innovative-ideas" element={<InnovativeIdeas />} />
+                <Route path="/innovative-ideas/:id" element={<InnovativeIdeaDetail />} />
+                <Route path="/achievements" element={<Achievements />} />
+                <Route path="/members" element={<Members />} />
+                <Route path="/volunteering" element={<Volunteering />} />
+                <Route path="/register" element={<Register />} />
 
-              {/* Unified Login Route */}
-              <Route path="/login" element={<Login />} />
-              {/* Legacy admin login redirect */}
-              <Route path="/admin/login" element={<Navigate to="/login" replace />} />
+                {/* Unified Login Route */}
+                <Route path="/login" element={<Login />} />
+                {/* Legacy admin login redirect */}
+                <Route path="/admin/login" element={<Navigate to="/login" replace />} />
 
-              {/* Admin Routes - Admin Only */}
-              <Route
-                path="/admin/*"
-                element={
-                  <ProtectedRoute adminOnly>
-                    <AdminDashboard />
-                  </ProtectedRoute>
-                }
-              />
+                {/* Admin Routes - Admin Only */}
+                <Route
+                  path="/admin/*"
+                  element={
+                    <ProtectedRoute adminOnly>
+                      <AdminDashboard />
+                    </ProtectedRoute>
+                  }
+                />
 
-              {/* Volunteer Routes - Volunteer Only */}
-              <Route
-                path="/volunteer/*"
-                element={
-                  <ProtectedRoute volunteerOnly>
-                    <VolunteerDashboard />
-                  </ProtectedRoute>
-                }
-              />
-
-              {/* Core Team Route - Also Volunteer Only (middleware will check core team access) */}
-              <Route
-                path="/core-team/*"
-                element={
-                  <ProtectedRoute volunteerOnly>
-                    <CoreTeamDashboard />
-                  </ProtectedRoute>
-                }
-              />
-            </Routes>
-          </Suspense>
+                {/* Volunteer Routes - Volunteer Only */}
+                <Route
+                  path="/volunteer/*"
+                  element={
+                    <ProtectedRoute volunteerOnly>
+                      <VolunteerDashboard />
+                    </ProtectedRoute>
+                  }
+                />
+              </Routes>
+            </Suspense>
+          </ErrorBoundary>
         </main>
         <Footer />
       </div>

@@ -1,7 +1,12 @@
 import { useState } from 'react';
-import { academicYearsAPI, uploadAPI } from '../../services/api';
+import { uploadAPI } from '../../services/api';
 import type { AcademicYear } from '../../services/api';
 import { AYStatusBadge, useFlash, PasswordPromptModal, ConfirmModal } from './Shared';
+import { 
+    useAcademicYears, useCreateAY, useActivateAY, 
+    useLockAY, useUnlockAY, useArchiveAY, 
+    useUnarchiveAY, useDeleteAY, useUpdateAY 
+} from '../../hooks/useAcademicYears';
 
 interface AcademicYearReportsProps {
     ay: AcademicYear;
@@ -68,12 +73,22 @@ const AcademicYearReports = ({ ay, busy, handleUploadReport }: AcademicYearRepor
     );
 };
 
-export const AcademicYearsTab = ({ years, onRefresh, isSuperadmin }: { years: AcademicYear[]; onRefresh: () => void; isSuperadmin: boolean }) => {
+export const AcademicYearsTab = ({ isSuperadmin }: { isSuperadmin: boolean }) => {
+    const { data: years = [], isLoading } = useAcademicYears();
+    const createAY = useCreateAY();
+    const activateAY = useActivateAY();
+    const lockAY = useLockAY();
+    const unlockAY = useUnlockAY();
+    const archiveAY = useArchiveAY();
+    const unarchiveAY = useUnarchiveAY();
+    const deleteAY = useDeleteAY();
+    const updateAY = useUpdateAY();
+
     const [form, setForm] = useState({ label: '', startDate: '', endDate: '', volunteerCap: '100' });
     const [showForm, setShowForm] = useState(false);
     const { msg, flash } = useFlash();
     const [busy, setBusy] = useState<number | null>(null);
-    const [unlockAy, setUnlockAy] = useState<AcademicYear | null>(null);
+    const [unlockAyState, setUnlockAyState] = useState<AcademicYear | null>(null);
     const [confirmAction, setConfirmAction] = useState<{ ayId: number, action: 'lock'|'archive'|'unarchive'|'delete', title: string, message: string } | null>(null);
 
     const handleCreate = async () => {
@@ -91,33 +106,20 @@ export const AcademicYearsTab = ({ years, onRefresh, isSuperadmin }: { years: Ac
             return;
         }
 
-        setBusy(-1);
         try {
-            await academicYearsAPI.create({ ...form, volunteerCap: cap });
-            setShowForm(false); setForm({ label: '', startDate: '', endDate: '', volunteerCap: '100' });
-            onRefresh(); flash('ok', 'Academic year created.');
-        } catch (e: any) { flash('err', e.response?.data?.message ?? 'Error.'); }
-        finally { setBusy(null); }
-    };
-    
-    const act = async (fn: () => Promise<unknown>, id: number) => {
-        setBusy(id); 
-        try { 
-            await fn(); 
-            onRefresh(); 
+            await createAY.mutateAsync({ ...form, volunteerCap: cap });
+            setShowForm(false); 
+            setForm({ label: '', startDate: '', endDate: '', volunteerCap: '100' });
         } catch (e: any) { 
-            flash('err', e.response?.data?.message ?? 'Error.'); 
-        } finally {
-            setBusy(null);
+            flash('err', e.response?.data?.message ?? 'Error creating AY.'); 
         }
     };
-
+    
     const handleUploadReport = async (ayId: number, type: 'regularActivityReportUrl' | 'specialCampReportUrl', file: File) => {
         setBusy(ayId);
         try {
             const { url } = await uploadAPI.uploadFile(file);
-            await academicYearsAPI.update(ayId, { [type]: url });
-            onRefresh();
+            await updateAY.mutateAsync({ id: ayId, data: { [type]: url } });
             flash('ok', 'Report uploaded successfully.');
         } catch (e: any) { 
             flash('err', e.response?.data?.message ?? 'Upload failed.'); 
@@ -125,6 +127,10 @@ export const AcademicYearsTab = ({ years, onRefresh, isSuperadmin }: { years: Ac
             setBusy(null);
         }
     };
+
+    if (isLoading) {
+        return <div className="flex justify-center items-center h-64 text-gray-500 font-medium animate-pulse">Loading academic years...</div>;
+    }
 
     return (
         <div>
@@ -137,18 +143,18 @@ export const AcademicYearsTab = ({ years, onRefresh, isSuperadmin }: { years: Ac
                 <div className="mb-6 bg-white rounded-xl shadow p-6 border border-gray-100">
                     <h3 className="font-semibold text-gray-700 mb-4">Create Academic Year</h3>
                     <div className="grid grid-cols-2 gap-4 mb-4">
-                        <div><label htmlFor="form-label" className="block text-sm text-gray-600 mb-1">Label (e.g. 2025-26)</label>
+                        <div><label htmlFor="form-label" className="block text-sm text-gray-600 mb-1">Label (e.g. 2025-26) *</label>
                             <input id="form-label" value={form.label} onChange={e => setForm({ ...form, label: e.target.value })} placeholder="2025-26" className="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" /></div>
-                        <div><label htmlFor="form-cap" className="block text-sm text-gray-600 mb-1">Volunteer Cap</label>
+                        <div><label htmlFor="form-cap" className="block text-sm text-gray-600 mb-1">Volunteer Cap *</label>
                             <input id="form-cap" min="1" type="number" value={form.volunteerCap} onChange={e => setForm({ ...form, volunteerCap: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" /></div>
-                        <div><label htmlFor="form-start" className="block text-sm text-gray-600 mb-1">Start Date</label>
+                        <div><label htmlFor="form-start" className="block text-sm text-gray-600 mb-1">Start Date *</label>
                             <input id="form-start" type="date" value={form.startDate} onChange={e => setForm({ ...form, startDate: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" /></div>
-                        <div><label htmlFor="form-end" className="block text-sm text-gray-600 mb-1">End Date</label>
+                        <div><label htmlFor="form-end" className="block text-sm text-gray-600 mb-1">End Date *</label>
                             <input id="form-end" type="date" value={form.endDate} onChange={e => setForm({ ...form, endDate: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" /></div>
                     </div>
                     <div className="flex gap-3">
-                        <button disabled={busy === -1} onClick={handleCreate} className="bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700 text-sm font-medium disabled:opacity-50">Create</button>
-                        <button disabled={busy === -1} onClick={() => setShowForm(false)} className="border px-5 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50">Cancel</button>
+                        <button disabled={createAY.isPending} onClick={handleCreate} className="bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700 text-sm font-medium disabled:opacity-50">Create</button>
+                        <button disabled={createAY.isPending} onClick={() => setShowForm(false)} className="border px-5 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50">Cancel</button>
                     </div>
                 </div>
             )}
@@ -163,22 +169,22 @@ export const AcademicYearsTab = ({ years, onRefresh, isSuperadmin }: { years: Ac
                             </div>
                             <div className="flex gap-2">
                                 {!ay.isCurrent && !ay.isLocked && !ay.isArchived && (
-                                    <button disabled={busy === ay.id} onClick={() => act(() => academicYearsAPI.activate(ay.id), ay.id)} className="text-xs bg-green-600 text-white px-3 py-1.5 rounded-lg hover:bg-green-700 disabled:opacity-50">Activate</button>
+                                    <button disabled={activateAY.isPending} onClick={() => activateAY.mutate(ay.id)} className="text-xs bg-green-600 text-white px-3 py-1.5 rounded-lg hover:bg-green-700 disabled:opacity-50">Activate</button>
                                 )}
                                 {ay.isCurrent && !ay.isLocked && (
-                                    <button disabled={busy === ay.id} onClick={() => setConfirmAction({ ayId: ay.id, action: 'lock', title: 'Lock Academic Year', message: `Lock AY ${ay.label}? This can only be reversed by a superadmin.` })} className="text-xs bg-red-600 text-white px-3 py-1.5 rounded-lg hover:bg-red-700 disabled:opacity-50">🔒 Lock</button>
+                                    <button disabled={lockAY.isPending} onClick={() => setConfirmAction({ ayId: ay.id, action: 'lock', title: 'Lock Academic Year', message: `Lock AY ${ay.label}? This can only be reversed by a superadmin.` })} className="text-xs bg-red-600 text-white px-3 py-1.5 rounded-lg hover:bg-red-700 disabled:opacity-50">🔒 Lock</button>
                                 )}
                                 {ay.isLocked && !ay.isArchived && (
-                                    <button disabled={busy === ay.id} onClick={() => setConfirmAction({ ayId: ay.id, action: 'archive', title: 'Archive Academic Year', message: `Archive AY ${ay.label}?` })} className="text-xs bg-gray-500 text-white px-3 py-1.5 rounded-lg hover:bg-gray-600 disabled:opacity-50">Archive</button>
+                                    <button disabled={archiveAY.isPending} onClick={() => setConfirmAction({ ayId: ay.id, action: 'archive', title: 'Archive Academic Year', message: `Archive AY ${ay.label}?` })} className="text-xs bg-gray-500 text-white px-3 py-1.5 rounded-lg hover:bg-gray-600 disabled:opacity-50">Archive</button>
                                 )}
                                 {isSuperadmin && ay.isLocked && !ay.isArchived && (
-                                    <button disabled={busy === ay.id} onClick={() => setUnlockAy(ay)} className="text-xs border border-red-500 text-red-600 px-3 py-1.5 rounded-lg hover:bg-red-50 disabled:opacity-50">🔓 Unlock</button>
+                                    <button disabled={unlockAY.isPending} onClick={() => setUnlockAyState(ay)} className="text-xs border border-red-500 text-red-600 px-3 py-1.5 rounded-lg hover:bg-red-50 disabled:opacity-50">🔓 Unlock</button>
                                 )}
                                 {isSuperadmin && ay.isArchived && (
-                                    <button disabled={busy === ay.id} onClick={() => setConfirmAction({ ayId: ay.id, action: 'unarchive', title: 'Unarchive Academic Year', message: `Unarchive AY ${ay.label}?` })} className="text-xs bg-purple-600 text-white px-3 py-1.5 rounded-lg hover:bg-purple-700 disabled:opacity-50">Unarchive</button>
+                                    <button disabled={unarchiveAY.isPending} onClick={() => setConfirmAction({ ayId: ay.id, action: 'unarchive', title: 'Unarchive Academic Year', message: `Unarchive AY ${ay.label}?` })} className="text-xs bg-purple-600 text-white px-3 py-1.5 rounded-lg hover:bg-purple-700 disabled:opacity-50">Unarchive</button>
                                 )}
                                 {!ay.isCurrent && !ay.isLocked && !ay.isArchived && (
-                                    <button disabled={busy === ay.id} onClick={() => setConfirmAction({ ayId: ay.id, action: 'delete', title: 'Delete Academic Year', message: `Delete AY ${ay.label}? This is permanent and might fail if there are linked records.` })} className="text-xs bg-red-100 text-red-700 px-3 py-1.5 rounded-lg hover:bg-red-200 disabled:opacity-50">Delete</button>
+                                    <button disabled={deleteAY.isPending} onClick={() => setConfirmAction({ ayId: ay.id, action: 'delete', title: 'Delete Academic Year', message: `Delete AY ${ay.label}? This is permanent and might fail if there are linked records.` })} className="text-xs bg-red-100 text-red-700 px-3 py-1.5 rounded-lg hover:bg-red-200 disabled:opacity-50">Delete</button>
                                 )}
                             </div>
                         </div>
@@ -189,19 +195,16 @@ export const AcademicYearsTab = ({ years, onRefresh, isSuperadmin }: { years: Ac
             </div>
 
             <PasswordPromptModal 
-                isOpen={!!unlockAy} 
-                targetLabel={`AY ${unlockAy?.label || ''}`}
-                onClose={() => setUnlockAy(null)} 
+                isOpen={!!unlockAyState} 
+                targetLabel={`AY ${unlockAyState?.label || ''}`}
+                onClose={() => setUnlockAyState(null)} 
                 onSubmit={async (pwd) => {
-                    if (!unlockAy) return false;
+                    if (!unlockAyState) return false;
                     try {
-                        await academicYearsAPI.unlock(unlockAy.id, pwd);
-                        onRefresh();
-                        flash('ok', 'Academic year unlocked successfully.');
-                        setUnlockAy(null);
+                        await unlockAY.mutateAsync({ id: unlockAyState.id, password: pwd });
+                        setUnlockAyState(null);
                         return true;
                     } catch (e: any) {
-                        flash('err', e.response?.data?.message ?? 'Invalid superadmin password.');
                         return false;
                     }
                 }} 
@@ -215,10 +218,10 @@ export const AcademicYearsTab = ({ years, onRefresh, isSuperadmin }: { years: Ac
                 onConfirm={async () => {
                     if (!confirmAction) return;
                     const { ayId, action } = confirmAction;
-                    if (action === 'lock') await act(() => academicYearsAPI.lock(ayId), ayId);
-                    else if (action === 'archive') await act(() => academicYearsAPI.archive(ayId), ayId);
-                    else if (action === 'unarchive') await act(() => academicYearsAPI.unarchive(ayId), ayId);
-                    else if (action === 'delete') await act(() => academicYearsAPI.delete(ayId), ayId);
+                    if (action === 'lock') await lockAY.mutateAsync(ayId);
+                    else if (action === 'archive') await archiveAY.mutateAsync(ayId);
+                    else if (action === 'unarchive') await unarchiveAY.mutateAsync(ayId);
+                    else if (action === 'delete') await deleteAY.mutateAsync(ayId);
                     setConfirmAction(null);
                 }}
             />

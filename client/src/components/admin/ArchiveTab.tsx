@@ -1,7 +1,8 @@
-import type { AcademicYear } from '../../services/api';
 import { AYStatusBadge } from './Shared';
+import { useAcademicYears } from '../../hooks/useAcademicYears';
 
-export const ArchiveTab = ({ years }: { years: AcademicYear[] }) => {
+export const ArchiveTab = () => {
+    const { data: years = [] } = useAcademicYears();
     const archived = years.filter(y => y.isArchived);
     return (
         <div>

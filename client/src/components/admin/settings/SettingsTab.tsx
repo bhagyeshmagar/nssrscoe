@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react';
 import ImageCropperModal from '../../common/ImageCropperModal';
-import { settingsAPI, decodeToken } from '../../../services/api';
+import { decodeToken } from '../../../services/api';
 import type { SiteSettings } from '../../../services/api';
 import { useAuthStore } from '../../../stores/authStore';
-import toast from 'react-hot-toast';
 
 import { HeroSection } from './HeroSection';
 import { StatsSection } from './StatsSection';
@@ -11,7 +10,11 @@ import { AboutSection } from './AboutSection';
 import { LeadershipSection } from './LeadershipSection';
 import { SocialSection } from './SocialSection';
 
-export const SettingsTab = ({ settings, onRefresh }: { settings: SiteSettings | null, onRefresh: () => void }) => {
+import { useSettings, useUpdateSettings } from '../../../hooks/useSettings';
+
+export const SettingsTab = () => {
+    const { data: settings } = useSettings();
+    const updateSettings = useUpdateSettings();
     const { token } = useAuthStore();
     const isSuperadmin = token ? decodeToken(token)?.isSuperadmin : false;
     const [formData, setFormData] = useState<SiteSettings>({
@@ -33,7 +36,6 @@ export const SettingsTab = ({ settings, onRefresh }: { settings: SiteSettings | 
         aboutPoMessage: '',
         aboutPoName: '',
         aboutPoPhoto: '',
-        homeSliderImages: '[]',
         socialInstagram: '',
         socialFacebook: '',
         socialTwitter: '',
@@ -65,14 +67,11 @@ export const SettingsTab = ({ settings, onRefresh }: { settings: SiteSettings | 
             const dataToSave = {
                 ...formData
             };
-            await settingsAPI.update(dataToSave);
-            toast.success('Settings saved successfully!');
-            onRefresh();
+            await updateSettings.mutateAsync(dataToSave);
         } catch (error) {
-            console.error('Error saving settings:', error);
-            toast.error('Error saving settings');
+        } finally {
+            setSaving(false);
         }
-        setSaving(false);
     };
 
     if (!isSuperadmin) {

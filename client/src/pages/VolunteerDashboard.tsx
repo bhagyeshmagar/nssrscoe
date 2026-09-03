@@ -4,12 +4,15 @@ import { useAuthStore } from '../stores/authStore';
 import { decodeToken } from '../services/api';
 import { connectSocket, disconnectSocket } from '../services/socket';
 import { LogOut } from 'lucide-react';
+import { volunteerProfileAPI } from '../services/api';
 
 import { ProfileTab } from '../components/volunteer/ProfileTab';
 import { PasswordTab } from '../components/volunteer/PasswordTab';
 import { VolunteersListTab } from '../components/volunteer/VolunteersListTab';
 import { NotificationsTab } from '../components/volunteer/NotificationsTab';
 import { MyAttendanceTab } from '../components/volunteer/MyAttendanceTab';
+import { CoreTeamTab } from '@/components/volunteer/CoreTeamTab';
+import { InnovativeIdeasTab } from '@/components/volunteer/InnovativeIdeasTab';
 
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -28,7 +31,18 @@ const VolunteerDashboard = () => {
         return 'Volunteer';
     });
 
+    const [isCoreTeam, setIsCoreTeam] = useState(false);
+
     useEffect(() => {
+        volunteerProfileAPI.getMyProfile()
+            .then(res => {
+                const data = (res.data as any).data || res.data;
+                if (data.isCoreTeam) {
+                    setIsCoreTeam(true);
+                }
+            })
+            .catch(err => console.error('Failed to load profile status:', err));
+
         connectSocket();
         
         return () => {
@@ -51,14 +65,16 @@ const VolunteerDashboard = () => {
                             <CardTitle className="text-2xl font-bold text-nss-blue">Volunteer Dashboard</CardTitle>
                             <CardDescription className="text-base mt-1">Welcome, <span className="font-semibold text-gray-700">{userName}</span></CardDescription>
                         </div>
-                        <Button
-                            variant="destructive"
-                            onClick={handleLogout}
-                            className="bg-red-500 hover:bg-red-600"
-                        >
-                            <LogOut className="w-4 h-4 mr-2" />
-                            Logout
-                        </Button>
+                        <div className="flex gap-2">
+                            <Button
+                                variant="destructive"
+                                onClick={handleLogout}
+                                className="bg-red-500 hover:bg-red-600"
+                            >
+                                <LogOut className="w-4 h-4 mr-2" />
+                                Logout
+                            </Button>
+                        </div>
                     </CardHeader>
                 </Card>
 
@@ -78,11 +94,19 @@ const VolunteerDashboard = () => {
                         <TabsTrigger value="volunteers" className="flex-1 md:flex-none text-xs sm:text-sm py-2.5 sm:py-3 px-3 sm:px-6 data-[state=active]:bg-blue-50 data-[state=active]:text-nss-blue min-h-[44px]">
                             👥 Volunteers
                         </TabsTrigger>
-                        <TabsTrigger value="notifications" className="flex-1 md:flex-none text-xs sm:text-sm py-2.5 sm:py-3 px-3 sm:px-6 data-[state=active]:bg-blue-50 data-[state=active]:text-nss-blue min-h-[44px]">
+                        <TabsTrigger value="alerts" className="flex-1 md:flex-none text-xs sm:text-sm py-2.5 sm:py-3 px-3 sm:px-6 data-[state=active]:bg-blue-50 data-[state=active]:text-nss-blue min-h-[44px]">
                             🔔 Alerts
                         </TabsTrigger>
                         <TabsTrigger value="attendance" className="flex-1 md:flex-none text-xs sm:text-sm py-2.5 sm:py-3 px-3 sm:px-6 data-[state=active]:bg-blue-50 data-[state=active]:text-nss-blue min-h-[44px]">
                             📅 Attendance
+                        </TabsTrigger>
+                        {isCoreTeam && (
+                            <TabsTrigger value="core-team" className="flex-1 md:flex-none text-xs sm:text-sm py-2.5 sm:py-3 px-3 sm:px-6 data-[state=active]:bg-blue-50 data-[state=active]:text-nss-blue min-h-[44px]">
+                                🌟 Core Team
+                            </TabsTrigger>
+                        )}
+                        <TabsTrigger value="ideas" className="flex-1 md:flex-none text-xs sm:text-sm py-2.5 sm:py-3 px-3 sm:px-6 data-[state=active]:bg-blue-50 data-[state=active]:text-nss-blue min-h-[44px]">
+                            💡 Ideas
                         </TabsTrigger>
                     </TabsList>
 
@@ -95,12 +119,22 @@ const VolunteerDashboard = () => {
                         <VolunteersListTab />
                     </TabsContent>
                     
-                    <TabsContent value="notifications" className="mt-0">
+                    <TabsContent value="alerts" className="mt-0">
                         <NotificationsTab />
                     </TabsContent>
                     
                     <TabsContent value="attendance" className="mt-0">
                         <MyAttendanceTab />
+                    </TabsContent>
+                    
+                    {isCoreTeam && (
+                        <TabsContent value="core-team">
+                            <CoreTeamTab />
+                        </TabsContent>
+                    )}
+
+                    <TabsContent value="ideas" className="mt-0">
+                        <InnovativeIdeasTab />
                     </TabsContent>
                 </Tabs>
             </div>

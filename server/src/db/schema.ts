@@ -287,7 +287,7 @@ export const auditLogs = mssqlTable('audit_logs', {
 export const events = mssqlTable('events', {
     id: int('id').identity().primaryKey(),
     title: nvarchar('title', { length: 255 }).notNull(),
-    description: nvarchar('description', { length: 'max' }).notNull(),
+    description: nvarchar('description', { length: 'max' }),
     date: datetime2('date').notNull(),
     location: nvarchar('location', { length: 255 }).notNull(),
     imageUrl: nvarchar('image_url', { length: 'max' }),
@@ -295,10 +295,14 @@ export const events = mssqlTable('events', {
     reportUrl: nvarchar('report_url', { length: 'max' }),
     driveLink: nvarchar('drive_link', { length: 'max' }),
     volunteersCount: int('volunteers_count').default(0),
+    approvalStatus: nvarchar('approval_status', { length: 20 }).default('pending').notNull(),
+    approvedById: int('approved_by_id').references(() => admins.id),
+    approvedAt: datetime2('approved_at'),
     academicYearId: int('academic_year_id').references(() => academicYears.id),
     createdAt: datetime2('created_at').default(sql`getdate()`),
 }, (t) => [
 check('chk_events_type', sql`${t.type} IN ('upcoming','past')`),
+check('chk_events_approval_status', sql`${t.approvalStatus} IN ('pending','approved','rejected')`),
 ]);
 
 export const eventImages = mssqlTable('event_images', {
@@ -310,6 +314,19 @@ export const eventImages = mssqlTable('event_images', {
     createdAt: datetime2('created_at').default(sql`getdate()`),
 });
 
+export const homeSliderImages = mssqlTable('home_slider_images', {
+    id: int('id').identity().primaryKey(),
+    url: nvarchar('url', { length: 'max' }).notNull(),
+    description: nvarchar('description', { length: 255 }).default(''),
+    eventId: int('event_id').references(() => events.id, { onDelete: 'set null' }),
+    approvalStatus: nvarchar('approval_status', { length: 20 }).default('pending').notNull(),
+    approvedById: int('approved_by_id').references(() => admins.id),
+    approvedAt: datetime2('approved_at'),
+    createdAt: datetime2('created_at').default(sql`getdate()`),
+}, (t) => [
+    check('chk_slider_approval_status', sql`${t.approvalStatus} IN ('pending','approved','rejected')`),
+]);
+
 export const eventRegistrations = mssqlTable('event_registrations', {
     id: int('id').identity().primaryKey(),
     eventId: int('event_id').references(() => events.id).notNull(),
@@ -319,13 +336,15 @@ export const eventRegistrations = mssqlTable('event_registrations', {
     department: nvarchar('department', { length: 100 }).notNull(),
     year: nvarchar('year', { length: 20 }).notNull(),
     visitorPassId: nvarchar('visitor_pass_id', { length: 50 }).unique(),
+    hasAttended: bit('has_attended').default(false).notNull(),
     /** Admin approval workflow: pending → approved | rejected */
     status: nvarchar('status', { length: 20 }).default('pending').notNull(),
     approvedAt: datetime2('approved_at'),
     approvedById: int('approved_by_id').references(() => admins.id),
     createdAt: datetime2('created_at').default(sql`getdate()`),
 }, (t) => [
-check('chk_event_registrations_status', sql`${t.status} IN ('pending','approved','rejected')`),
+    check('chk_event_registrations_status', sql`${t.status} IN ('pending','approved','rejected')`),
+    unique('unq_event_email').on(t.eventId, t.email),
 ]);
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -387,6 +406,7 @@ export const volunteersRelations = relations(volunteers, ({ one, many }: any) =>
     coreTeamAssignments: many(coreTeamAssignments),
     specialCampParticipations: many(specialCampParticipants),
     attendanceRecords: many(attendanceRecords),
+    innovativeIdeas: many(innovativeIdeas),
 }));
 
 export const volunteerProfilesRelations = relations(volunteerProfiles, ({ one }: any) => ({
@@ -547,3 +567,60 @@ export const emailLogs = mssqlTable('email_logs', {
     check('chk_email_logs_status', sql`${t.status} IN ('sent','failed')`),
 ]);
 
+// ─────────────────────────────────────────────────────────────────────────────
+// INNOVATIVE IDEAS
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const innovativeIdeas = mssqlTable('innovative_ideas', {
+    id: int('id').identity().primaryKey(),
+    volunteerId: int('volunteer_id').notNull().references(() => volunteers.id, { onDelete: 'cascade' }),
+    title: nvarchar('title', { length: 255 }).notNull(),
+    description: nvarchar('description', { length: 'max' }).notNull(),
+    category: nvarchar('category', { length: 255 }).notNull(),
+    article: nvarchar('article', { length: 'max' }),
+    methodology: nvarchar('methodology', { length: 'max' }),
+    benefits: nvarchar('benefits', { length: 'max' }),
+    supportingDocumentUrl: nvarchar('supporting_document_url', { length: 'max' }),
+    status: nvarchar('status', { length: 20 }).default('pending').notNull(),
+    rejectionReason: nvarchar('rejection_reason', { length: 'max' }),
+    approvedById: int('approved_by_id').references(() => admins.id),
+    approvedAt: datetime2('approved_at'),
+    deleteRequested: bit('delete_requested').default(false).notNull(),
+    pendingUpdateData: nvarchar('pending_update_data', { length: 'max' }),
+    createdAt: datetime2('created_at').default(sql`getdate()`),
+    updatedAt: datetime2('updated_at').default(sql`getdate()`),
+    updatedById: int('updated_by_id').references(() => admins.id),
+    deletedById: int('deleted_by_id').references(() => admins.id),
+    deletedAt: datetime2('deleted_at'),
+}, (t) => [
+    check('chk_innovative_ideas_status', sql`${t.status} IN ('pending','approved','rejected')`),
+]);
+
+export const innovativeIdeasRelations = relations(innovativeIdeas, ({ one }: any) => ({
+    volunteer: one(volunteers, { fields: [innovativeIdeas.volunteerId], references: [volunteers.id] }),
+    approvedBy: one(admins, { fields: [innovativeIdeas.approvedById], references: [admins.id] }),
+}));
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ACHIEVEMENTS
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const achievements = mssqlTable('achievements', {
+    id:             int('id').identity().primaryKey(),
+    title:          nvarchar('title', { length: 255 }).notNull(),
+    description:    nvarchar('description', { length: 'max' }).notNull(),
+    imageUrl:       nvarchar('image_url', { length: 'max' }).notNull(),
+    date:           datetime2('date').notNull(),
+    academicYearId: int('academic_year_id').references(() => academicYears.id),
+    createdById:    int('created_by_id').references(() => admins.id),
+    createdAt:      datetime2('created_at').default(sql`getdate()`),
+    updatedAt:      datetime2('updated_at').default(sql`getdate()`),
+    updatedById:    int('updated_by_id').references(() => admins.id),
+    deletedById:    int('deleted_by_id').references(() => admins.id),
+    deletedAt:      datetime2('deleted_at'),
+});
+
+export const achievementsRelations = relations(achievements, ({ one }: any) => ({
+    academicYear: one(academicYears, { fields: [achievements.academicYearId], references: [academicYears.id] }),
+    createdBy:    one(admins,        { fields: [achievements.createdById],    references: [admins.id] }),
+}));

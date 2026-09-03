@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { membersAPI, uploadAPI } from '../services/api';
+import { uploadAPI } from '../services/api';
+import { useMembers } from '../hooks/useMembers';
 
 interface Member {
     id: number;
@@ -13,21 +13,8 @@ interface Member {
 }
 
 const Members = () => {
-    const [members, setMembers] = useState<Member[]>([]);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        const fetchMembers = async () => {
-            try {
-                const response = await membersAPI.getAll();
-                setMembers(response.data.data || []);
-            } catch (error) {
-                console.error('Error fetching members:', error);
-            }
-            setLoading(false);
-        };
-        fetchMembers();
-    }, []);
+    const { data = [], isLoading: loading } = useMembers();
+    const members = data as Member[];
 
     // Group members by category
     const groupedMembers = members.reduce((acc, member) => {

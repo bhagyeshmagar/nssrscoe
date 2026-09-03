@@ -21,14 +21,16 @@ export interface AttendanceRecord {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const requireUnlockedAY = async (ayId: number, tx: any = db) => {
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+const requireUnlockedAY = async (ayId: number, tx: Tx | typeof db = db) => {
     const [ay] = await tx.select().top(1).from(academicYears).where(eq(academicYears.id, ayId));
     if (!ay) throw new NotFoundError(`Academic year ${ayId} not found.`);
     if (ay.isLocked) throw new AYLockedError(ay.label);
     return ay;
 };
 
-const findSession = async (sessionId: number, tx: any = db) => {
+const findSession = async (sessionId: number, tx: Tx | typeof db = db) => {
     const [session] = await tx
         .select()
         .top(1).from(attendanceSessions)
@@ -53,6 +55,11 @@ export const createSession = async (ayId: number, input: CreateSessionInput, adm
     return await db.transaction(async (tx) => {
         await requireUnlockedAY(ayId, tx);
 
+        if (input.eventId) {
+            const [event] = await tx.select().top(1).from(events).where(eq(events.id, input.eventId));
+            if (!event) throw new NotFoundError(`Event ${input.eventId} not found.`);
+        }
+
         const [session] = await tx.insert(attendanceSessions).output().values({
             academicYearId: ayId,
             title: input.title,
@@ -74,7 +81,7 @@ export const createSession = async (ayId: number, input: CreateSessionInput, adm
     });
 };
 
-export const getSession = async (sessionId: number, tx: any = db) => {
+export const getSession = async (sessionId: number, tx: Tx | typeof db = db) => {
     const session = await findSession(sessionId, tx);
     const records = await tx
         .select({
@@ -115,8 +122,6 @@ export const deleteSession = async (sessionId: number, adminId: number) => {
 // ── Mark attendance (bulk) ────────────────────────────────────────────────────
 
 // ── Private helper: core upsert logic, runs inside an existing tx ─────────────
-
-type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 const _markAttendanceInTx = async (
     tx: Tx,
@@ -233,6 +238,9 @@ export const getEventAttendance = async (ayId: number, eventId: number) => {
 
 export const saveEventAttendance = async (ayId: number, eventId: number, records: AttendanceRecord[], adminId: number) => {
     return await db.transaction(async (tx) => {
+        // Serialize concurrent requests to prevent duplicate sessions for the same event
+        await tx.execute(sql`EXEC sp_getapplock @Resource=${'ATT_EVENT_' + ayId + '_' + eventId}, @LockMode='Exclusive', @LockOwner='Transaction', @LockTimeout=5000`);
+
         await requireUnlockedAY(ayId, tx);
 
         const [event] = await tx.select().top(1).from(events).where(eq(events.id, eventId));
@@ -254,6 +262,14 @@ export const saveEventAttendance = async (ayId: number, eventId: number, records
                 description: `Auto-created session for event: ${event.title}`,
                 createdById: adminId,
             });
+
+            await logAudit({
+                action: 'attendance.session_create',
+                entityType: 'attendance_session',
+                entityId: session.id,
+                performedById: adminId,
+                academicYearId: ayId,
+            }, tx);
         }
 
         // Use the shared inner helper directly — avoids opening a nested transaction
@@ -302,6 +318,9 @@ export const getAYAttendanceSummary = async (ayId: number) => {
 };
 
 export const getVolunteerAttendance = async (ayId: number, volunteerId: number) => {
+    const [vol] = await db.select().top(1).from(volunteers).where(eq(volunteers.id, volunteerId));
+    if (!vol) throw new NotFoundError(`Volunteer ${volunteerId} not found.`);
+
     return db
         .select({
             sessionId: attendanceSessions.id,

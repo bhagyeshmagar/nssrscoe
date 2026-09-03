@@ -3,6 +3,7 @@ import type { MyAttendanceItem } from '../../services/api';
 import { volunteerProfileAPI } from '../../services/api';
 import toast from 'react-hot-toast';
 
+import { formatDate } from '@/utils/dateFormatter';
 export const MyAttendanceTab = () => {
     const [attendanceList, setAttendanceList] = useState<MyAttendanceItem[]>([]);
     const [loading, setLoading] = useState(false);
@@ -82,7 +83,7 @@ export const MyAttendanceTab = () => {
                         ) : (
                             attendanceList.map((item, index) => (
                                 <tr key={`${item.type}-${item.id}-${index}`} className="hover:bg-gray-50 transition">
-                                    <td className="px-6 py-4">{new Date(item.date).toLocaleDateString()}</td>
+                                    <td className="px-6 py-4">{formatDate(item.date)}</td>
                                     <td className="px-6 py-4">
                                         <span className={`px-2 py-1 rounded text-xs font-medium ${item.type === 'event' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
                                             {item.type.charAt(0).toUpperCase() + item.type.slice(1)}

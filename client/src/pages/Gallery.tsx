@@ -7,8 +7,8 @@ interface GalleryItem {
     description?: string;
     url: string;
     type: 'image' | 'video';
-    eventId?: number;
-    createdAt: string;
+    eventId?: number | null;
+    createdAt?: string;
 }
 
 const DescriptionText = ({ text }: { text: string }) => {

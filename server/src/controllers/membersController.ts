@@ -13,8 +13,33 @@
 import { Request, Response } from 'express';
 import { db } from '../db';
 import { coreTeamAssignments, coreTeamRoles, academicYears, volunteers, volunteerProfiles } from '../db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { ok, created, noContent, handleError } from '../lib/response';
+import { ValidationError } from '../lib/errors';
+import { positiveIntParam } from '../lib/schemas';
+import { z } from 'zod';
+
+const createMemberSchema = z.object({
+    coreTeamRoleId: z.coerce.number().int().positive().optional(),
+    volunteerId: z.coerce.number().int().positive().nullish(),
+    displayName: z.string().trim().nullish(),
+    displayPhotoUrl: z.string().trim().nullish(),
+    name: z.string().trim().nullish(),
+    role: z.string().trim().nullish(),
+    photoUrl: z.string().trim().nullish(),
+    order: z.coerce.number().int().nullish(),
+});
+
+const updateMemberSchema = z.object({
+    volunteerId: z.coerce.number().int().positive().nullish(),
+    displayName: z.string().trim().nullish(),
+    displayPhotoUrl: z.string().trim().nullish(),
+    displayOrder: z.coerce.number().int().nullish(),
+    name: z.string().trim().nullish(),
+    photoUrl: z.string().trim().nullish(),
+    role: z.string().trim().nullish(),
+    order: z.coerce.number().int().nullish(),
+});
 
 /**
  * GET /api/members
@@ -64,7 +89,7 @@ export const getMembers = async (req: Request, res: Response) => {
                 .select({ id: volunteers.id, name: volunteers.name, photoUrl: volunteerProfiles.profilePhotoUrl })
                 .from(volunteers)
                 .leftJoin(volunteerProfiles, eq(volunteers.id, volunteerProfiles.volunteerId))
-                .where(eq(volunteers.academicYearId, currentAY.id));
+                .where(inArray(volunteers.id, volunteerIds));
             vols.forEach(v => { volunteerMap[v.id] = { name: v.name, photoUrl: v.photoUrl }; });
         }
 
@@ -94,7 +119,8 @@ export const getMembers = async (req: Request, res: Response) => {
  */
 export const createMember = async (req: Request, res: Response) => {
     try {
-        const { coreTeamRoleId, volunteerId, displayName, displayPhotoUrl, name, role, photoUrl, order } = req.body;
+        const parsed = createMemberSchema.parse(req.body);
+        const { coreTeamRoleId, volunteerId, displayName, displayPhotoUrl, name, role, photoUrl, order } = parsed;
 
         const [currentAY] = await db
             .select({ id: academicYears.id })
@@ -103,42 +129,29 @@ export const createMember = async (req: Request, res: Response) => {
             ;
 
         if (!currentAY) {
-            return res.status(400).json({ message: 'No active academic year is set. Create and activate an academic year first.' });
+            throw new ValidationError('No active academic year is set. Create and activate an academic year first.');
         }
 
-        let roleId = coreTeamRoleId ? parseInt(coreTeamRoleId) : null;
+        let roleId = coreTeamRoleId ? coreTeamRoleId : null;
         
         // Legacy support: if 'role' is provided as string
         if (!roleId && role) {
-            let coreRole = await db.select().top(1).from(coreTeamRoles).where(eq(coreTeamRoles.name, role)).then(res => res[0]);
+            const coreRole = await db.select({ id: coreTeamRoles.id }).top(1).from(coreTeamRoles).where(eq(coreTeamRoles.name, role)).then(res => res[0]);
             if (!coreRole) {
-                const code = role.toLowerCase().replace(/[^a-z0-9]+/g, '_').substring(0, 50);
-                let inferredCategory = 'Institute Officers';
-                if (role.toLowerCase().includes('coordinator')) inferredCategory = 'Department Coordinators';
-                else if (role.toLowerCase().includes('lead')) inferredCategory = 'Portfolio Leads';
-                else if (role.toLowerCase().includes('representative')) inferredCategory = 'NSS Representatives';
-                else if (role.toLowerCase().includes('nss program officer') || role.toLowerCase().includes('nss po')) inferredCategory = 'NSS Program Officer';
-
-                const [newRole] = await db.insert(coreTeamRoles).output().values({
-                    name: role,
-                    code: code,
-                    category: inferredCategory,
-                    roleType: role.toLowerCase().includes('coordinator') || role.toLowerCase().includes('lead') || role.toLowerCase().includes('representative') ? 'student' : 'institution',
-                });
-                coreRole = newRole;
+                throw new ValidationError(`Role "${role}" does not exist. Please provide a valid role ID or existing role name.`);
             }
             roleId = coreRole.id;
         }
 
-        if (!roleId) return res.status(400).json({ message: 'Role is required' });
+        if (!roleId) throw new ValidationError('Role is required');
 
         const [newAssignment] = await db.insert(coreTeamAssignments).output().values({
             academicYearId: currentAY.id,
             coreTeamRoleId: roleId,
-            volunteerId: volunteerId ? parseInt(volunteerId) : null,
+            volunteerId: volunteerId ? volunteerId : null,
             displayName: displayName ?? name ?? null,
             displayPhotoUrl: displayPhotoUrl ?? photoUrl ?? null,
-            displayOrder: order !== undefined ? parseInt(order) : 0,
+            displayOrder: order ?? 0,
         });
 
         created(res, newAssignment);
@@ -152,34 +165,22 @@ export const createMember = async (req: Request, res: Response) => {
  * Updates a core team assignment.
  */
 export const updateMember = async (req: Request, res: Response) => {
-    const { id } = req.params;
     try {
-        const { volunteerId, displayName, displayPhotoUrl, displayOrder, name, photoUrl, role, order } = req.body;
+        const id = positiveIntParam.parse(req.params.id);
+        const parsed = updateMemberSchema.parse(req.body);
+        const { volunteerId, displayName, displayPhotoUrl, displayOrder, name, photoUrl, role, order } = parsed;
         
-        let updateData: any = {
-            volunteerId: volunteerId !== undefined ? parseInt(volunteerId) : undefined,
-            displayName: displayName ?? name ?? undefined,
-            displayPhotoUrl: displayPhotoUrl ?? photoUrl ?? undefined,
-            displayOrder: displayOrder !== undefined ? parseInt(displayOrder) : (order !== undefined ? parseInt(order) : undefined),
+        let updateData: Partial<typeof coreTeamAssignments.$inferInsert> = {
+            volunteerId: volunteerId !== undefined ? (volunteerId ? volunteerId : null) : undefined,
+            displayName: displayName !== undefined ? displayName : (name ?? undefined),
+            displayPhotoUrl: displayPhotoUrl !== undefined ? displayPhotoUrl : (photoUrl ?? undefined),
+            displayOrder: displayOrder !== undefined ? displayOrder : (order !== undefined ? order : undefined),
         };
 
         if (role) {
-            let coreRole = await db.select().top(1).from(coreTeamRoles).where(eq(coreTeamRoles.name, role)).then(res => res[0]);
+            const coreRole = await db.select({ id: coreTeamRoles.id }).top(1).from(coreTeamRoles).where(eq(coreTeamRoles.name, role)).then(res => res[0]);
             if (!coreRole) {
-                const code = role.toLowerCase().replace(/[^a-z0-9]+/g, '_').substring(0, 50);
-                let inferredCategory = 'Institute Officers';
-                if (role.toLowerCase().includes('coordinator')) inferredCategory = 'Department Coordinators';
-                else if (role.toLowerCase().includes('lead')) inferredCategory = 'Portfolio Leads';
-                else if (role.toLowerCase().includes('representative')) inferredCategory = 'NSS Representatives';
-                else if (role.toLowerCase().includes('nss program officer') || role.toLowerCase().includes('nss po')) inferredCategory = 'NSS Program Officer';
-
-                const [newRole] = await db.insert(coreTeamRoles).output().values({
-                    name: role,
-                    code: code,
-                    category: inferredCategory,
-                    roleType: role.toLowerCase().includes('coordinator') || role.toLowerCase().includes('lead') || role.toLowerCase().includes('representative') ? 'student' : 'institution',
-                });
-                coreRole = newRole;
+                throw new ValidationError(`Role "${role}" does not exist.`);
             }
             updateData.coreTeamRoleId = coreRole.id;
         }
@@ -187,7 +188,7 @@ export const updateMember = async (req: Request, res: Response) => {
         const [updated] = await db
             .update(coreTeamAssignments)
             .set(updateData)
-            .where(eq(coreTeamAssignments.id, Number(id)))
+            .where(eq(coreTeamAssignments.id, id))
             .output();
         ok(res, updated);
     } catch (error) {
@@ -200,9 +201,9 @@ export const updateMember = async (req: Request, res: Response) => {
  * Removes a core team assignment.
  */
 export const deleteMember = async (req: Request, res: Response) => {
-    const { id } = req.params;
     try {
-        await db.delete(coreTeamAssignments).where(eq(coreTeamAssignments.id, Number(id)));
+        const id = positiveIntParam.parse(req.params.id);
+        await db.delete(coreTeamAssignments).where(eq(coreTeamAssignments.id, id));
         noContent(res);
     } catch (error) {
         handleError(res, error);

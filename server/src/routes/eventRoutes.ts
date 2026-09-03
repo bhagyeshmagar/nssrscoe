@@ -1,13 +1,13 @@
 import { Router } from 'express';
 import { getEvents, createEvent, updateEvent, deleteEvent } from '../controllers/eventController';
-import { authenticateToken, requireAdmin } from '../middleware/auth';
+import { authenticateToken, requireAdmin, optionalAuth } from '../middleware/auth';
 import { validateRequest } from '../middleware/validate';
 import { createEventSchema, updateEventSchema } from '../lib/schemas/index';
 
 const router = Router();
 
-// Public: anyone can list events
-router.get('/', getEvents);
+// Public: anyone can list events, but admins get extra pending events
+router.get('/', optionalAuth, getEvents);
 
 // Admin-only mutations
 router.post('/',    authenticateToken, requireAdmin, validateRequest(createEventSchema), createEvent);

@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
-import { registrationsAPI } from '../../services/api';
-import type { EventRegistration, EventData } from '../../services/api';
-import { CheckCircle, XCircle, Clock, Mail } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { useState } from 'react';
+import { CheckCircle, XCircle, Clock, Mail, Download } from 'lucide-react';
+import * as XLSX from 'xlsx';
+import { useRegistrationsByEvent, useApproveRegistration, useRejectRegistration, useToggleAttendance } from '../../hooks/useRegistrations';
+import { useEvents } from '../../hooks/useEvents';
 
+import { formatDate } from '@/utils/dateFormatter';
 type FilterStatus = 'all' | 'pending' | 'approved' | 'rejected';
 
 const StatusBadge = ({ status }: { status: string }) => {
@@ -24,41 +25,25 @@ const StatusBadge = ({ status }: { status: string }) => {
     );
 };
 
-export const RegistrationsTab = ({ events }: { events: (EventData & { id: number })[] }) => {
-    const [selectedEventId, setSelectedEventId] = useState<string>('');
-    const [registrations, setRegistrations] = useState<EventRegistration[]>([]);
-    const [loading, setLoading] = useState(false);
+export const RegistrationsTab = () => {
+    const { data: events = [] } = useEvents();
+    const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
     const [actionLoading, setActionLoading] = useState<number | null>(null);
     const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
 
-    const fetchRegistrations = useCallback(async (eventId: number) => {
-        setLoading(true);
-        try {
-            const response = await registrationsAPI.getByEventId(eventId);
-            setRegistrations((response.data as any).data || []);
-        } catch (error) {
-            console.error('Error fetching registrations:', error);
-            toast.error('Failed to load registrations');
-        }
-        setLoading(false);
-    }, []);
+    const { data: registrations = [], isLoading: loading } = useRegistrationsByEvent(
+        selectedEventId ? Number(selectedEventId) : null
+    );
 
-    useEffect(() => {
-        if (selectedEventId) {
-            fetchRegistrations(Number(selectedEventId));
-        } else {
-            setRegistrations([]);
-        }
-    }, [selectedEventId, fetchRegistrations]);
+    const approveRegistration = useApproveRegistration();
+    const rejectRegistration = useRejectRegistration();
+    const toggleAttendance = useToggleAttendance();
 
     const handleApprove = async (id: number) => {
         setActionLoading(id);
         try {
-            await registrationsAPI.approve(id);
-            await fetchRegistrations(Number(selectedEventId));
-            toast.success('Registration approved! Pass email sent to the volunteer.');
+            await approveRegistration.mutateAsync(id);
         } catch (err: any) {
-            toast.error(err?.response?.data?.message || 'Failed to approve registration.');
         }
         setActionLoading(null);
     };
@@ -67,11 +52,17 @@ export const RegistrationsTab = ({ events }: { events: (EventData & { id: number
         if (!window.confirm('Are you sure you want to reject this registration?')) return;
         setActionLoading(id);
         try {
-            await registrationsAPI.reject(id);
-            await fetchRegistrations(Number(selectedEventId));
-            toast.success('Registration rejected.');
+            await rejectRegistration.mutateAsync(id);
         } catch (err: any) {
-            toast.error(err?.response?.data?.message || 'Failed to reject registration.');
+        }
+        setActionLoading(null);
+    };
+
+    const handleToggleAttendance = async (id: number, currentStatus: boolean) => {
+        setActionLoading(id);
+        try {
+            await toggleAttendance.mutateAsync({ id, hasAttended: !currentStatus });
+        } catch (err: any) {
         }
         setActionLoading(null);
     };
@@ -85,26 +76,59 @@ export const RegistrationsTab = ({ events }: { events: (EventData & { id: number
         pending: registrations.filter(r => r.status === 'pending').length,
         approved: registrations.filter(r => r.status === 'approved').length,
         rejected: registrations.filter(r => r.status === 'rejected').length,
+        attended: registrations.filter(r => r.hasAttended).length,
+    };
+
+    const handleExport = () => {
+        if (!selectedEventId || registrations.length === 0) return;
+        const event = events.find(e => e.id === selectedEventId);
+        const eventName = event ? event.title : 'Event';
+        
+        const exportData = registrations.map(reg => ({
+            'Pass ID': reg.visitorPassId || 'N/A',
+            'Name': reg.name,
+            'Email': reg.email,
+            'Phone': reg.phone,
+            'Department': reg.department,
+            'Year': reg.year,
+            'Status': reg.status,
+            'Attendance': reg.hasAttended ? 'Present' : 'Absent',
+            'Registered At': new Date(reg.createdAt || '').toLocaleString()
+        }));
+
+        const ws = XLSX.utils.json_to_sheet(exportData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Registrations');
+        XLSX.writeFile(wb, `${eventName}_Registrations.xlsx`);
     };
 
     return (
         <div>
             <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-bold text-gray-800">Event Registrations</h2>
+                {selectedEventId && registrations.length > 0 && (
+                    <button
+                        onClick={handleExport}
+                        className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition text-sm shadow-sm"
+                    >
+                        <Download className="w-4 h-4" />
+                        Download Report
+                    </button>
+                )}
             </div>
 
             {/* Event Selector */}
             <div className="bg-white p-6 rounded-lg shadow mb-6">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Select Event to view registrations:</label>
                 <select
-                    value={selectedEventId}
-                    onChange={e => { setSelectedEventId(e.target.value); setFilterStatus('all'); }}
+                    value={selectedEventId || ''}
+                    onChange={e => { setSelectedEventId(e.target.value ? Number(e.target.value) : null); setFilterStatus('all'); }}
                     className="w-full md:w-1/2 border rounded px-3 py-2"
                 >
                     <option value="">-- Select an Event --</option>
                     {events.map(e => (
                         <option key={e.id} value={e.id}>
-                            {e.title} ({new Date(e.date).toLocaleDateString()}) – {e.type}
+                            {e.title} ({formatDate(e.date)}) – {e.type}
                         </option>
                     ))}
                 </select>
@@ -131,6 +155,9 @@ export const RegistrationsTab = ({ events }: { events: (EventData & { id: number
                                 <span className="ml-1.5 opacity-80">({counts[s]})</span>
                             </button>
                         ))}
+                        <div className="ml-auto px-4 py-1.5 rounded-full text-sm font-bold bg-blue-100 text-blue-800 border border-blue-200 shadow-sm">
+                            Attended: {counts.attended} / {counts.approved}
+                        </div>
                     </div>
 
                     {loading ? (
@@ -146,6 +173,7 @@ export const RegistrationsTab = ({ events }: { events: (EventData & { id: number
                                         <th className="px-4 py-3 text-left font-semibold text-gray-600">Phone</th>
                                         <th className="px-4 py-3 text-left font-semibold text-gray-600">Dept / Year</th>
                                         <th className="px-4 py-3 text-left font-semibold text-gray-600">Status</th>
+                                        <th className="px-4 py-3 text-left font-semibold text-gray-600">Attendance</th>
                                         <th className="px-4 py-3 text-left font-semibold text-gray-600">Submitted</th>
                                         <th className="px-4 py-3 text-left font-semibold text-gray-600">Actions</th>
                                     </tr>
@@ -163,8 +191,25 @@ export const RegistrationsTab = ({ events }: { events: (EventData & { id: number
                                             <td className="px-4 py-3">{reg.phone}</td>
                                             <td className="px-4 py-3">{reg.department} ({reg.year})</td>
                                             <td className="px-4 py-3"><StatusBadge status={reg.status || 'pending'} /></td>
+                                            <td className="px-4 py-3">
+                                                {reg.status === 'approved' ? (
+                                                    <button
+                                                        onClick={() => handleToggleAttendance(reg.id, reg.hasAttended)}
+                                                        disabled={actionLoading === reg.id}
+                                                        className={`px-3 py-1 rounded-full text-xs font-semibold border transition disabled:opacity-50 ${
+                                                            reg.hasAttended 
+                                                                ? 'bg-green-100 text-green-700 border-green-300 hover:bg-green-200' 
+                                                                : 'bg-gray-100 text-gray-600 border-gray-300 hover:bg-gray-200'
+                                                        }`}
+                                                    >
+                                                        {reg.hasAttended ? 'Present' : 'Absent'}
+                                                    </button>
+                                                ) : (
+                                                    <span className="text-gray-400 text-xs">—</span>
+                                                )}
+                                            </td>
                                             <td className="px-4 py-3 text-gray-500">
-                                                {reg.createdAt ? new Date(reg.createdAt).toLocaleDateString() : '—'}
+                                                {reg.createdAt ? formatDate(reg.createdAt) : '—'}
                                             </td>
                                             <td className="px-4 py-3">
                                                 {reg.status === 'pending' && (
@@ -205,7 +250,7 @@ export const RegistrationsTab = ({ events }: { events: (EventData & { id: number
                                     ))}
                                     {filtered.length === 0 && (
                                         <tr>
-                                            <td colSpan={8} className="px-4 py-8 text-center text-gray-400">
+                                            <td colSpan={9} className="px-4 py-8 text-center text-gray-400">
                                                 {registrations.length === 0
                                                     ? 'No registrations found for this event.'
                                                     : `No ${filterStatus} registrations.`}

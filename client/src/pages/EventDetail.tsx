@@ -1,32 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { eventsAPI, eventImagesAPI, uploadAPI } from '../services/api';
+import type { EventData as Event, EventImage } from '../services/api';
 import { Calendar, MapPin, Download, Clock, Users, ChevronLeft, ArrowRight, ZoomIn, Share2, ExternalLink } from 'lucide-react';
 import { format } from 'date-fns';
 import { motion } from 'framer-motion';
 
 import { EventRegistrationModal } from '../components/events/EventRegistrationModal';
 import { ImageLightbox } from '../components/events/ImageLightbox';
-
-interface Event {
-    id: number;
-    title: string;
-    description: string;
-    date: string;
-    location: string;
-    imageUrl?: string;
-    type: 'upcoming' | 'today' | 'past';
-    reportUrl?: string;
-    driveLink?: string;
-    volunteersCount?: number;
-}
-
-interface EventImage {
-    id: number;
-    url: string;
-    isMaster: boolean;
-    caption?: string;
-}
 
 const EventDetail = () => {
     const { id } = useParams();
@@ -81,7 +62,7 @@ const EventDetail = () => {
         );
     }
 
-    const bannerImage = eventImages.find(img => img.isMaster)?.url || event?.imageUrl || eventImages[0]?.url;
+    const bannerImage = eventImages.find(img => img.isMaster)?.url || eventImages[0]?.url;
 
     return (
         <div className="bg-white min-h-screen font-sans">

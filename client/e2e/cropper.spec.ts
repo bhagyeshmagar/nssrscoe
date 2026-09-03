@@ -76,6 +76,7 @@ test.describe('Image Cropper Flow', () => {
              });
         });
 
+        await page.addInitScript("window.sessionStorage.setItem('splashShown', 'true');");
         await page.goto('/login');
 
         const emailInput = page.getByLabel(/Email \/ Username/i);
@@ -90,7 +91,7 @@ test.describe('Image Cropper Flow', () => {
         await expect(page).toHaveURL(/\/admin/);
 
         // Click on the Home Slider tab
-        const sliderTab = page.locator('button:has-text("Home Slider")');
+        const sliderTab = page.getByRole('link', { name: /Home Slider/i });
         await sliderTab.click();
 
         // Click on the upload button in Settings Tab (Home Slider)

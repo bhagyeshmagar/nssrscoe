@@ -1,13 +1,15 @@
 import { Response } from 'express';
 import { CoreTeamAuthRequest } from '../middleware/coreTeamAuth';
 import { ok, handleError } from '../lib/response';
+import { AppError } from '../lib/errors';
 import * as service from '../services/coreTeamDashboardService';
 
 export const getDashboardData = async (req: CoreTeamAuthRequest, res: Response) => {
     try {
-        const { department, roleName, academicYearId } = req.coreTeam!;
+        if (!req.coreTeam) throw new AppError('Unauthorized', 401, 'UNAUTHORIZED');
+        const { department, roleName, academicYearId } = req.coreTeam;
 
-        let volunteers: any[] = [];
+        let volunteers: Awaited<ReturnType<typeof service.getDepartmentVolunteers>> = [];
         if (department) {
             // Dept coordinator — show their department's volunteers
             volunteers = await service.getDepartmentVolunteers(academicYearId, department);

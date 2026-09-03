@@ -5,9 +5,12 @@ import { useFlash, useAYSelector } from './Shared';
 import { FileSpreadsheet, Mail } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import toast from 'react-hot-toast';
+import { useAcademicYears } from '../../hooks/useAcademicYears';
 
-export const AttendanceTab = ({ years, currentAY }: { years: AcademicYear[]; currentAY: AcademicYear | null }) => {
-    const { selectedAyId, setSelectedAyId, selectedAY } = useAYSelector(years, currentAY);
+import { formatDate } from '@/utils/dateFormatter';
+export const AttendanceTab = () => {
+    const { data: years = [] } = useAcademicYears();
+    const { selectedAyId, setSelectedAyId, selectedAY } = useAYSelector(years, null);
     const [eventsList, setEventsList] = useState<EventData[]>([]);
     const [volunteersList, setVolunteersList] = useState<VolunteerWithProfile[]>([]);
     const [selectedEvent, setSelectedEvent] = useState<EventData | null>(null);
@@ -52,10 +55,10 @@ export const AttendanceTab = ({ years, currentAY }: { years: AcademicYear[]; cur
     useEffect(() => { load(); }, [load]);
     
     useEffect(() => {
-        if (!selectedAyId && years.length > 0) {
-            setSelectedAyId(currentAY?.id ?? years[0].id);
+        if (!selectedAyId && selectedAY) {
+            setSelectedAyId(selectedAY.id);
         }
-    }, [currentAY, years, selectedAyId]);
+    }, [selectedAY, selectedAyId]);
 
 
 
@@ -101,7 +104,7 @@ export const AttendanceTab = ({ years, currentAY }: { years: AcademicYear[]; cur
 
             const wsData = [
                 [`Event: ${event.title}`],
-                [`Date: ${new Date(event.date).toLocaleDateString()}`],
+                [`Date: ${formatDate(event.date)}`],
                 [`Location: ${event.location}`],
                 [],
                 ['Sr. No.', 'PRN No.', 'Name', 'Department', 'Attendance Status'],
@@ -195,7 +198,7 @@ export const AttendanceTab = ({ years, currentAY }: { years: AcademicYear[]; cur
                             {eventsList.length === 0 && <tr><td colSpan={4} className="text-center py-8 text-gray-400">No events found for this Academic Year.</td></tr>}
                             {eventsList.map(e => (
                                 <tr key={e.id} className="hover:bg-gray-50">
-                                    <td className="px-4 py-3 font-mono text-gray-700">{new Date(e.date).toLocaleDateString()}</td>
+                                    <td className="px-4 py-3 font-mono text-gray-700">{formatDate(e.date)}</td>
                                     <td className="px-4 py-3 font-medium">{e.title}</td>
                                     <td className="px-4 py-3 text-gray-500">{e.location}</td>
                                     <td className="px-4 py-3">
@@ -237,7 +240,7 @@ export const AttendanceTab = ({ years, currentAY }: { years: AcademicYear[]; cur
                     <div className="flex justify-between items-center mb-6 border-b pb-4">
                         <div>
                             <h3 className="text-xl font-bold text-gray-800">Attendance for: {selectedEvent.title}</h3>
-                            <p className="text-sm text-gray-500 mt-1">{new Date(selectedEvent.date).toLocaleDateString()} • {selectedEvent.location}</p>
+                            <p className="text-sm text-gray-500 mt-1">{formatDate(selectedEvent.date)} • {selectedEvent.location}</p>
                         </div>
                         <div className="flex items-center gap-4">
                             <div className="flex items-center gap-2">

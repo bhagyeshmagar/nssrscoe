@@ -39,6 +39,12 @@ const ALLOWED_TYPES: Record<string, string> = {
     '.pdf':  'application/pdf',
     '.doc':  'application/msword',
     '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    '.ppt':  'application/vnd.ms-powerpoint',
+    '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    '.xls':  'application/vnd.ms-excel',
+    '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    '.txt':  'text/plain',
+    '.csv':  'text/csv',
 };
 
 const fileFilter = (_req: Express.Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
@@ -53,13 +59,13 @@ const fileFilter = (_req: Express.Request, file: Express.Multer.File, cb: multer
     if (ext === '.jpg' && file.mimetype === 'image/jpg') {
         return cb(null, true);
     }
-    cb(new Error('Only allowed file types are accepted (images, videos, PDF, DOCX).'));
+    cb(new Error('Only allowed file types are accepted (images, videos, documents).'));
 };
 
 const upload = multer({
     storage,
     fileFilter,
-    limits: { fileSize: 50 * 1024 * 1024 }, // 50 MB
+    limits: { fileSize: 100 * 1024 * 1024 }, // 100 MB global limit (restricted for non-videos below)
 });
 
 // All upload routes require authentication
@@ -72,7 +78,7 @@ router.post('/single', (req, res, next) => {
             console.error('[upload] Error:', err);
             if (err instanceof multer.MulterError) {
                 if (err.code === 'LIMIT_FILE_SIZE') {
-                    return res.status(400).json({ success: false, message: 'File too large. Maximum size is 50 MB.' });
+                    return res.status(400).json({ success: false, message: 'File too large. Maximum size is 100 MB.' });
                 }
                 return res.status(400).json({ success: false, message: `Upload error: ${err.message}` });
             }
@@ -83,11 +89,21 @@ router.post('/single', (req, res, next) => {
             return res.status(400).json({ success: false, message: 'No file uploaded.' });
         }
 
+        // Custom size enforcement: 10MB limit for non-videos
+        const isVideo = req.file.mimetype.startsWith('video/');
+        if (!isVideo && req.file.size > 10 * 1024 * 1024) {
+            fs.promises.unlink(req.file.path).catch(e => console.error('Cleanup error', e));
+            return res.status(400).json({ success: false, message: 'File too large. Maximum size for non-video files is 10 MB.' });
+        }
+
         return res.json({
-            url: `/uploads/${req.file.filename}`,
-            filename: req.file.filename,
-            originalName: req.file.originalname,
-            size: req.file.size,
+            success: true,
+            data: {
+                url: `/uploads/${req.file.filename}`,
+                filename: req.file.filename,
+                originalName: req.file.originalname,
+                size: req.file.size,
+            }
         });
     });
 });
@@ -99,7 +115,7 @@ router.post('/multiple', (req, res) => {
             console.error('[upload] Error:', err);
             if (err instanceof multer.MulterError) {
                 if (err.code === 'LIMIT_FILE_SIZE') {
-                    return res.status(400).json({ success: false, message: 'File too large. Maximum size is 50 MB.' });
+                    return res.status(400).json({ success: false, message: 'File too large. Maximum size is 100 MB.' });
                 }
                 if (err.code === 'LIMIT_FILE_COUNT') {
                     return res.status(400).json({ success: false, message: 'Too many files. Maximum is 10 files per request.' });
@@ -113,14 +129,24 @@ router.post('/multiple', (req, res) => {
             return res.status(400).json({ success: false, message: 'No files uploaded.' });
         }
 
-        const files = (req.files as Express.Multer.File[]).map(file => ({
+        const uploadedFiles = req.files as Express.Multer.File[];
+        
+        // Custom size enforcement: 10MB limit for non-videos
+        const overLimitFiles = uploadedFiles.filter(f => !f.mimetype.startsWith('video/') && f.size > 10 * 1024 * 1024);
+        if (overLimitFiles.length > 0) {
+            // Cleanup all uploaded files in this batch
+            Promise.all(uploadedFiles.map(f => fs.promises.unlink(f.path).catch(e => console.error('Cleanup error', e))));
+            return res.status(400).json({ success: false, message: 'One or more files are too large. Maximum size for non-video files is 10 MB.' });
+        }
+
+        const files = uploadedFiles.map(file => ({
             url: `/uploads/${file.filename}`,
             filename: file.filename,
             originalName: file.originalname,
             size: file.size,
         }));
 
-        return res.json({ files });
+        return res.json({ success: true, data: { files } });
     });
 });
 

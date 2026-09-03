@@ -4,11 +4,11 @@ import { galleryAPI, uploadAPI, settingsAPI } from '../services/api';
 
 interface VideoItem {
     id: number;
-    title: string | null;
+    title?: string;
     description?: string;
     url: string;
     type: string;
-    createdAt: string;
+    createdAt?: string;
 }
 
 const DescriptionText = ({ text }: { text: string }) => {
@@ -46,9 +46,7 @@ const Videos = () => {
     const fetchSettings = async () => {
         try {
             const res = await settingsAPI.get();
-            if (res.data.data?.youtubeChannelUrl) {
-                setYoutubeUrl(res.data.data.youtubeChannelUrl);
-            } else if (res.data.data?.socialYoutube) {
+            if (res.data.data?.socialYoutube) {
                 setYoutubeUrl(res.data.data.socialYoutube);
             }
         } catch (error) {

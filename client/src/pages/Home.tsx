@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
 
-import { settingsAPI, uploadAPI, eventsAPI } from '../services/api';
+import { settingsAPI, uploadAPI, eventsAPI, sliderAPI } from '../services/api';
 import type { SiteSettings, EventData } from '../services/api';
 import { EventsTray } from '../components/home/EventsTray';
+import { AchievementsCarousel } from '../components/home/AchievementsCarousel';
 import { Info, Image, Users, FileText, Video, CalendarDays } from 'lucide-react';
 
 const Home = () => {
@@ -27,15 +28,12 @@ const Home = () => {
                 const fetchedSettings = response.data.data;
                 setSettings(fetchedSettings);
 
-                if (fetchedSettings.homeSliderImages) {
-                    try {
-                        const parsed = JSON.parse(fetchedSettings.homeSliderImages);
-                        if (Array.isArray(parsed) && parsed.length > 0) {
-                            setSliderImages(parsed);
-                        }
-                    } catch (e) {
-                        console.error('Failed to parse slider images', e);
-                    }
+                // Fetch Slider Images
+                try {
+                    const sliderRes = await sliderAPI.getAll();
+                    setSliderImages(sliderRes.data.data);
+                } catch(e) {
+                    console.error('Failed to fetch slider images', e);
                 }
 
                 // Fetch Events
@@ -219,6 +217,9 @@ const Home = () => {
                     </div>
                 )}
             </section>
+
+            {/* Achievements Carousel */}
+            <AchievementsCarousel />
 
             {/* Quick Stats */}
             <section className="py-16 bg-gray-100">

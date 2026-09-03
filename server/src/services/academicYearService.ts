@@ -147,7 +147,7 @@ export const updateAcademicYear = async (id: number, input: UpdateAYInput, admin
                 entityId: id,
                 performedById: adminId,
                 academicYearId: id,
-                details: input as unknown as Record<string, unknown>,
+                details: { ...input },
             }, tx);
 
             return updated;
@@ -169,6 +169,9 @@ export const updateAcademicYear = async (id: number, input: UpdateAYInput, admin
 export const activateAcademicYear = async (id: number, adminId: number) => {
     try {
         return await db.transaction(async (tx) => {
+            // Serialize concurrent activation requests
+            await tx.execute(sql`EXEC sp_getapplock @Resource='AY_ACTIVATE', @LockMode='Exclusive', @LockOwner='Transaction', @LockTimeout=5000`);
+
             const ay = await findAY(id, tx);
 
             if (ay.isLocked)   throw new AYLockedError(ay.label);

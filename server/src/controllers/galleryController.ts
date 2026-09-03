@@ -3,7 +3,23 @@ import { db } from '../db';
 import { gallery } from '../db/schema';
 import { eq, desc } from 'drizzle-orm';
 import { ok, created, noContent, handleError } from '../lib/response';
-import { AuthRequest } from '../middleware/auth';
+import { AuthRequest, getAdminId } from '../middleware/auth';
+import { ForbiddenError, NotFoundError } from '../lib/errors';
+import { positiveIntParam } from '../lib/schemas';
+import { z } from 'zod';
+
+const galleryItemSchema = z.object({
+    title: z.string().trim().max(255).optional().nullable(),
+    description: z.string().trim().optional().default(''),
+    url: z.string().trim().min(1, 'URL cannot be empty.'),
+    type: z.enum(['image', 'video']),
+});
+
+const updateGalleryItemSchema = galleryItemSchema.partial();
+
+const rejectGallerySchema = z.object({
+    reason: z.string().trim().min(1, 'Rejection reason is required.'),
+});
 
 export const getGallery = async (req: Request, res: Response) => {
     try {
@@ -28,7 +44,7 @@ export const getGalleryAdmin = async (req: Request, res: Response) => {
 export const createGalleryItem = async (req: Request, res: Response) => {
     try {
         const authReq = req as AuthRequest;
-        const { title, description, url, type } = req.body;
+        const { title, description, url, type } = galleryItemSchema.parse(req.body);
         
         const isSuperadmin = authReq.user!.isSuperadmin;
         const status = isSuperadmin ? 'approved' : 'pending';
@@ -39,7 +55,7 @@ export const createGalleryItem = async (req: Request, res: Response) => {
             url,
             type,
             status,
-            submittedById: authReq.user!.id,
+            submittedById: getAdminId(authReq),
         });
 
         created(res, item, status === 'pending' 
@@ -53,15 +69,22 @@ export const createGalleryItem = async (req: Request, res: Response) => {
 export const updateGalleryItem = async (req: Request, res: Response) => {
     try {
         const authReq = req as AuthRequest;
-        const id = Number(req.params.id);
+        const id = positiveIntParam.parse(req.params.id);
+        const adminId = getAdminId(authReq);
 
-        // Whitelist updatable fields — never spread req.body directly
-        const { title, description, url, type } = req.body;
+        const [existing] = await db.select({ submittedById: gallery.submittedById }).top(1).from(gallery).where(eq(gallery.id, id));
+        if (!existing) throw new NotFoundError('Gallery item not found.');
+
+        if (!authReq.user!.isSuperadmin && existing.submittedById !== adminId) {
+            throw new ForbiddenError('You can only update your own gallery items.');
+        }
+
+        const parsed = updateGalleryItemSchema.parse(req.body);
         const updates: Partial<typeof gallery.$inferInsert> = {};
-        if (title !== undefined)       updates.title = String(title).trim() || null;
-        if (description !== undefined) updates.description = String(description);
-        if (url !== undefined)         updates.url = String(url).trim();
-        if (type !== undefined)        updates.type = type;
+        if (parsed.title !== undefined) updates.title = parsed.title;
+        if (parsed.description !== undefined) updates.description = parsed.description;
+        if (parsed.url !== undefined) updates.url = parsed.url;
+        if (parsed.type !== undefined) updates.type = parsed.type;
 
         if (!authReq.user!.isSuperadmin) {
             // Non-superadmin edits must go back to pending review
@@ -81,9 +104,19 @@ export const updateGalleryItem = async (req: Request, res: Response) => {
 };
 
 export const deleteGalleryItem = async (req: Request, res: Response) => {
-    const { id } = req.params;
     try {
-        await db.delete(gallery).where(eq(gallery.id, Number(id)));
+        const authReq = req as AuthRequest;
+        const id = positiveIntParam.parse(req.params.id);
+        const adminId = getAdminId(authReq);
+
+        const [existing] = await db.select({ submittedById: gallery.submittedById }).top(1).from(gallery).where(eq(gallery.id, id));
+        if (!existing) throw new NotFoundError('Gallery item not found.');
+
+        if (!authReq.user!.isSuperadmin && existing.submittedById !== adminId) {
+            throw new ForbiddenError('You can only delete your own gallery items.');
+        }
+
+        await db.delete(gallery).where(eq(gallery.id, id));
         noContent(res);
     } catch (error) {
         handleError(res, error);
@@ -93,7 +126,7 @@ export const deleteGalleryItem = async (req: Request, res: Response) => {
 export const approveGalleryItem = async (req: Request, res: Response) => {
     try {
         const authReq = req as AuthRequest;
-        const id = Number(req.params.id);
+        const id = positiveIntParam.parse(req.params.id);
         const [item] = await db.update(gallery)
             .set({ status: 'approved', reviewedById: authReq.user!.id, rejectionReason: null })
             .where(eq(gallery.id, id))
@@ -107,8 +140,8 @@ export const approveGalleryItem = async (req: Request, res: Response) => {
 export const rejectGalleryItem = async (req: Request, res: Response) => {
     try {
         const authReq = req as AuthRequest;
-        const id = Number(req.params.id);
-        const { reason } = req.body;
+        const id = positiveIntParam.parse(req.params.id);
+        const { reason } = rejectGallerySchema.parse(req.body);
         const [item] = await db.update(gallery)
             .set({ status: 'rejected', reviewedById: authReq.user!.id, rejectionReason: reason || null })
             .where(eq(gallery.id, id))

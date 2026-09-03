@@ -3,25 +3,32 @@ import { db } from '../db';
 import { eq, desc, sql } from 'drizzle-orm';
 import { events, academicYears } from '../db/schema';
 import { ok, created, handleError } from '../lib/response';
-import { NotFoundError, ForbiddenError } from '../lib/errors';
+import { NotFoundError, ForbiddenError, ValidationError } from '../lib/errors';
+import { positiveIntParam } from '../lib/schemas';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const requireEventNotLocked = async (eventId: number) => {
-    const [ev] = await db.select({ academicYearId: events.academicYearId }).top(1).from(events).where(eq(events.id, eventId));
-    if (!ev) throw new NotFoundError('Event not found.');
-    if (ev.academicYearId) {
-        const [ay] = await db.select({ isLocked: academicYears.isLocked }).top(1).from(academicYears).where(eq(academicYears.id, ev.academicYearId));
-        if (ay?.isLocked) throw new ForbiddenError('Cannot modify an event in a locked academic year.', 'AY_LOCKED');
-    }
-    return ev;
+    const [result] = await db
+        .select({
+            academicYearId: events.academicYearId,
+            isLocked: academicYears.isLocked,
+        })
+        .from(events)
+        .leftJoin(academicYears, eq(events.academicYearId, academicYears.id))
+        .where(eq(events.id, eventId));
+
+    if (!result) throw new NotFoundError('Event not found.');
+    if (result.isLocked) throw new ForbiddenError('Cannot modify an event in a locked academic year.', 'AY_LOCKED');
+    return result;
 };
 
 // ── Controllers ───────────────────────────────────────────────────────────────
 
 export const getEvents = async (req: Request, res: Response) => {
     try {
-        const allEvents = await db.select({
+        const user = (req as any).user;
+        let query = db.select({
             id: events.id,
             title: events.title,
             description: events.description,
@@ -34,7 +41,14 @@ export const getEvents = async (req: Request, res: Response) => {
             createdAt: events.createdAt,
             imageUrl: sql<string>`COALESCE(NULLIF(events.image_url, ''), (SELECT TOP 1 url FROM event_images WHERE event_id = events.id AND is_master = 1), (SELECT TOP 1 url FROM event_images WHERE event_id = events.id))`,
             volunteersCount: sql<number>`(SELECT COUNT(ar.id) FROM attendance_records ar JOIN attendance_sessions s ON ar.session_id = s.id WHERE s.event_id = events.id AND ar.status = 'present')`,
-        }).from(events).orderBy(desc(events.date));
+            approvalStatus: events.approvalStatus,
+        }).from(events);
+
+        if (!user || user.role === 'volunteer') {
+            query = query.where(eq(events.approvalStatus, 'approved')) as typeof query;
+        }
+
+        const allEvents = await query.orderBy(desc(events.date));
 
         ok(res, allEvents);
     } catch (error) {
@@ -47,7 +61,7 @@ export const createEvent = async (req: Request, res: Response) => {
         const { title, description, location, reportUrl, driveLink, date } = req.body;
 
         if (!title || !description || !location || !date) {
-            return res.status(400).json({ success: false, message: 'title, description, location, and date are required.' });
+            throw new ValidationError('title, description, location, and date are required.');
         }
 
         const [currentAY] = await db
@@ -59,6 +73,11 @@ export const createEvent = async (req: Request, res: Response) => {
             throw new ForbiddenError('Current academic year is locked.', 'AY_LOCKED');
         }
 
+        const user = (req as any).user;
+        const approvalStatus = user?.isSuperadmin ? 'approved' : 'pending';
+        const approvedById = user?.isSuperadmin ? user.id : null;
+        const approvedAt = user?.isSuperadmin ? new Date() : null;
+
         const [newEvent] = await db.insert(events).output().values({
             title: String(title).trim(),
             description: String(description).trim(),
@@ -67,6 +86,9 @@ export const createEvent = async (req: Request, res: Response) => {
             driveLink: driveLink ?? null,
             academicYearId: currentAY?.id ?? null,
             date: new Date(date),
+            approvalStatus,
+            approvedById,
+            approvedAt,
         });
 
         created(res, newEvent);
@@ -77,7 +99,7 @@ export const createEvent = async (req: Request, res: Response) => {
 
 export const updateEvent = async (req: Request, res: Response) => {
     try {
-        const id = Number(req.params.id);
+        const id = positiveIntParam.parse(req.params.id);
         await requireEventNotLocked(id);
 
         const { title, description, location, reportUrl, driveLink, date } = req.body;
@@ -98,7 +120,7 @@ export const updateEvent = async (req: Request, res: Response) => {
 
 export const deleteEvent = async (req: Request, res: Response) => {
     try {
-        const id = Number(req.params.id);
+        const id = positiveIntParam.parse(req.params.id);
         await requireEventNotLocked(id);
         await db.delete(events).where(eq(events.id, id));
         ok(res, null, 'Event deleted.');

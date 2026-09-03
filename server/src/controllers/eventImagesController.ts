@@ -3,13 +3,13 @@ import { db } from '../db';
 import { eventImages } from '../db/schema';
 import { eq, and } from 'drizzle-orm';
 import { ok, created, noContent, handleError } from '../lib/response';
-import { NotFoundError } from '../lib/errors';
+import { NotFoundError, ValidationError } from '../lib/errors';
+import { positiveIntParam } from '../lib/schemas';
 
 // Get all images for an event
 export const getEventImages = async (req: Request, res: Response) => {
     try {
-        const eventId = parseInt(req.params.eventId);
-        if (isNaN(eventId)) return res.status(400).json({ success: false, message: 'Invalid event ID.' });
+        const eventId = positiveIntParam.parse(req.params.eventId);
 
         const images = await db.select().from(eventImages)
             .where(eq(eventImages.eventId, eventId))
@@ -23,10 +23,12 @@ export const getEventImages = async (req: Request, res: Response) => {
 // Add images to an event (validated via schema middleware in route)
 export const addEventImages = async (req: Request, res: Response) => {
     try {
-        const eventId = parseInt(req.params.eventId);
-        if (isNaN(eventId)) return res.status(400).json({ success: false, message: 'Invalid event ID.' });
+        const eventId = positiveIntParam.parse(req.params.eventId);
 
         const { images } = req.body as { images: Array<{ url: string; isMaster?: boolean; caption?: string | null }> };
+        if (!Array.isArray(images) || images.length === 0) {
+            throw new ValidationError('images must be a non-empty array.');
+        }
 
         // If any new image is master, clear all existing masters first
         if (images.some(img => img.isMaster)) {
@@ -52,11 +54,8 @@ export const addEventImages = async (req: Request, res: Response) => {
 // Set an image as master — scoped to eventId so cross-event tampering is prevented
 export const setMasterImage = async (req: Request, res: Response) => {
     try {
-        const eventId = parseInt(req.params.eventId);
-        const imageId = parseInt(req.params.imageId);
-        if (isNaN(eventId) || isNaN(imageId)) {
-            return res.status(400).json({ success: false, message: 'Invalid ID.' });
-        }
+        const eventId = positiveIntParam.parse(req.params.eventId);
+        const imageId = positiveIntParam.parse(req.params.imageId);
 
         // Verify the image belongs to this event
         const [img] = await db.select({ id: eventImages.id })
@@ -64,14 +63,16 @@ export const setMasterImage = async (req: Request, res: Response) => {
             .where(and(eq(eventImages.id, imageId), eq(eventImages.eventId, eventId)));
         if (!img) throw new NotFoundError('Image not found for this event.');
 
-        // Unset all masters, then set the requested one
-        await db.update(eventImages)
-            .set({ isMaster: false })
-            .where(eq(eventImages.eventId, eventId));
+        // Unset all masters, then set the requested one transactionally
+        await db.transaction(async (tx) => {
+            await tx.update(eventImages)
+                .set({ isMaster: false })
+                .where(eq(eventImages.eventId, eventId));
 
-        await db.update(eventImages)
-            .set({ isMaster: true })
-            .where(eq(eventImages.id, imageId));
+            await tx.update(eventImages)
+                .set({ isMaster: true })
+                .where(eq(eventImages.id, imageId));
+        });
 
         ok(res, null, 'Master image updated.');
     } catch (error) {
@@ -82,8 +83,12 @@ export const setMasterImage = async (req: Request, res: Response) => {
 // Delete an event image
 export const deleteEventImage = async (req: Request, res: Response) => {
     try {
-        const imageId = parseInt(req.params.imageId);
-        if (isNaN(imageId)) return res.status(400).json({ success: false, message: 'Invalid image ID.' });
+        const eventId = positiveIntParam.parse(req.params.eventId);
+        const imageId = positiveIntParam.parse(req.params.imageId);
+
+        const [existing] = await db.select({ id: eventImages.id }).top(1).from(eventImages)
+            .where(and(eq(eventImages.id, imageId), eq(eventImages.eventId, eventId)));
+        if (!existing) throw new NotFoundError('Image not found for this event.');
 
         await db.delete(eventImages).where(eq(eventImages.id, imageId));
         noContent(res);
@@ -95,8 +100,12 @@ export const deleteEventImage = async (req: Request, res: Response) => {
 // Update image caption / master flag (validated via schema middleware in route)
 export const updateEventImage = async (req: Request, res: Response) => {
     try {
-        const imageId = parseInt(req.params.imageId);
-        if (isNaN(imageId)) return res.status(400).json({ success: false, message: 'Invalid image ID.' });
+        const eventId = positiveIntParam.parse(req.params.eventId);
+        const imageId = positiveIntParam.parse(req.params.imageId);
+
+        const [existing] = await db.select({ id: eventImages.id }).top(1).from(eventImages)
+            .where(and(eq(eventImages.id, imageId), eq(eventImages.eventId, eventId)));
+        if (!existing) throw new NotFoundError('Image not found for this event.');
 
         const { caption, isMaster } = req.body as { caption?: string | null; isMaster?: boolean };
 
@@ -105,7 +114,7 @@ export const updateEventImage = async (req: Request, res: Response) => {
         if (isMaster !== undefined) updateData.isMaster = isMaster;
 
         if (Object.keys(updateData).length === 0) {
-            return res.status(400).json({ success: false, message: 'Nothing to update.' });
+            throw new ValidationError('Nothing to update.');
         }
 
         await db.update(eventImages)

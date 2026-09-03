@@ -1,11 +1,28 @@
 import { useState, useEffect } from 'react';
-import { eventsAPI, eventImagesAPI, uploadAPI } from '../../services/api';
-import type { EventData, EventImage, AcademicYear } from '../../services/api';
+import { eventImagesAPI, uploadAPI } from '../../services/api';
+import type { EventData, EventImage } from '../../services/api';
 import ImageCropperModal from '../common/ImageCropperModal';
 import { useFlash } from './Shared';
+import { useAuthStore } from '../../stores/authStore';
+import { decodeToken } from '../../services/api';
+import { useEvents, useCreateEvent, useUpdateEvent, useDeleteEvent } from '../../hooks/useEvents';
+import { useAcademicYears, useCurrentAcademicYear } from '../../hooks/useAcademicYears';
 
-export const EventsTab = ({ events, onRefresh, showForm, setShowForm, editingItem, setEditingItem, years, currentAY, isSuperadmin }: { events: EventData[], onRefresh: () => void, showForm: boolean, setShowForm: (val: boolean) => void, editingItem: EventData | null, setEditingItem: (val: EventData | null) => void, years: AcademicYear[], currentAY: AcademicYear | null, isSuperadmin: boolean }) => {
+import { formatDate } from '@/utils/dateFormatter';
+export const EventsTab = () => {
+    const { token } = useAuthStore();
+    const isAdmin = token ? ['admin', 'superadmin'].includes(decodeToken(token)?.role || '') : false;
+    const { data: years = [] } = useAcademicYears();
+    const { data: currentAY } = useCurrentAcademicYear();
+    const { data: events = [], isLoading } = useEvents();
+    const createEvent = useCreateEvent();
+    const updateEvent = useUpdateEvent();
+    const deleteEvent = useDeleteEvent();
     const { flash } = useFlash();
+    
+    const [showForm, setShowForm] = useState(false);
+    const [editingItem, setEditingItem] = useState<EventData | null>(null);
+    
     const [formData, setFormData] = useState<EventData>({
         id: 0, title: '', description: '', date: '', location: '', type: 'upcoming', volunteersCount: 0, driveLink: ''
     });
@@ -118,9 +135,9 @@ const handleSubmit = async (e: React.FormEvent) => {
         let eventId = editingItem?.id;
 
         if (editingItem) {
-            await eventsAPI.update(editingItem.id, formData);
+            await updateEvent.mutateAsync({ id: editingItem.id, data: formData });
         } else {
-            const response = await eventsAPI.create(formData);
+            const response = await createEvent.mutateAsync(formData);
             eventId = response.data.data.id;
         }
 
@@ -140,7 +157,6 @@ const handleSubmit = async (e: React.FormEvent) => {
             } catch (imgError: any) {
                 console.error('Error uploading images:', imgError);
                 flash('err', 'Event saved, but failed to upload some images. Please try uploading them again.');
-                onRefresh();
                 setUploading(false);
                 return;
             }
@@ -148,7 +164,6 @@ const handleSubmit = async (e: React.FormEvent) => {
 
         flash('ok', editingItem ? 'Event updated.' : 'Event created.');
         resetForm();
-        onRefresh();
     } catch (error: any) {
         console.error('Error saving event:', error);
         flash('err', error.response?.data?.message || 'Failed to save event.');
@@ -161,9 +176,7 @@ const handleDelete = async (id: number) => {
     if (!confirm('Are you sure you want to delete this event?')) return;
     setActionId(id);
     try {
-        await eventsAPI.delete(id);
-        flash('ok', 'Event deleted.');
-        onRefresh();
+        await deleteEvent.mutateAsync(id);
     } catch (error: any) {
         console.error('Error deleting event:', error);
         flash('err', error.response?.data?.message || 'Failed to delete event.');
@@ -189,7 +202,7 @@ return (
     <div>
         <div className="flex justify-between items-center mb-6">
             <h2 className="text-2xl font-bold text-gray-800">Manage Events</h2>
-            {currentAY && !currentAY.isLocked && isSuperadmin && (
+            {currentAY && !currentAY.isLocked && isAdmin && (
                 <button
                     onClick={() => { resetForm(); setShowForm(true); }}
                     className="bg-nss-blue text-white px-4 py-2 rounded hover:bg-blue-900 transition"
@@ -282,7 +295,7 @@ return (
                         </div>
                     )}
 
-                    <textarea placeholder="Description" required value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} className="border rounded px-3 py-2 w-full" rows={3} />
+                    <textarea placeholder="Description" value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} className="border rounded px-3 py-2 w-full" rows={3} />
 
                     <div className="flex gap-2">
                         <button type="submit" disabled={uploading} className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 disabled:bg-gray-400">
@@ -307,19 +320,29 @@ return (
                     </tr>
                 </thead>
                 <tbody>
-                    {events.map((event: EventData) => (
+                    {isLoading ? (
+                        <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">Loading events...</td></tr>
+                    ) : events.map((event: EventData) => (
                         <tr key={event.id} className="border-t hover:bg-gray-50">
                             <td className="px-4 py-3">{event.title}</td>
-                            <td className="px-4 py-3">{new Date(event.date).toLocaleDateString()}</td>
+                            <td className="px-4 py-3">{formatDate(event.date)}</td>
                             <td className="px-4 py-3">{event.location}</td>
                             <td className="px-4 py-3">{event.volunteersCount || 0}</td>
                             <td className="px-4 py-3">
-                                <span className={`px-2 py-1 rounded text-xs ${event.type === 'upcoming' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}`}>
-                                    {event.type}
-                                </span>
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                                        event.type === 'upcoming' ? 'bg-blue-100 text-blue-800' :
+                                        event.type === 'today' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                                    }`}>
+                                        {event.type?.toUpperCase()}
+                                    </span>
+                                    {event.approvalStatus === 'pending' && <span className="text-xs px-2 py-1 rounded-full font-medium bg-amber-100 text-amber-800">Pending</span>}
+                                    {event.approvalStatus === 'approved' && <span className="text-xs px-2 py-1 rounded-full font-medium bg-emerald-100 text-emerald-800">Approved</span>}
+                                    {event.approvalStatus === 'rejected' && <span className="text-xs px-2 py-1 rounded-full font-medium bg-red-100 text-red-800">Rejected</span>}
+                                </div>
                             </td>
                             <td className="px-4 py-3">
-                                {(!years.find(y => y.id === event.academicYearId)?.isLocked) && isSuperadmin && (
+                                {(!years.find(y => y.id === event.academicYearId)?.isLocked) && isAdmin && (
                                     <>
                                         <button onClick={() => setEditingItem(event)} disabled={actionId === event.id} className="text-blue-600 hover:underline mr-3 disabled:opacity-50">Edit</button>
                                         <button onClick={() => handleDelete(event.id)} disabled={actionId === event.id} className="text-red-600 hover:underline disabled:opacity-50">Delete</button>
@@ -328,7 +351,7 @@ return (
                             </td>
                         </tr>
                     ))}
-                    {events.length === 0 && (
+                    {!isLoading && events.length === 0 && (
                         <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">No events found. Click "Add Event" to create one.</td></tr>
                     )}
                 </tbody>

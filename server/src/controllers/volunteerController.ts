@@ -1,35 +1,42 @@
 import { Request, Response } from 'express';
 import * as volService from '../services/volunteerService';
 import { ok, created, noContent, handleError } from '../lib/response';
-import { AuthRequest } from '../middleware/auth';
+import { AuthRequest, getAdminId } from '../middleware/auth';
 import { db } from '../db';
 import { volunteerProfiles, volunteers } from '../db/schema';
 import { eq } from 'drizzle-orm';
+import { ValidationError, NotFoundError } from '../lib/errors';
+import { positiveIntParam } from '../lib/schemas';
+import { z } from 'zod';
 
 // ── Admin: AY-scoped volunteer management ─────────────────────────────────────
 
 export const listVolunteersByAY = async (req: Request, res: Response) => {
     try {
-        const ayId = Number(req.params.ayId);
-        const { department, status, search, isActive, sortBy, page, limit } = req.query;
+        const ayId = positiveIntParam.parse(req.params.ayId);
+        const { department, status, search, isActive, sortBy } = req.query;
+        const { page, limit } = z.object({
+            page: z.coerce.number().int().positive().optional().default(1),
+            limit: z.coerce.number().int().positive().max(100).optional().default(20),
+        }).parse(req.query);
         const data = await volService.listVolunteersForAY(ayId, {
             department: department as string | undefined,
             status: status as 'regular' | 'backup' | undefined,
             search: search as string | undefined,
             sortBy: sortBy as 'name' | 'department' | undefined,
             isActive: isActive !== undefined ? isActive === 'true' : undefined,
-            page: page ? parseInt(page as string) : undefined,
-            limit: limit ? parseInt(limit as string) : undefined,
+            page,
+            limit,
         });
 
         const authReq = req as AuthRequest;
         if (authReq.user!.role !== 'superadmin') {
-            data.data.forEach((v: any) => {
+            data.data = data.data.map((v: any) => {
                 if (v.profile) {
-                    delete v.profile.caste;
-                    delete v.profile.casteCategory;
-                    delete v.profile.religion;
+                    const { caste, casteCategory, religion, ...safeProfile } = v.profile;
+                    return { ...v, profile: safeProfile };
                 }
+                return v;
             });
         }
 
@@ -39,8 +46,8 @@ export const listVolunteersByAY = async (req: Request, res: Response) => {
 
 export const createVolunteer = async (req: Request, res: Response) => {
     try {
-        const adminId = (req as AuthRequest).user!.id;
-        const ayId = Number(req.params.ayId);
+        const adminId = getAdminId(req);
+        const ayId = positiveIntParam.parse(req.params.ayId);
         const vol = await volService.createVolunteer(ayId, req.body, adminId);
         created(res, vol, `Volunteer "${vol.name}" added to academic year.`);
     } catch (err) { handleError(res, err); }
@@ -48,13 +55,12 @@ export const createVolunteer = async (req: Request, res: Response) => {
 
 export const getVolunteer = async (req: Request, res: Response) => {
     try {
-        const data = await volService.getVolunteerById(Number(req.params.id));
+        const data = await volService.getVolunteerById(positiveIntParam.parse(req.params.id));
         
         const authReq = req as AuthRequest;
         if (authReq.user!.role !== 'superadmin' && data.profile) {
-            delete (data.profile as any).caste;
-            delete (data.profile as any).casteCategory;
-            delete (data.profile as any).religion;
+            const { caste, casteCategory, religion, ...safeProfile } = data.profile as any;
+            data.profile = safeProfile;
         }
 
         ok(res, data);
@@ -63,44 +69,44 @@ export const getVolunteer = async (req: Request, res: Response) => {
 
 export const updateVolunteer = async (req: Request, res: Response) => {
     try {
-        const adminId = (req as AuthRequest).user!.id;
-        const vol = await volService.updateVolunteer(Number(req.params.id), req.body, adminId);
+        const adminId = getAdminId(req);
+        const vol = await volService.updateVolunteer(positiveIntParam.parse(req.params.id), req.body, adminId);
         ok(res, vol, 'Volunteer updated.');
     } catch (err) { handleError(res, err); }
 };
 
 export const deleteVolunteer = async (req: Request, res: Response) => {
     try {
-        const adminId = (req as AuthRequest).user!.id;
-        await volService.deleteVolunteer(Number(req.params.id), adminId);
+        const adminId = getAdminId(req);
+        await volService.deleteVolunteer(positiveIntParam.parse(req.params.id), adminId);
         noContent(res);
     } catch (err) { handleError(res, err); }
 };
 
 export const changeVolunteerStatus = async (req: Request, res: Response) => {
     try {
-        const adminId = (req as AuthRequest).user!.id;
+        const adminId = getAdminId(req);
         const { status } = req.body;
         if (!['regular', 'backup'].includes(status)) {
-            return res.status(400).json({ success: false, code: 'VALIDATION_ERROR', message: 'status must be "regular" or "backup".' });
+            throw new ValidationError('status must be "regular" or "backup".');
         }
-        const vol = await volService.changeVolunteerStatus(Number(req.params.id), status, adminId);
+        const vol = await volService.changeVolunteerStatus(positiveIntParam.parse(req.params.id), status, adminId);
         ok(res, vol, `Volunteer status changed to "${status}".`);
     } catch (err) { handleError(res, err); }
 };
 
 export const toggleVolunteerActive = async (req: Request, res: Response) => {
     try {
-        const adminId = (req as AuthRequest).user!.id;
-        const vol = await volService.toggleVolunteerActive(Number(req.params.id), adminId);
+        const adminId = getAdminId(req);
+        const vol = await volService.toggleVolunteerActive(positiveIntParam.parse(req.params.id), adminId);
         ok(res, vol, `Volunteer ${vol.isActive ? 'activated' : 'deactivated'}.`);
     } catch (err) { handleError(res, err); }
 };
 
 export const importVolunteers = async (req: Request, res: Response) => {
     try {
-        const adminId = (req as AuthRequest).user!.id;
-        const ayId = Number(req.params.ayId);
+        const adminId = getAdminId(req);
+        const ayId = positiveIntParam.parse(req.params.ayId);
         const result = await volService.importVolunteersFromAY({ ...req.body, targetAyId: ayId }, adminId);
         ok(res, result, `Import complete. ${result.imported.length} imported, ${result.skipped.length} skipped.`);
     } catch (err) { handleError(res, err); }
@@ -137,7 +143,7 @@ export const updateMyPassword = async (req: Request, res: Response) => {
         const volunteerId = (req as AuthRequest).user!.id;
         const { currentPassword, newPassword } = req.body;
         if (!currentPassword || !newPassword) {
-            return res.status(400).json({ success: false, code: 'VALIDATION_ERROR', message: 'currentPassword and newPassword are required.' });
+            throw new ValidationError('currentPassword and newPassword are required.');
         }
         await volService.changePassword(volunteerId, currentPassword, newPassword);
         ok(res, null, 'Password updated.');
@@ -154,7 +160,7 @@ export const getPublicVolunteers = async (req: Request, res: Response) => {
             .top(1).from(volunteers)
             .where(eq(volunteers.id, volunteerUser.id))
             ;
-        if (!vol) return res.status(404).json({ success: false, message: 'Volunteer not found.' });
+        if (!vol) throw new NotFoundError('Volunteer not found.');
 
         const result = await volService.listVolunteersForAY(vol.academicYearId, { isActive: true, sortBy: 'department' });
         // Strip sensitive fields
@@ -201,11 +207,10 @@ export const getExperiences = async (req: Request, res: Response) => {
 
 export const approveVolunteerExperience = async (req: Request, res: Response) => {
     try {
-        const id = parseInt(req.params.id, 10);
-        if (isNaN(id)) return res.status(400).json({ success: false, message: 'Invalid volunteer ID.' });
+        const id = positiveIntParam.parse(req.params.id);
 
-        const adminUser = (req as AuthRequest).user!;
-        const updated = await volService.approveVolunteerExperience(id, adminUser.id);
+        const adminId = getAdminId(req);
+        const updated = await volService.approveVolunteerExperience(id, adminId);
         ok(res, updated);
     } catch (err) { handleError(res, err); }
 };

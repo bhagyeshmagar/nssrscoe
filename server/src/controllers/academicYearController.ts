@@ -1,16 +1,10 @@
 import { Request, Response } from 'express';
 import * as ayService from '../services/academicYearService';
 import { ok, created } from '../lib/response';
-import { AuthRequest } from '../middleware/auth';
+import { AuthRequest, getAdminId } from '../middleware/auth';
 import { asyncHandler } from '../lib/asyncHandler';
 import { positiveIntParam, createAYSchema, updateAYSchema, unlockAYSchema } from '../lib/schemas';
 import { AppError } from '../lib/errors';
-
-const getAdminId = (req: Request): number => {
-    const user = (req as AuthRequest).user;
-    if (!user) throw new AppError('Unauthorized access', 401, 'UNAUTHORIZED');
-    return user.id;
-};
 
 export const listAcademicYears = asyncHandler(async (req: Request, res: Response) => {
     const data = await ayService.getAllAcademicYears();

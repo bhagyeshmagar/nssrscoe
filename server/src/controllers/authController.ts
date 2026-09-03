@@ -38,10 +38,13 @@ export const login = async (req: Request, res: Response) => {
                     { expiresIn: '1d' }
                 );
                 return res.json({
-                    token,
-                    role,
-                    isSuperadmin: !!admin.isSuperadmin,
-                    user: { id: admin.id, username: admin.username, isSuperadmin: !!admin.isSuperadmin },
+                    success: true,
+                    data: {
+                        token,
+                        role,
+                        isSuperadmin: !!admin.isSuperadmin,
+                        user: { id: admin.id, username: admin.username, isSuperadmin: !!admin.isSuperadmin },
+                    }
                 });
             }
         }
@@ -63,9 +66,12 @@ export const login = async (req: Request, res: Response) => {
                     { expiresIn: '1d' }
                 );
                 return res.json({
-                    token,
-                    role: 'volunteer',
-                    user: { id: volunteer.id, name: volunteer.name, email: volunteer.email },
+                    success: true,
+                    data: {
+                        token,
+                        role: 'volunteer',
+                        user: { id: volunteer.id, name: volunteer.name, email: volunteer.email },
+                    }
                 });
             }
         }
@@ -91,15 +97,18 @@ export const verifyToken = async (req: Request, res: Response) => {
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as JwtPayload;
         return res.json({
-            valid: true,
-            role: decoded.role,
-            isSuperadmin: decoded.isSuperadmin,
-            user: {
-                id: decoded.id,
-                username: decoded.username,
-                email: decoded.email,
+            success: true,
+            data: {
+                valid: true,
+                role: decoded.role,
                 isSuperadmin: decoded.isSuperadmin,
-            },
+                user: {
+                    id: decoded.id,
+                    username: decoded.username,
+                    email: decoded.email,
+                    isSuperadmin: decoded.isSuperadmin,
+                },
+            }
         });
     } catch {
         return res.status(401).json({ valid: false, success: false, message: 'Token is invalid or expired.' });

@@ -5,12 +5,9 @@ import * as notificationController from '../controllers/notificationController';
 
 const router = Router({ mergeParams: true });
 
-// All routes require authentication
-router.use(authenticateToken);
-
-router.get('/volunteers/me/notifications', catchAsync(notificationController.getMyNotifications));
-router.get('/volunteers/me/notifications/count', catchAsync(notificationController.getUnreadCount));
-router.put('/volunteers/me/notifications/read-all', catchAsync(notificationController.markAllAsRead));
-router.put('/volunteers/me/notifications/:id/read', catchAsync(notificationController.markAsRead));
+router.get('/volunteers/me/notifications', authenticateToken, catchAsync(notificationController.getMyNotifications));
+router.get('/volunteers/me/notifications/count', authenticateToken, catchAsync(notificationController.getUnreadCount));
+router.put('/volunteers/me/notifications/read-all', authenticateToken, catchAsync(notificationController.markAllAsRead));
+router.put('/volunteers/me/notifications/:id/read', authenticateToken, catchAsync(notificationController.markAsRead));
 
 export default router;

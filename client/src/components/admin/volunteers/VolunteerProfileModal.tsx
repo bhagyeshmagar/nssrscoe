@@ -1,6 +1,7 @@
 import type { VolunteerWithProfile, VolunteerAttendanceRecord } from '../../../services/api';
 import { uploadAPI } from '../../../services/api';
 
+import { formatDate } from '@/utils/dateFormatter';
 interface Props {
     vol?: VolunteerWithProfile;
     attendance: VolunteerAttendanceRecord[];
@@ -98,7 +99,7 @@ export const VolunteerProfileModal = ({ vol, attendance, loadingAttendance, isSu
                             <div key={idx} className="bg-green-50/50 border border-green-100 rounded-lg p-3 flex justify-between items-center">
                                 <div>
                                     <div className="text-sm font-semibold text-gray-800">{att.sessionTitle}</div>
-                                    <div className="text-xs text-gray-500 mt-0.5">{new Date(att.date).toLocaleDateString()}</div>
+                                    <div className="text-xs text-gray-500 mt-0.5">{formatDate(att.date)}</div>
                                 </div>
                                 <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded text-xs font-semibold uppercase">Present</span>
                             </div>

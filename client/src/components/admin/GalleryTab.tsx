@@ -1,8 +1,12 @@
 import { useState, useEffect } from 'react';
-import { galleryAPI, uploadAPI } from '../../services/api';
+import { uploadAPI } from '../../services/api';
 import type { GalleryData } from '../../services/api';
 import ImageCropperModal from '../common/ImageCropperModal';
 import { useFlash } from './Shared';
+import {
+    useGallery, useCreateGalleryItem, useUpdateGalleryItem,
+    useDeleteGalleryItem, useApproveGalleryItem, useRejectGalleryItem
+} from '../../hooks/useGallery';
 
 export type GalleryItem = GalleryData & { id: number; createdAt?: string; };
 
@@ -41,15 +45,16 @@ const PendingGalleryApprovals = ({ items, onApprove, onReject, actionId }: { ite
     );
 };
 
-export const GalleryTab = ({ gallery, onRefresh, showForm, setShowForm, editingItem, setEditingItem, isSuperadmin }: {
-    gallery: GalleryItem[];
-    onRefresh: () => void;
-    showForm: boolean;
-    setShowForm: (val: boolean) => void;
-    editingItem: GalleryItem | null;
-    setEditingItem: (i: GalleryItem | null) => void;
-    isSuperadmin?: boolean;
-}) => {
+export const GalleryTab = ({ isSuperadmin }: { isSuperadmin?: boolean }) => {
+    const [showForm, setShowForm] = useState(false);
+    const [editingItem, setEditingItem] = useState<GalleryItem | null>(null);
+    const { data: gallery = [], isLoading } = useGallery(true); // true for admin fetch
+    const createGalleryItem = useCreateGalleryItem();
+    const updateGalleryItem = useUpdateGalleryItem();
+    const deleteGalleryItem = useDeleteGalleryItem();
+    const approveGalleryItem = useApproveGalleryItem();
+    const rejectGalleryItem = useRejectGalleryItem();
+
     const { msg, flash } = useFlash();
     const [formData, setFormData] = useState<Partial<GalleryData>>({ title: '', description: '', url: '', type: 'image' });
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -57,7 +62,7 @@ export const GalleryTab = ({ gallery, onRefresh, showForm, setShowForm, editingI
     const [uploading, setUploading] = useState(false);
     const [activeMediaTab, setActiveMediaTab] = useState<'images' | 'videos'>('images');
     const [uploadMediaType, setUploadMediaType] = useState<'image' | 'video'>('image');
-    
+
     const [actionId, setActionId] = useState<number | null>(null);
 
     // Image Cropper State
@@ -71,7 +76,7 @@ export const GalleryTab = ({ gallery, onRefresh, showForm, setShowForm, editingI
             setUploadMediaType(editingItem.type || 'image');
             setShowForm(true);
         }
-    }, [editingItem]);
+    }, [editingItem, setShowForm]);
 
     // Memory cleanup for object URLs
     useEffect(() => {
@@ -126,17 +131,19 @@ export const GalleryTab = ({ gallery, onRefresh, showForm, setShowForm, editingI
             const galleryData = { ...formData, url, type: uploadMediaType } as GalleryData;
 
             if (editingItem) {
-                await galleryAPI.update(editingItem.id, galleryData);
-                flash('ok', 'Gallery item updated');
+                await updateGalleryItem.mutateAsync({ id: editingItem.id, data: galleryData });
             } else {
-                await galleryAPI.create(galleryData);
-                flash('ok', 'Gallery item added');
+                await createGalleryItem.mutateAsync(galleryData);
             }
             resetForm();
-            onRefresh();
-        } catch (error) {
-            console.error('Error saving gallery item:', error);
-            flash('err', 'Failed to save gallery item');
+        } catch (error: any) {
+            console.error("Gallery Submission Error:", error);
+            // Check if the error came from the upload step (AxiosError)
+            if (error.response?.data?.message) {
+                flash('err', error.response.data.message);
+            } else {
+                flash('err', `Unexpected error: ${error.message || String(error)}`);
+            }
         }
         setUploading(false);
     };
@@ -145,12 +152,9 @@ export const GalleryTab = ({ gallery, onRefresh, showForm, setShowForm, editingI
         if (confirm('Are you sure you want to delete this item?')) {
             setActionId(id);
             try {
-                await galleryAPI.delete(id);
-                flash('ok', 'Gallery item deleted');
-                onRefresh();
+                await deleteGalleryItem.mutateAsync(id);
             } catch (error) {
-                console.error('Error deleting gallery item:', error);
-                flash('err', 'Failed to delete gallery item');
+                // Toast handles the error display
             }
             setActionId(null);
         }
@@ -159,11 +163,9 @@ export const GalleryTab = ({ gallery, onRefresh, showForm, setShowForm, editingI
     const handleApprove = async (id: number) => {
         setActionId(id);
         try {
-            await galleryAPI.approve(id);
-            flash('ok', 'Item approved and published.');
-            onRefresh();
+            await approveGalleryItem.mutateAsync(id);
         } catch (e: any) {
-            flash('err', e.response?.data?.message || 'Failed to approve item');
+            // Toast handles error
         } finally {
             setActionId(null);
         }
@@ -172,11 +174,9 @@ export const GalleryTab = ({ gallery, onRefresh, showForm, setShowForm, editingI
     const handleReject = async (id: number, reason: string) => {
         setActionId(id);
         try {
-            await galleryAPI.reject(id, reason);
-            flash('ok', 'Item rejected.');
-            onRefresh();
+            await rejectGalleryItem.mutateAsync({ id, reason });
         } catch (e: any) {
-            flash('err', e.response?.data?.message || 'Failed to reject item');
+            // Toast handles error
         } finally {
             setActionId(null);
         }
@@ -193,8 +193,12 @@ export const GalleryTab = ({ gallery, onRefresh, showForm, setShowForm, editingI
         setFilePreview('');
     };
 
-    const images = gallery.filter((item: GalleryItem) => item.type !== 'video');
-    const videos = gallery.filter((item: GalleryItem) => item.type === 'video');
+    if (isLoading) {
+        return <div className="flex justify-center items-center h-64 text-gray-500 font-medium animate-pulse">Loading gallery...</div>;
+    }
+
+    const images = (gallery as GalleryItem[]).filter((item: GalleryItem) => item.type !== 'video');
+    const videos = (gallery as GalleryItem[]).filter((item: GalleryItem) => item.type === 'video');
 
     return (
         <div>
@@ -226,7 +230,7 @@ export const GalleryTab = ({ gallery, onRefresh, showForm, setShowForm, editingI
 
             {msg && <div className={`mb-4 p-3 rounded-lg text-sm border ${msg.type === 'ok' ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700'}`}>{msg.text}</div>}
 
-            {isSuperadmin && <PendingGalleryApprovals items={gallery} onApprove={handleApprove} onReject={handleReject} actionId={actionId} />}
+            {isSuperadmin && <PendingGalleryApprovals items={gallery as GalleryItem[]} onApprove={handleApprove} onReject={handleReject} actionId={actionId} />}
 
             {showForm && (
                 <div className="bg-white p-6 rounded-lg shadow mb-6 border-l-4 border-l-nss-blue">
@@ -236,7 +240,7 @@ export const GalleryTab = ({ gallery, onRefresh, showForm, setShowForm, editingI
                     </h3>
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Title (optional)</label>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Title </label>
                             <input
                                 type="text"
                                 placeholder={`Enter ${uploadMediaType} title`}
@@ -247,9 +251,8 @@ export const GalleryTab = ({ gallery, onRefresh, showForm, setShowForm, editingI
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Description *</label>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Description </label>
                             <textarea
-                                required
                                 placeholder="Enter description/caption..."
                                 value={formData.description}
                                 onChange={e => setFormData({ ...formData, description: e.target.value })}

@@ -5,6 +5,7 @@ import { Download, CheckCircle, XCircle, Clock, Calendar, MapPin, Hash, User } f
 import { format } from 'date-fns';
 import html2canvas from 'html2canvas';
 
+import { formatDate } from '@/utils/dateFormatter';
 interface PassData {
     registration: {
         id: number;
@@ -193,7 +194,7 @@ const VolunteeringPassPage = () => {
                         <div className="flex justify-between"><span className="text-gray-400">Name</span><span className="font-medium">{reg.name}</span></div>
                         <div className="flex justify-between"><span className="text-gray-400">Pass ID</span><span className="font-mono text-nss-blue font-semibold">{reg.visitorPassId}</span></div>
                         <div className="flex justify-between"><span className="text-gray-400">Event</span><span className="font-medium text-right max-w-[60%]">{event.title}</span></div>
-                        <div className="flex justify-between"><span className="text-gray-400">Submitted</span><span>{reg.createdAt ? new Date(reg.createdAt).toLocaleDateString() : '—'}</span></div>
+                        <div className="flex justify-between"><span className="text-gray-400">Submitted</span><span>{reg.createdAt ? formatDate(reg.createdAt) : '—'}</span></div>
                     </div>
                 )}
 

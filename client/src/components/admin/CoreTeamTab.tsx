@@ -1,13 +1,16 @@
 import { useState, useEffect, useCallback } from 'react';
 import { coreTeamAPI, volunteersAPI, uploadAPI } from '../../services/api';
-import type { AcademicYear, CoreTeamRole, CoreTeamAssignment, VolunteerWithProfile, AssignRoleData } from '../../services/api';
-import { useFlash } from './Shared';
+import type { CoreTeamRole, CoreTeamAssignment, VolunteerWithProfile, AssignRoleData } from '../../services/api';
+import { useFlash, useAYSelector } from './Shared';
 import { ExportDataModal } from '../common/ExportDataModal';
 import ImageCropperModal from '../common/ImageCropperModal';
 import { Download, Trash2 } from 'lucide-react';
+import { useAcademicYears } from '../../hooks/useAcademicYears';
 
-export const CoreTeamTab = ({ years, currentAY, isSuperadmin }: { years: AcademicYear[]; currentAY: AcademicYear | null; isSuperadmin: boolean }) => {
-    const [selectedAyId, setSelectedAyId] = useState<number>(currentAY?.id ?? 0);
+export const CoreTeamTab = ({ }: { isSuperadmin: boolean }) => {
+    const { data: years = [] } = useAcademicYears();
+    const { selectedAyId, setSelectedAyId, selectedAY } = useAYSelector(years, null);
+    
     const [assignments, setAssignments] = useState<CoreTeamAssignment[]>([]);
     const [roles, setRoles] = useState<CoreTeamRole[]>([]);
     const [vols, setVols] = useState<VolunteerWithProfile[]>([]);
@@ -39,17 +42,10 @@ export const CoreTeamTab = ({ years, currentAY, isSuperadmin }: { years: Academi
             console.error(e); 
             flash('err', e.response?.data?.message || 'Failed to load core team data.');
         }
-    }, [selectedAyId]);
+    }, [selectedAyId, flash]);
 
     useEffect(() => { load(); }, [load]);
     
-    useEffect(() => {
-        if (!selectedAyId && years.length > 0) {
-            setSelectedAyId(currentAY?.id ?? years[0].id);
-        }
-    }, [currentAY, years, selectedAyId]);
-
-    const selectedAY = years.find(y => y.id === selectedAyId);
     const selectedRole = roles.find(r => r.id === form.coreTeamRoleId);
     const isInstitution = selectedRole?.roleType === 'institution' || (typeof form.coreTeamRoleId === 'string' && (form.coreTeamRoleId.includes('Institute Officers') || form.coreTeamRoleId.includes('NSS Program Officer')));
 
@@ -155,7 +151,7 @@ export const CoreTeamTab = ({ years, currentAY, isSuperadmin }: { years: Academi
                     <button onClick={() => setShowExportModal(true)} className="bg-green-600 text-white px-3 py-2 rounded-lg hover:bg-green-700 text-sm font-medium flex items-center">
                         <Download className="w-4 h-4 mr-1" /> Export
                     </button>
-                    {selectedAY && !selectedAY.isLocked && isSuperadmin && <button onClick={() => { setShowForm(!showForm); setEditingId(null); setForm({ coreTeamRoleId: 0, volunteerId: 0, displayName: '', displayPhotoUrl: '', department: '', customRoleName: '', customCategory: '', displayOrder: 0 }); setSelectedFile(null); }} className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm font-medium">+ Assign Role</button>}
+                    {selectedAY && !selectedAY.isLocked && <button onClick={() => { setShowForm(!showForm); setEditingId(null); setForm({ coreTeamRoleId: 0, volunteerId: 0, displayName: '', displayPhotoUrl: '', department: '', customRoleName: '', customCategory: '', displayOrder: 0 }); setSelectedFile(null); }} className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm font-medium flex items-center gap-1"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>Assign Role</button>}
                 </div>
             </div>
             {selectedAY?.isLocked && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">[Locked] Locked - read-only.</div>}
@@ -246,7 +242,7 @@ export const CoreTeamTab = ({ years, currentAY, isSuperadmin }: { years: Academi
                                 <td className="px-4 py-3 text-gray-500 text-xs">{a.department ?? a.volunteer?.department ?? '-'}</td>
                                 <td className="px-4 py-3 font-medium">{a.displayOrder ?? 0}</td>
                                 <td className="px-4 py-3">
-                                    {selectedAY && !selectedAY.isLocked && isSuperadmin && (
+                                    {selectedAY && !selectedAY.isLocked && (
                                         <div className="flex gap-2">
                                             <button onClick={() => handleEdit(a)} disabled={actionId === a.id} className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-700 hover:bg-blue-200 disabled:opacity-50">Edit</button>
                                             <button onClick={() => handleRemove(a.id)} disabled={actionId === a.id} className="text-xs px-2 py-1 rounded bg-red-100 text-red-700 hover:bg-red-200 disabled:opacity-50">Remove</button>

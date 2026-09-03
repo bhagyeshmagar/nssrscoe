@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import type { AcademicYear, Meeting, SpecialCamp } from '../../../services/api';
+import type { Meeting, SpecialCamp } from '../../../services/api';
 import { meetingsAPI, specialCampsAPI, decodeToken } from '../../../services/api';
 import { useAYSelector } from '../Shared';
 import { ExportDataModal } from '../../common/ExportDataModal';
@@ -7,15 +7,17 @@ import { MeetingAttendanceModal } from '../MeetingAttendanceModal';
 import { Download } from 'lucide-react';
 import { useAuthStore } from '../../../stores/authStore';
 import toast from 'react-hot-toast';
+import { useAcademicYears } from '../../../hooks/useAcademicYears';
 
 import { handleExportAttendanceXLSX } from './MeetingExportUtils';
 import { MeetingForm } from './MeetingForm';
 import { MeetingTable } from './MeetingTable';
 
-export const MeetingsTab = ({ years, currentAY }: { years: AcademicYear[], currentAY: AcademicYear | null }) => {
+export const MeetingsTab = () => {
+    const { data: years = [] } = useAcademicYears();
     const { token } = useAuthStore();
     const isSuperadmin = token ? decodeToken(token)?.isSuperadmin : false;
-    const { selectedAyId, setSelectedAyId } = useAYSelector(years, currentAY);
+    const { selectedAyId, setSelectedAyId } = useAYSelector(years, null);
     const [meetings, setMeetings] = useState<Meeting[]>([]);
     const [loading, setLoading] = useState(false);
     const [showForm, setShowForm] = useState(false);

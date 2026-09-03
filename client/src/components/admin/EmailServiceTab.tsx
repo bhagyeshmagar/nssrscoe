@@ -369,7 +369,7 @@ const EmailLogsTab = () => {
                 emailLogsAPI.getLogs({ emailType: typeFilter || undefined, status: (statusFilter as any) || undefined, page, limit: LIMIT }),
                 page === 1 ? emailLogsAPI.getStats() : Promise.resolve(null),
             ]);
-            const data: EmailLog[] = (logsRes.data.data as any).data ?? [];
+            const data: EmailLog[] = logsRes.data.data.data ?? [];
             setLogs(data);
             setHasMore(data.length === LIMIT);
             if (statsRes) {

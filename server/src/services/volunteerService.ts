@@ -1,4 +1,4 @@
-import { eq, and, count, ne, sql, like, or } from 'drizzle-orm';
+import { eq, and, count, ne, sql, like, or, inArray } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { db } from '../db';
@@ -11,6 +11,7 @@ import {
     events,
     meetingAttendance,
     meetings,
+    coreTeamAssignments,
 } from '../db/schema';
 import {
     NotFoundError,
@@ -65,6 +66,27 @@ export interface ListVolunteerFilters {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+const generateSecurePassword = (length = 12) => {
+    const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+~`|}{[]:;?><,./-=';
+    let password = '';
+    // Ensure at least one of each type
+    password += 'abcdefghijklmnopqrstuvwxyz'[crypto.randomInt(26)];
+    password += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[crypto.randomInt(26)];
+    password += '0123456789'[crypto.randomInt(10)];
+    password += '!@#$%^&*()_+~`|}{[]:;?><,./-='[crypto.randomInt(29)];
+    
+    for (let i = 4; i < length; i++) {
+        password += charset[crypto.randomInt(charset.length)];
+    }
+    
+    const chars = password.split('');
+    for (let i = chars.length - 1; i > 0; i--) {
+        const j = crypto.randomInt(i + 1);
+        [chars[i], chars[j]] = [chars[j], chars[i]];
+    }
+    return chars.join('');
+};
+
 /** Resolve AY and enforce it's not locked. Returns the AY record. */
 const requireUnlockedAY = async (ayId: number) => {
     const [ay] = await db
@@ -75,15 +97,6 @@ const requireUnlockedAY = async (ayId: number) => {
     if (!ay) throw new NotFoundError(`Academic year ${ayId} not found.`);
     if (ay.isLocked) throw new AYLockedError(ay.label);
     return ay;
-};
-
-/** Count regular volunteers in an AY (for cap enforcement). */
-const countRegularVolunteers = async (ayId: number): Promise<number> => {
-    const [row] = await db
-        .select({ n: count() })
-        .from(volunteers)
-        .where(and(eq(volunteers.academicYearId, ayId), eq(volunteers.status, 'regular')));
-    return Number(row.n);
 };
 
 const findVolunteer = async (id: number) => {
@@ -128,7 +141,7 @@ export const listVolunteersForAY = async (ayId: number, filters: ListVolunteerFi
     let orderClause: any[] = [volunteers.name];
     if (filters.sortBy === 'department') {
         orderClause = [
-            sql.raw(`CASE department ${cases} ELSE 99 END`),
+            sql.raw(`CASE volunteers.department ${cases} ELSE 99 END`),
             volunteers.name
         ];
     }
@@ -195,13 +208,18 @@ export const getVolunteerById = async (id: number) => {
                 WHERE ${attendanceRecords.volunteerId} = ${volunteers.id}
                   AND ${attendanceRecords.status} = 'present'
             )`.as('events_attended_count'),
+            isCoreTeam: sql<boolean>`CAST(CASE WHEN EXISTS (
+                SELECT 1
+                FROM ${coreTeamAssignments}
+                WHERE core_team_assignments.volunteer_id = volunteers.id
+            ) THEN 1 ELSE 0 END AS BIT)`.as('is_core_team'),
         })
         .top(1).from(volunteers)
         .leftJoin(volunteerProfiles, eq(volunteers.id, volunteerProfiles.volunteerId))
         .where(eq(volunteers.id, id))
         ;
     if (!row) throw new NotFoundError(`Volunteer ${id} not found.`);
-    return { ...row.volunteers, profile: row.profile, eventsAttendedCount: row.eventsAttendedCount };
+    return { ...row.volunteers, profile: row.profile, eventsAttendedCount: row.eventsAttendedCount, isCoreTeam: row.isCoreTeam };
 };
 
 export const getMyAttendance = async (volunteerId: number) => {
@@ -278,6 +296,8 @@ export const createVolunteer = async (
             // Create empty profile
             await tx.insert(volunteerProfiles).values({ volunteerId: inserted.id });
             
+            await auditVolunteerCreate(inserted.id, adminId, ayId, inserted.name, tx);
+
             return inserted;
         } catch (err: any) {
             if (err?.number === 2627 || err?.number === 2601) {
@@ -286,8 +306,6 @@ export const createVolunteer = async (
             throw err;
         }
     });
-
-    await auditVolunteerCreate(newVol.id, adminId, ayId, newVol.name);
 
     // Send welcome email with credentials (fire-and-forget, never blocks creation)
     sendVolunteerWelcomeEmail({
@@ -307,18 +325,20 @@ export const updateVolunteer = async (id: number, input: UpdateVolunteerInput, a
     await requireUnlockedAY(vol.academicYearId);
 
     try {
-        const [updated] = await db
-            .update(volunteers)
-            .set({
-                ...(input.name && { name: input.name.trim() }),
-                ...(input.email && { email: input.email.toLowerCase().trim() }),
-                ...(input.department && { department: input.department }),
-                updatedAt: new Date(),
-            })
-            .where(eq(volunteers.id, id)).output();
+        return await db.transaction(async (tx) => {
+            const [updated] = await tx
+                .update(volunteers)
+                .set({
+                    ...(input.name && { name: input.name.trim() }),
+                    ...(input.email && { email: input.email.toLowerCase().trim() }),
+                    ...(input.department && { department: input.department }),
+                    updatedAt: new Date(),
+                })
+                .where(eq(volunteers.id, id)).output();
 
-        await logAudit({ action: 'volunteer.update', entityType: 'volunteer', entityId: id, performedById: adminId, academicYearId: vol.academicYearId, details: input as unknown as Record<string, unknown> });
-        return updated;
+            await logAudit({ action: 'volunteer.update', entityType: 'volunteer', entityId: id, performedById: adminId, academicYearId: vol.academicYearId, details: { ...input } }, tx);
+            return updated;
+        });
     } catch (err: any) {
         if (err?.number === 2627 || err?.number === 2601) {
             throw new ConflictError(`Email "${input.email}" is already registered.`);
@@ -331,11 +351,7 @@ export const updateVolunteer = async (id: number, input: UpdateVolunteerInput, a
 /** Update the volunteer's own profile fields (not auth fields). */
 export const updateVolunteerProfile = async (volunteerId: number, profileData: Record<string, unknown>) => {
     const vol = await findVolunteer(volunteerId);
-    const [ay] = await db
-        .select({ isLocked: academicYears.isLocked, label: academicYears.label })
-        .top(1).from(academicYears)
-        .where(eq(academicYears.id, vol.academicYearId));
-    if (ay?.isLocked) throw new AYLockedError(ay.label);
+    await requireUnlockedAY(vol.academicYearId);
 
     const allowedFields = [
         'fullName', 'prnNo', 'collegeYearAtEnrollment', 'nssYear', 'marksheetUrl',
@@ -360,42 +376,42 @@ export const updateVolunteerProfile = async (volunteerId: number, profileData: R
         profileUpdate.isExperienceApproved = false;
     }
 
-    // Update volunteers.department if provided (kept in sync)
-    if (profileData.department) {
-        profileUpdate.department = profileData.department;
-        await db
-            .update(volunteers)
-            .set({ department: profileData.department as Department })
-            .where(eq(volunteers.id, volunteerId));
-    }
-
-    const [updated] = await db
-        .update(volunteerProfiles)
-        .set(profileUpdate)
-        .where(eq(volunteerProfiles.volunteerId, volunteerId))
-        .output();
-        
-    if (updated) {
-        return { ...updated, department: profileData.department };
-    }
-
-    try {
-        const [newProfile] = await db
-            .insert(volunteerProfiles)
-            .output().values({ volunteerId, ...profileUpdate });
-        return { ...newProfile, department: profileData.department };
-    } catch (err: any) {
-        if (err?.number === 2627 || err?.number === 2601) {
-            // Raced with another insert, try update again
-            const [retryUpdated] = await db
-                .update(volunteerProfiles)
-                .set(profileUpdate)
-                .where(eq(volunteerProfiles.volunteerId, volunteerId))
-                .output();
-            return { ...retryUpdated, department: profileData.department };
+    return await db.transaction(async (tx) => {
+        if (profileData.department) {
+            profileUpdate.department = profileData.department;
+            await tx
+                .update(volunteers)
+                .set({ department: profileData.department as Department })
+                .where(eq(volunteers.id, volunteerId));
         }
-        throw err;
-    }
+
+        const [updated] = await tx
+            .update(volunteerProfiles)
+            .set(profileUpdate)
+            .where(eq(volunteerProfiles.volunteerId, volunteerId))
+            .output();
+            
+        let finalProfile;
+        if (updated) {
+            finalProfile = { ...updated, department: profileData.department };
+        } else {
+            const [newProfile] = await tx
+                .insert(volunteerProfiles)
+                .output().values({ volunteerId, ...profileUpdate });
+            finalProfile = { ...newProfile, department: profileData.department };
+        }
+
+        await logAudit({
+            action: 'volunteer.update_profile',
+            entityType: 'volunteer',
+            entityId: volunteerId,
+            performedById: volunteerId, // usually done by self
+            academicYearId: vol.academicYearId,
+            details: profileData,
+        }, tx);
+
+        return finalProfile;
+    });
 };
 
 // ── Status changes ────────────────────────────────────────────────────────────
@@ -426,10 +442,11 @@ export const changeVolunteerStatus = async (
             .set({ status: newStatus, updatedAt: new Date() })
             .where(eq(volunteers.id, id))
             .output();
+            
+        await logAudit({ action: 'volunteer.status_change', entityType: 'volunteer', entityId: id, performedById: adminId, academicYearId: vol.academicYearId, details: { from: vol.status, to: newStatus } }, tx);
+        
         return res;
     });
-
-    await logAudit({ action: 'volunteer.status_change', entityType: 'volunteer', entityId: id, performedById: adminId, academicYearId: vol.academicYearId, details: { from: vol.status, to: newStatus } });
 
     // Notify the volunteer if they've been moved to backup status
     if (newStatus === 'backup') {
@@ -453,50 +470,57 @@ export const toggleVolunteerActive = async (id: number, adminId: number) => {
     const vol = await findVolunteer(id);
     await requireUnlockedAY(vol.academicYearId);
 
-    const [updated] = await db
-        .update(volunteers)
-        .set({ isActive: !vol.isActive, updatedAt: new Date() })
-        .where(eq(volunteers.id, id))
-        .output();
+    return await db.transaction(async (tx) => {
+        const [updated] = await tx
+            .update(volunteers)
+            .set({ isActive: !vol.isActive, updatedAt: new Date() })
+            .where(eq(volunteers.id, id))
+            .output();
 
-    await logAudit({ action: 'volunteer.toggle_active', entityType: 'volunteer', entityId: id, performedById: adminId, academicYearId: vol.academicYearId, details: { isActive: updated.isActive } });
+        await logAudit({ action: 'volunteer.toggle_active', entityType: 'volunteer', entityId: id, performedById: adminId, academicYearId: vol.academicYearId, details: { isActive: updated.isActive } }, tx);
 
-    return updated;
+        return updated;
+    });
 };
 
 export const deleteVolunteer = async (id: number, adminId: number) => {
     const vol = await findVolunteer(id);
     await requireUnlockedAY(vol.academicYearId);
 
-    const [updated] = await db
-        .update(volunteers)
-        .set({ isActive: false, updatedAt: new Date() })
-        .where(eq(volunteers.id, id))
-        .output();
+    return await db.transaction(async (tx) => {
+        const [updated] = await tx
+            .update(volunteers)
+            .set({ isActive: false, updatedAt: new Date() })
+            .where(eq(volunteers.id, id))
+            .output();
 
-    await logAudit({ action: 'volunteer.delete', entityType: 'volunteer', entityId: id, performedById: adminId, academicYearId: vol.academicYearId });
+        await logAudit({ action: 'volunteer.delete', entityType: 'volunteer', entityId: id, performedById: adminId, academicYearId: vol.academicYearId }, tx);
 
-    return updated;
+        return updated;
+    });
 };
 
 export const approveVolunteerExperience = async (volunteerId: number, adminId: number) => {
     const vol = await findVolunteer(volunteerId);
+    await requireUnlockedAY(vol.academicYearId);
     
-    const [updatedProfile] = await db
-        .update(volunteerProfiles)
-        .set({ isExperienceApproved: true, updatedAt: new Date() })
-        .where(eq(volunteerProfiles.volunteerId, volunteerId))
-        .output();
-        
-    await logAudit({ 
-        action: 'volunteer.approve_experience', 
-        entityType: 'volunteer', 
-        entityId: volunteerId, 
-        performedById: adminId, 
-        academicYearId: vol.academicYearId 
-    });
+    return await db.transaction(async (tx) => {
+        const [updatedProfile] = await tx
+            .update(volunteerProfiles)
+            .set({ isExperienceApproved: true, updatedAt: new Date() })
+            .where(eq(volunteerProfiles.volunteerId, volunteerId))
+            .output();
+            
+        await logAudit({ 
+            action: 'volunteer.approve_experience', 
+            entityType: 'volunteer', 
+            entityId: volunteerId, 
+            performedById: adminId, 
+            academicYearId: vol.academicYearId 
+        }, tx);
 
-    return updatedProfile;
+        return updatedProfile;
+    });
 };
 
 
@@ -532,65 +556,84 @@ export const importVolunteersFromAY = async (input: ImportVolunteerInput, adminI
             currentCap = Number(row.n);
         }
 
-        for (const sourceId of input.sourceVolunteerIds) {
-            try {
-                const [source] = await tx.select({
-                    volunteers: volunteers,
-                    profile: volunteerProfiles,
-                }).from(volunteers).leftJoin(volunteerProfiles, eq(volunteers.id, volunteerProfiles.volunteerId)).where(eq(volunteers.id, sourceId));
-                
-                if (!source) {
-                    results.errors.push(`Volunteer ${sourceId}: not found`);
-                    continue;
-                }
+        const [existingEmailsData] = await Promise.all([
+            tx.select({ email: volunteers.email }).from(volunteers).where(eq(volunteers.academicYearId, input.targetAyId))
+        ]);
+        const existingEmails = new Set(existingEmailsData.map(r => r.email));
 
-                if (defaultStatus === 'regular' && currentCap >= targetAy.volunteerCap) {
-                    results.skipped.push(`${source.volunteers.name} — cap reached`);
-                    continue;
-                }
+        const sources = await tx.select({
+            volunteers: volunteers,
+            profile: volunteerProfiles,
+        }).from(volunteers)
+        .leftJoin(volunteerProfiles, eq(volunteers.id, volunteerProfiles.volunteerId))
+        .where(inArray(volunteers.id, input.sourceVolunteerIds));
 
-                const password = input.resetPassword ?? crypto.randomBytes(4).toString('hex');
-                const passwordHash = await bcrypt.hash(password, 10);
+        // Create a map to quickly look up missing sources
+        const sourceIdsFound = new Set(sources.map(s => s.volunteers.id));
+        input.sourceVolunteerIds.forEach(id => {
+            if (!sourceIdsFound.has(id)) {
+                results.errors.push(`Volunteer ${id}: not found`);
+            }
+        });
 
-                try {
-                    const [newVol] = await tx.insert(volunteers).output().values({
-                        academicYearId: input.targetAyId,
-                        name: source.volunteers.name,
-                        email: source.volunteers.email,
-                        passwordHash,
-                        department: source.volunteers.department,
-                        status: defaultStatus,
-                        isActive: true,
-                        createdById: adminId,
-                    });
-
-                    if (source.profile) {
-                        const { volunteerId: _, id: __, updatedAt: ___, ...profileCopy } = source.profile as Record<string, unknown>;
-                        await tx.insert(volunteerProfiles).values({
-                            volunteerId: newVol.id,
-                            ...(profileCopy as Partial<typeof volunteerProfiles.$inferInsert>),
-                        });
-                    } else {
-                        await tx.insert(volunteerProfiles).values({ volunteerId: newVol.id });
-                    }
-                    
-                    if (defaultStatus === 'regular') currentCap++;
-                    results.imported.push(source.volunteers.name);
-
-                } catch (err: any) {
-                    if (err?.number === 2627 || err?.number === 2601) {
-                        results.skipped.push(`${source.volunteers.name} — already in target AY`);
-                    } else {
-                        throw err;
-                    }
-                }
-            } catch (err) {
-                results.errors.push(`Volunteer ${sourceId}: ${err instanceof Error ? err.message : 'unknown error'}`);
+        const validSources = [];
+        for (const s of sources) {
+            if (existingEmails.has(s.volunteers.email)) {
+                results.skipped.push(`${s.volunteers.name} — already in target AY`);
+            } else {
+                validSources.push(s);
             }
         }
-    });
 
-    await logAudit({ action: 'volunteer.import', entityType: 'academic_year', entityId: input.targetAyId, performedById: adminId, academicYearId: input.targetAyId, details: { count: results.imported.length, skipped: results.skipped.length } });
+        if (defaultStatus === 'regular' && validSources.length + currentCap > targetAy.volunteerCap) {
+            const toKeep = Math.max(0, targetAy.volunteerCap - currentCap);
+            validSources.slice(toKeep).forEach(s => results.skipped.push(`${s.volunteers.name} — cap reached`));
+            validSources.splice(toKeep);
+        }
+
+        if (validSources.length > 0) {
+            const volsToInsert = await Promise.all(validSources.map(async (s) => {
+                const password = input.resetPassword ?? generateSecurePassword();
+                const passwordHash = await bcrypt.hash(password, 10);
+                return {
+                    academicYearId: input.targetAyId,
+                    name: s.volunteers.name,
+                    email: s.volunteers.email,
+                    passwordHash,
+                    department: s.volunteers.department,
+                    status: defaultStatus,
+                    isActive: true,
+                    createdById: adminId,
+                };
+            }));
+
+            const insertedVols = await tx.insert(volunteers).output().values(volsToInsert);
+            
+            // Map inserted volunteers by email to attach profiles correctly
+            const insertedMap = new Map(insertedVols.map((v: any) => [v.email, v.id]));
+            
+            const profilesToInsert = validSources.map(s => {
+                const newVolId = insertedMap.get(s.volunteers.email)!;
+                if (s.profile) {
+                    const { volunteerId: _, id: __, updatedAt: ___, ...profileCopy } = s.profile as Record<string, unknown>;
+                    return {
+                        volunteerId: newVolId,
+                        ...(profileCopy as Partial<typeof volunteerProfiles.$inferInsert>),
+                    };
+                } else {
+                    return { volunteerId: newVolId };
+                }
+            });
+
+            if (profilesToInsert.length > 0) {
+                await tx.insert(volunteerProfiles).values(profilesToInsert);
+            }
+
+            results.imported.push(...validSources.map(s => s.volunteers.name));
+        }
+
+        await logAudit({ action: 'volunteer.import', entityType: 'academic_year', entityId: input.targetAyId, performedById: adminId, academicYearId: input.targetAyId, details: { count: results.imported.length, skipped: results.skipped.length } }, tx);
+    });
 
     return results;
 };

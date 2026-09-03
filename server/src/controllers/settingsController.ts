@@ -41,7 +41,7 @@ export const updateSettings = async (req: Request, res: Response) => {
         const entries = Object.entries(updates);
 
         if (entries.length === 0) {
-            return res.status(400).json({ success: false, message: 'No settings provided.' });
+            throw new ValidationError('No settings provided.');
         }
 
         // Reject unknown keys
@@ -69,16 +69,18 @@ export const updateSettings = async (req: Request, res: Response) => {
             .where(inArray(siteSettings.key, keys));
         const existingKeys = new Set(existing.map(r => r.key));
 
-        // Batch updates and inserts
-        for (const [key, value] of entries) {
-            if (existingKeys.has(key)) {
-                await db.update(siteSettings)
-                    .set({ value, updatedAt: new Date() })
-                    .where(eq(siteSettings.key, key));
-            } else {
-                await db.insert(siteSettings).values({ key, value });
+        // Batch updates and inserts transactionally
+        await db.transaction(async (tx) => {
+            for (const [key, value] of entries) {
+                if (existingKeys.has(key)) {
+                    await tx.update(siteSettings)
+                        .set({ value, updatedAt: new Date() })
+                        .where(eq(siteSettings.key, key));
+                } else {
+                    await tx.insert(siteSettings).values({ key, value });
+                }
             }
-        }
+        });
 
         ok(res, null, 'Settings updated successfully.');
     } catch (error) {

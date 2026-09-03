@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { academicYearsAPI, eventsAPI } from '../services/api';
 import type { AcademicYear, EventData } from '../services/api';
 
+import { formatDate } from '@/utils/dateFormatter';
 const Calendar = () => {
     const navigate = useNavigate();
     const [currentAY, setCurrentAY] = useState<AcademicYear | null>(null);
@@ -69,7 +70,7 @@ const Calendar = () => {
                             {activities.map(act => (
                                 <tr key={act.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => navigate(`/events/${act.id}`)}>
                                     <td className="px-6 py-4 whitespace-nowrap font-medium">{new Date(act.date).toLocaleString('default', { month: 'long' })}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap">{new Date(act.date).toLocaleDateString()}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap">{formatDate(act.date)}</td>
                                     <td className="px-6 py-4">{act.title}</td>
                                     <td className="px-6 py-4">
                                         <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getTypeColor(act.type)}`}>

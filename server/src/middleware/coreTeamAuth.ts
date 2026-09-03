@@ -36,17 +36,22 @@ export const requireCoreTeamRole = async (req: Request, res: Response, next: Nex
             department: coreTeamAssignments.department,
             roleCode: coreTeamRoles.code,
             roleName: coreTeamRoles.name,
+            category: coreTeamRoles.category,
         })
         .top(1).from(coreTeamAssignments)
         .innerJoin(coreTeamRoles, eq(coreTeamAssignments.coreTeamRoleId, coreTeamRoles.id))
         .where(and(
             eq(coreTeamAssignments.volunteerId, authReq.user.id),
             eq(coreTeamAssignments.academicYearId, currentAy.id)
-        ))
-        ;
+        ));
 
         if (!assignment) {
             throw new UnauthorizedError('Access denied. You are not assigned to the core team for the current academic year.');
+        }
+
+        let inferredDept = assignment.department as Department | undefined;
+        if (!inferredDept && assignment.category === 'Department Coordinators') {
+            inferredDept = assignment.roleName as Department;
         }
 
         // Attach core team info to user
@@ -54,7 +59,7 @@ export const requireCoreTeamRole = async (req: Request, res: Response, next: Nex
             assignmentId: assignment.id,
             roleCode: assignment.roleCode,
             roleName: assignment.roleName,
-            department: (assignment.department as Department) || undefined,
+            department: inferredDept,
             academicYearId: currentAy.id
         };
 

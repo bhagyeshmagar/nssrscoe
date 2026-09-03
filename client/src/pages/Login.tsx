@@ -3,29 +3,41 @@ import { toast } from 'react-hot-toast';
 import { useAuthStore } from '../stores/authStore';
 import { authAPI } from '../services/api';
 import { Eye, EyeOff, LockKeyhole, Loader2 } from 'lucide-react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
-const Login = () => {
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
-    const [showPassword, setShowPassword] = useState(false);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState('');
+const loginSchema = z.object({
+    email: z.string().min(1, 'Email is required').email('Invalid email address'),
+    password: z.string().min(1, 'Password is required'),
+});
 
-    const handleLogin = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setLoading(true);
+type LoginFormData = z.infer<typeof loginSchema>;
+
+const Login = () => {
+    const [showPassword, setShowPassword] = useState(false);
+    const [error, setError] = useState('');
+    
+    const {
+        register,
+        handleSubmit,
+        formState: { errors, isSubmitting },
+    } = useForm<LoginFormData>({
+        resolver: zodResolver(loginSchema),
+        defaultValues: { email: '', password: '' },
+    });
+
+    const onLoginSubmit = async (data: LoginFormData) => {
         setError('');
 
         try {
-            const response = await authAPI.login(email, password);
-            type LoginPayload = { token: string; role: 'admin' | 'volunteer'; data?: { token: string; role: 'admin' | 'volunteer' } };
-            const rawData = response.data as unknown as LoginPayload;
-            const payload = rawData.data || rawData;
+            const response = await authAPI.login(data.email, data.password);
+            const payload = response.data.data;
             useAuthStore.getState().setAuth(payload.token, payload.role);
 
             toast.success('Login successful!');
@@ -40,7 +52,6 @@ const Login = () => {
             const axiosError = err as { response?: { data?: { message?: string } } };
             setError(axiosError.response?.data?.message || 'Invalid credentials. Please try again.');
         }
-        setLoading(false);
     };
 
     return (
@@ -56,7 +67,7 @@ const Login = () => {
                     </div>
                 </CardHeader>
                 <CardContent>
-                    <form onSubmit={handleLogin} className="space-y-4">
+                    <form onSubmit={handleSubmit(onLoginSubmit)} className="space-y-4">
                         {error && (
                             <Alert variant="destructive" className="bg-red-50">
                                 <AlertDescription>{error}</AlertDescription>
@@ -68,12 +79,13 @@ const Login = () => {
                             <Input
                                 id="email"
                                 type="text"
-                                value={email}
-                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)}
+                                {...register('email')}
                                 placeholder="Enter email or username"
-                                required
-                                className="focus-visible:ring-nss-blue"
+                                className={`focus-visible:ring-nss-blue ${errors.email ? 'border-red-500' : ''}`}
                             />
+                            {errors.email && (
+                                <p className="text-sm text-red-500 mt-1">{errors.email.message}</p>
+                            )}
                         </div>
                         
                         <div className="space-y-2">
@@ -82,11 +94,9 @@ const Login = () => {
                                 <Input
                                     id="password"
                                     type={showPassword ? "text" : "password"}
-                                    value={password}
-                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
+                                    {...register('password')}
                                     placeholder="Enter password"
-                                    required
-                                    className="pr-10 focus-visible:ring-nss-blue"
+                                    className={`pr-10 focus-visible:ring-nss-blue ${errors.password ? 'border-red-500' : ''}`}
                                 />
                                 <button
                                     type="button"
@@ -96,14 +106,17 @@ const Login = () => {
                                     {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                                 </button>
                             </div>
+                            {errors.password && (
+                                <p className="text-sm text-red-500 mt-1">{errors.password.message}</p>
+                            )}
                         </div>
 
                         <Button 
                             type="submit" 
-                            disabled={loading} 
+                            disabled={isSubmitting} 
                             className="w-full bg-nss-blue hover:bg-blue-900 transition-colors"
                         >
-                            {loading ? (
+                            {isSubmitting ? (
                                 <>
                                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                     Signing in...

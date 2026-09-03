@@ -1,13 +1,15 @@
-import { useState, useEffect } from 'react';
-import { adminsAPI, decodeToken } from '../../services/api';
-import type { AdminData } from '../../services/api';
+import { useState } from 'react';
+import { decodeToken } from '../../services/api';
 import { useAuthStore } from '../../stores/authStore';
 import { useFlash } from './Shared';
+import { useAdmins, useAdminMutations } from '../../hooks/useAdmins';
 
 export const AdminsTab = () => {
-    const [adminsList, setAdminsList] = useState<AdminData[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [busy, setBusy] = useState(false);
+    const { data: adminsList = [], isLoading: loading } = useAdmins();
+    const { createAdmin, updateAdmin, deleteAdmin, isCreating, isUpdating, isDeleting } = useAdminMutations();
+    
+    const busy = isCreating || isUpdating || isDeleting;
+    
     const [form, setForm] = useState({ username: '', password: '', isSuperadmin: false });
     const [editingId, setEditingId] = useState<number | null>(null);
     const [showForm, setShowForm] = useState(false);
@@ -16,19 +18,6 @@ export const AdminsTab = () => {
     const currentUser = decodeToken(useAuthStore.getState().token || '');
     const currentAdminId = currentUser?.id;
 
-    const loadAdmins = async () => {
-        try {
-            setLoading(true);
-            const { data } = await adminsAPI.getAll();
-            setAdminsList(data.data || []);
-        } catch (e: any) {
-            flash('err', e.response?.data?.message || 'Failed to load admins');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    useEffect(() => { loadAdmins(); }, []);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -48,26 +37,22 @@ export const AdminsTab = () => {
             }
         }
 
-        setBusy(true);
         try {
             const payload: any = { username: form.username, isSuperadmin: form.isSuperadmin };
             if (form.password) payload.password = form.password;
 
             if (editingId) {
-                await adminsAPI.update(editingId, payload);
+                await updateAdmin({ id: editingId, data: payload });
                 flash('ok', 'Admin updated successfully');
             } else {
-                await adminsAPI.create(payload);
+                await createAdmin(payload);
                 flash('ok', 'Admin created successfully');
             }
             setShowForm(false);
             setForm({ username: '', password: '', isSuperadmin: false });
             setEditingId(null);
-            loadAdmins();
         } catch (err: any) {
             flash('err', err.response?.data?.message || 'Error saving admin');
-        } finally {
-            setBusy(false);
         }
     };
 
@@ -86,15 +71,11 @@ export const AdminsTab = () => {
 
         if (!confirm('Are you sure you want to delete this admin?')) return;
         
-        setBusy(true);
         try {
-            await adminsAPI.delete(id);
+            await deleteAdmin(id);
             flash('ok', 'Admin deleted');
-            loadAdmins();
         } catch (err: any) {
             flash('err', err.response?.data?.message || 'Failed to delete admin');
-        } finally {
-            setBusy(false);
         }
     };
 

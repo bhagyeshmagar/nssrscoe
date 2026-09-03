@@ -52,7 +52,7 @@ test.describe('Volunteer Dashboard Flow', () => {
         await page.goto('/login');
 
         // Fill in the login form
-        const emailInput = page.getByLabel(/Email/i);
+        const emailInput = page.getByLabel(/Email \/ Username/i);
         const passwordInput = page.getByLabel(/Password/i);
         const loginButton = page.getByRole('button', { name: /Sign In/i });
 

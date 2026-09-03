@@ -14,15 +14,31 @@ const AuditLogTab = () => {
     const [exportStatus, setExportStatus] = useState<'idle' | 'loading' | 'ready'>('idle');
     const [exportData, setExportData] = useState<AuditLog[]>([]);
 
-    const fetchLogs = async (currentPage: number) => {
+    const [filters, setFilters] = useState({
+        action: '',
+        entityType: '',
+        performedById: '',
+        startDate: '',
+        endDate: '',
+    });
+    const [appliedFilters, setAppliedFilters] = useState(filters);
+
+    const fetchLogs = async (currentPage: number, currentFilters = appliedFilters) => {
         try {
             setLoading(true);
-            const res = await auditAPI.getLogs(currentPage, 20);
+            const activeFilters = {
+                action: currentFilters.action || undefined,
+                entityType: currentFilters.entityType || undefined,
+                performedById: currentFilters.performedById ? parseInt(currentFilters.performedById) : undefined,
+                startDate: currentFilters.startDate || undefined,
+                endDate: currentFilters.endDate || undefined,
+            };
+            const res = await auditAPI.getLogs(currentPage, 20, activeFilters);
             if (res.data.success) {
                 const logsData = res.data.data;
                 const metaData = res.data.meta;
                 setLogs(Array.isArray(logsData) ? logsData : []);
-                setTotalPages(metaData?.totalPages || 1);
+                setTotalPages((metaData as any)?.totalPages || 1);
             }
         } catch (error) {
             console.error('Failed to fetch audit logs', error);
@@ -42,19 +58,27 @@ const AuditLogTab = () => {
             let allLogs: AuditLog[] = [];
             let currentExportPage = 1;
             let exportTotalPages = 1;
+            
+            const activeFilters = {
+                action: appliedFilters.action || undefined,
+                entityType: appliedFilters.entityType || undefined,
+                performedById: appliedFilters.performedById ? parseInt(appliedFilters.performedById) : undefined,
+                startDate: appliedFilters.startDate || undefined,
+                endDate: appliedFilters.endDate || undefined,
+            };
 
             // Fetch first page to get total pages and first chunk
-            const firstRes = await auditAPI.getLogs(currentExportPage, 1000);
+            const firstRes = await auditAPI.getLogs(currentExportPage, 1000, activeFilters);
             if (firstRes.data.success) {
                 allLogs = allLogs.concat(Array.isArray(firstRes.data.data) ? firstRes.data.data : []);
-                exportTotalPages = firstRes.data.meta?.totalPages || 1;
+                exportTotalPages = (firstRes.data.meta as any)?.totalPages || 1;
             }
 
             // Loop to fetch any remaining pages if total exceeds chunk limit
             const MAX_PAGES = 100; // Safety cap: max 100,000 logs per export
             while (currentExportPage < exportTotalPages && currentExportPage < MAX_PAGES) {
                 currentExportPage++;
-                const res = await auditAPI.getLogs(currentExportPage, 1000);
+                const res = await auditAPI.getLogs(currentExportPage, 1000, activeFilters);
                 if (res.data.success) {
                     allLogs = allLogs.concat(Array.isArray(res.data.data) ? res.data.data : []);
                 }
@@ -84,6 +108,39 @@ const AuditLogTab = () => {
                 >
                     {exportStatus === 'loading' ? 'Preparing...' : 'Export to CSV'}
                 </button>
+            </div>
+
+            <div className="bg-slate-800 p-4 rounded-xl border border-slate-700/50 flex flex-wrap gap-4 items-end">
+                <div className="flex-1 min-w-[150px]">
+                    <label className="block text-xs font-medium text-slate-400 mb-1">Action</label>
+                    <input type="text" value={filters.action} onChange={e => setFilters({...filters, action: e.target.value})} placeholder="e.g. create" className="w-full bg-slate-900 border border-slate-700 rounded-md px-3 py-2 text-sm text-slate-200" />
+                </div>
+                <div className="flex-1 min-w-[150px]">
+                    <label className="block text-xs font-medium text-slate-400 mb-1">Entity Type</label>
+                    <input type="text" value={filters.entityType} onChange={e => setFilters({...filters, entityType: e.target.value})} placeholder="e.g. achievement" className="w-full bg-slate-900 border border-slate-700 rounded-md px-3 py-2 text-sm text-slate-200" />
+                </div>
+                <div className="flex-1 min-w-[150px]">
+                    <label className="block text-xs font-medium text-slate-400 mb-1">Admin ID</label>
+                    <input type="number" value={filters.performedById} onChange={e => setFilters({...filters, performedById: e.target.value})} placeholder="e.g. 1" className="w-full bg-slate-900 border border-slate-700 rounded-md px-3 py-2 text-sm text-slate-200" />
+                </div>
+                <div className="flex-1 min-w-[150px]">
+                    <label className="block text-xs font-medium text-slate-400 mb-1">Start Date</label>
+                    <input type="date" value={filters.startDate} onChange={e => setFilters({...filters, startDate: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded-md px-3 py-2 text-sm text-slate-200 [&::-webkit-calendar-picker-indicator]:filter [&::-webkit-calendar-picker-indicator]:invert" />
+                </div>
+                <div className="flex-1 min-w-[150px]">
+                    <label className="block text-xs font-medium text-slate-400 mb-1">End Date</label>
+                    <input type="date" value={filters.endDate} onChange={e => setFilters({...filters, endDate: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded-md px-3 py-2 text-sm text-slate-200 [&::-webkit-calendar-picker-indicator]:filter [&::-webkit-calendar-picker-indicator]:invert" />
+                </div>
+                <div className="flex gap-2">
+                    <button onClick={() => { setAppliedFilters(filters); setPage(1); fetchLogs(1, filters); }} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium transition-colors">Apply</button>
+                    <button onClick={() => { 
+                        const empty = {action:'', entityType:'', performedById:'', startDate:'', endDate:''};
+                        setFilters(empty);
+                        setAppliedFilters(empty);
+                        setPage(1);
+                        fetchLogs(1, empty);
+                    }} className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-md text-sm font-medium transition-colors">Clear</button>
+                </div>
             </div>
 
             <div className="bg-slate-800 rounded-xl overflow-hidden border border-slate-700/50">
@@ -118,7 +175,12 @@ const AuditLogTab = () => {
                                             </span>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
-                                            {log.performedByRole} #{log.performedById}
+                                            {log.performedByUsername ? (
+                                                <span className="font-medium text-slate-300">{log.performedByUsername}</span>
+                                            ) : (
+                                                <span className="text-slate-500">ID: {log.performedById}</span>
+                                            )}
+                                            <span className="ml-2 text-xs text-slate-500">({log.performedByRole})</span>
                                         </td>
                                         <td className="px-6 py-4 text-xs text-slate-400 max-w-xs truncate" title={log.details || ''}>
                                             {log.details || '-'}
@@ -164,7 +226,8 @@ const AuditLogTab = () => {
                     { key: 'action', label: 'Action' },
                     { key: 'entityType', label: 'Entity Type' },
                     { key: 'entityId', label: 'Entity ID' },
-                    { key: 'performedByRole', label: 'Performed By' },
+                    { key: 'performedByUsername', label: 'Performed By Username' },
+                    { key: 'performedByRole', label: 'Role' },
                     { key: 'performedById', label: 'Performed By ID' },
                     { key: 'details', label: 'Details' }
                 ]}

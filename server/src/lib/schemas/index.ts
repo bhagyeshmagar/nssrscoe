@@ -45,8 +45,8 @@ export const updateAYSchema = z.object({
         startDate:                z.string().trim().optional(),
         endDate:                  z.string().trim().optional(),
         volunteerCap:             z.number().int().min(1).max(1000).optional(),
-        regularActivityReportUrl: z.string().trim().url().optional().or(z.literal('')),
-        specialCampReportUrl:     z.string().trim().url().optional().or(z.literal('')),
+        regularActivityReportUrl: z.string().trim().optional().or(z.literal('')),
+        specialCampReportUrl:     z.string().trim().optional().or(z.literal('')),
     }),
 });
 
@@ -61,11 +61,12 @@ export const unlockAYSchema = z.object({
 export const createEventSchema = z.object({
     body: z.object({
         title:       z.string().trim().min(1, 'Title is required').max(255),
-        description: z.string().trim().min(1, 'Description is required'),
+        description: z.string().trim().optional(),
         location:    z.string().trim().min(1, 'Location is required').max(255),
         date:        z.string().min(1, 'Date is required'),
-        reportUrl:   z.string().trim().url().optional().or(z.literal('')).nullable(),
-        driveLink:   z.string().trim().url().optional().or(z.literal('')).nullable(),
+        reportUrl:   z.string().trim().optional().or(z.literal('')).nullable(),
+        driveLink:   z.string().trim().optional().or(z.literal('')).nullable(),
+        approvalStatus: z.enum(['pending', 'approved', 'rejected']).optional(),
     }),
 });
 
@@ -75,8 +76,9 @@ export const updateEventSchema = z.object({
         description: z.string().trim().optional(),
         location:    z.string().trim().min(1).max(255).optional(),
         date:        z.string().optional(),
-        reportUrl:   z.string().trim().url().optional().or(z.literal('')).nullable(),
-        driveLink:   z.string().trim().url().optional().or(z.literal('')).nullable(),
+        reportUrl:   z.string().trim().optional().or(z.literal('')).nullable(),
+        driveLink:   z.string().trim().optional().or(z.literal('')).nullable(),
+        approvalStatus: z.enum(['pending', 'approved', 'rejected']).optional(),
     }),
 });
 
@@ -250,7 +252,7 @@ export const assignRoleSchema = z.object({
         coreTeamRoleId:  z.number().int(),
         volunteerId:     z.number().int().positive().optional(),
         displayName:     z.string().trim().max(255).optional(),
-        displayPhotoUrl: z.string().trim().url().optional().or(z.literal('')).nullable(),
+        displayPhotoUrl: z.string().trim().optional().or(z.literal('')).nullable(),
         department:      z.string().trim().max(100).optional(),
         customRoleName:  z.string().trim().max(100).optional(),
         customCategory:  z.string().trim().max(100).optional(),
@@ -261,7 +263,7 @@ export const assignRoleSchema = z.object({
 export const updateAssignmentSchema = z.object({
     body: z.object({
         displayName:     z.string().trim().max(255).optional(),
-        displayPhotoUrl: z.string().trim().url().optional().or(z.literal('')).nullable(),
+        displayPhotoUrl: z.string().trim().optional().or(z.literal('')).nullable(),
         displayOrder:    z.number().int().min(0).optional(),
         volunteerId:     z.number().int().positive().optional(),
     }),

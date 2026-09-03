@@ -6,9 +6,11 @@ import path from 'path';
 import http from 'http';
 import authRoutes from './routes/authRoutes';
 import eventRoutes from './routes/eventRoutes';
+import sliderRoutes from './routes/sliderRoutes';
 import galleryRoutes from './routes/galleryRoutes';
 import membersRoutes from './routes/membersRoutes';
 import settingsRoutes from './routes/settingsRoutes';
+import approvalsRoutes from './routes/approvalsRoutes';
 import uploadRoutes from './routes/uploadRoutes';
 import eventImagesRoutes from './routes/eventImagesRoutes';
 import registrationRoutes from './routes/registrationRoutes';
@@ -30,6 +32,10 @@ import notificationRoutes from './routes/notificationRoutes';
 import coreTeamDashboardRoutes from './routes/coreTeamDashboardRoutes';
 import hodRoutes from './routes/hodRoutes';
 import emailRoutes from './routes/emailRoutes';
+import innovativeIdeaRoutes from './routes/innovativeIdeaRoutes';
+import adminInnovativeIdeaRoutes from './routes/adminInnovativeIdeaRoutes';
+import achievementRoutes from './routes/achievementRoutes';
+import adminAchievementRoutes from './routes/adminAchievementRoutes';
 import { apiRateLimiter } from './middleware/rateLimiter';
 
 dotenv.config();
@@ -104,9 +110,11 @@ app.use('/api/auth',          authRoutes);
 app.use('/api/admins',        adminRoutes);
 app.use('/api/audit-logs',    auditRoutes);
 app.use('/api/events',        eventRoutes);
+app.use('/api/slider',        sliderRoutes);
 app.use('/api/gallery',       galleryRoutes);
 app.use('/api/members',       membersRoutes);
 app.use('/api/settings',      settingsRoutes);
+app.use('/api/approvals',     approvalsRoutes);
 app.use('/api/upload',        uploadRoutes);
 app.use('/api/event-images',  eventImagesRoutes);
 
@@ -122,6 +130,10 @@ app.use('/api',               meetingRoutes);       // handles both /academic-ye
 app.use('/api',               notificationRoutes);  // handles /volunteers/me/notifications
 app.use('/api/hod-contacts',  hodRoutes);           // HOD contact management
 app.use('/api/email',         emailRoutes);          // email logs, stats, send-report
+app.use('/api/innovative-ideas', innovativeIdeaRoutes);
+app.use('/api/admin/innovative-ideas', adminInnovativeIdeaRoutes);
+app.use('/api/achievements', achievementRoutes);
+app.use('/api/admin/achievements', adminAchievementRoutes);
 
 // Error handling middleware
 app.use(errorHandler);

@@ -1,17 +1,16 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
-import type { AcademicYear, EventData } from '../../services/api';
+import { useAcademicYears } from '../../hooks/useAcademicYears';
+import { useEvents } from '../../hooks/useEvents';
+import { useAYSelector } from './Shared';
 
-export const ActivityCalendarTab = ({ events, years, currentAY }: { events: EventData[]; years: AcademicYear[]; currentAY: AcademicYear | null }) => {
+import { formatDate } from '@/utils/dateFormatter';
+export const ActivityCalendarTab = () => {
     const navigate = useNavigate();
-    const [selectedAyId, setSelectedAyId] = useState<number>(currentAY?.id ?? (years[0]?.id || 0));
-
-    useEffect(() => {
-        if (!selectedAyId && years.length > 0) {
-            setSelectedAyId(currentAY?.id ?? years[0].id);
-        }
-    }, [currentAY, years, selectedAyId]);
+    const { data: years = [] } = useAcademicYears();
+    const { data: events = [], isLoading } = useEvents();
+    const { selectedAyId, setSelectedAyId } = useAYSelector(years, null);
 
     const calendarEvents = useMemo(() => {
         return events
@@ -26,7 +25,7 @@ export const ActivityCalendarTab = ({ events, years, currentAY }: { events: Even
             const month = d.toLocaleString('en-US', { month: 'long' });
             // Prefixing with a single quote neutralizes CSV injection risks for spreadsheet apps
             const safeTitle = (forCsv && /^[=+\-@]/.test(e.title)) ? `'${e.title}` : e.title;
-            return [month, d.toLocaleDateString(), safeTitle, e.type];
+            return [month, formatDate(d), safeTitle, e.type];
         });
         return [headers, ...rows];
     };
@@ -45,12 +44,16 @@ export const ActivityCalendarTab = ({ events, years, currentAY }: { events: Even
         XLSX.writeFile(workbook, `activity_calendar_ay_${selectedAyId}.xlsx`);
     };
 
+    if (isLoading) {
+        return <div className="flex justify-center items-center h-64 text-gray-500 font-medium animate-pulse">Loading calendar...</div>;
+    }
+
     return (
         <div>
             <div className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-bold text-gray-800">Activity Calendar</h2>
                 <div className="flex items-center gap-3">
-                    <select value={selectedAyId} onChange={e => setSelectedAyId(Number(e.target.value))} className="border rounded-lg px-3 py-2 text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500">
+                    <select value={selectedAyId || ''} onChange={e => setSelectedAyId(Number(e.target.value))} className="border rounded-lg px-3 py-2 text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500">
                         {years.map(y => <option key={y.id} value={y.id}>{y.label} {y.isCurrent ? '(Active)' : y.isLocked ? '[Locked]' : ''}</option>)}
                     </select>
                     <div className="flex gap-2">
@@ -84,7 +87,7 @@ export const ActivityCalendarTab = ({ events, years, currentAY }: { events: Even
                             return (
                                 <tr key={e.id} onClick={() => navigate(`/events/${e.id}`)} className="hover:bg-gray-50 cursor-pointer transition-colors">
                                     <td className="px-4 py-3">{month}</td>
-                                    <td className="px-4 py-3">{d.toLocaleDateString()}</td>
+                                    <td className="px-4 py-3">{formatDate(d)}</td>
                                     <td className="px-4 py-3 font-medium text-gray-800">{e.title}</td>
                                     <td className="px-4 py-3">
                                         <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-700 capitalize">{e.type}</span>
