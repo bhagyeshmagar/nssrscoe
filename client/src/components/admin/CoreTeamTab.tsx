@@ -189,7 +189,8 @@ export const CoreTeamTab = (_props: { isSuperadmin: boolean }) => {
                                     <input value={form.displayName} onChange={e => setForm({ ...form, displayName: e.target.value })} placeholder="Prof. Dr. Name" className="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" /></div>
                                 <div className="col-span-2"><label className="block text-sm text-gray-600 mb-1">Priority / Order</label>
                                     <input type="number" value={form.displayOrder} onChange={e => setForm({ ...form, displayOrder: parseInt(e.target.value) || 0 })} placeholder="0" className="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" title="Lower number appears first" /></div>
-                                <div className="col-span-2"><label className="block text-sm text-gray-600 mb-1">Profile Photo</label>
+                                <div className="col-span-2">
+                                    <label className="block text-sm text-gray-600 mb-1">Profile Photo</label>
                                     <input type="file" accept="image/*" onChange={e => {
                                         const file = e.target.files?.[0];
                                         if (file) {
@@ -201,7 +202,15 @@ export const CoreTeamTab = (_props: { isSuperadmin: boolean }) => {
                                             reader.readAsDataURL(file);
                                             e.target.value = '';
                                         }
-                                    }} className="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" /></div>
+                                    }} className="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 mb-2" />
+                                    {selectedFile && (
+                                        <div className="flex items-center gap-3 bg-green-50 p-2 rounded border border-green-200">
+                                            <img src={URL.createObjectURL(selectedFile)} alt="Preview" className="h-12 w-12 object-cover rounded-full border border-gray-300" />
+                                            <span className="text-sm text-green-700 font-medium">✓ Photo ready for upload</span>
+                                            <button onClick={() => setSelectedFile(null)} className="ml-auto text-xs text-red-600 hover:text-red-800 bg-white px-2 py-1 rounded border">Remove</button>
+                                        </div>
+                                    )}
+                                </div>
                             </>
                         )}
                         {selectedRole && selectedRole.roleType !== 'institution' && (

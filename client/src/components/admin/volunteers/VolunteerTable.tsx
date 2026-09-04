@@ -5,6 +5,7 @@ interface Props {
     actionId: number | null;
     setViewProfileId: (id: number | null) => void;
     handleStatusChange: (id: number, s: 'regular' | 'backup') => void;
+    handleToggleActive: (id: number) => void;
     handleDelete: (id: number) => void;
     selectedAY: AcademicYear | null;
     
@@ -17,7 +18,7 @@ interface Props {
 }
 
 export const VolunteerTable = ({
-    vols, actionId, setViewProfileId, handleStatusChange, handleDelete, selectedAY,
+    vols, actionId, setViewProfileId, handleStatusChange, handleToggleActive, handleDelete, selectedAY,
     page, setPage, totalPages, isSuperadmin
 }: Props) => {
     return (
@@ -47,7 +48,8 @@ export const VolunteerTable = ({
                                         {selectedAY && !selectedAY.isLocked && (
                                             <>
                                                 <button onClick={() => handleStatusChange(v.id, v.status === 'regular' ? 'backup' : 'regular')} disabled={actionId === v.id} className="text-xs px-2 py-1 rounded bg-yellow-100 text-yellow-700 hover:bg-yellow-200 disabled:opacity-50">→ {v.status === 'regular' ? 'Backup' : 'Regular'}</button>
-                                                {isSuperadmin && <button onClick={() => handleDelete(v.id)} disabled={actionId === v.id} className="text-xs px-2 py-1 rounded bg-red-100 text-red-700 hover:bg-red-200 disabled:opacity-50">Del</button>}
+                                                <button onClick={() => handleToggleActive(v.id)} disabled={actionId === v.id} className="text-xs px-2 py-1 rounded bg-purple-100 text-purple-700 hover:bg-purple-200 disabled:opacity-50">{v.isActive ? 'Deactivate' : 'Activate'}</button>
+                                                <button onClick={() => handleDelete(v.id)} disabled={actionId === v.id} className="text-xs px-2 py-1 rounded bg-red-100 text-red-700 hover:bg-red-200 disabled:opacity-50">Del</button>
                                             </>
                                         )}
                                     </div>

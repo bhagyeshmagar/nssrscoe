@@ -17,7 +17,8 @@ import {
     useVolunteersByAY, 
     useCreateVolunteer, 
     useDeleteVolunteer, 
-    useChangeVolunteerStatus 
+    useChangeVolunteerStatus,
+    useToggleVolunteerActive
 } from '../../../hooks/useVolunteers';
 
 export const AYVolunteersTab = ({ isSuperadmin }: { isSuperadmin?: boolean }) => {
@@ -58,6 +59,7 @@ export const AYVolunteersTab = ({ isSuperadmin }: { isSuperadmin?: boolean }) =>
     const createVolunteer = useCreateVolunteer(selectedAyId);
     const deleteVolunteer = useDeleteVolunteer(selectedAyId);
     const changeVolunteerStatus = useChangeVolunteerStatus(selectedAyId);
+    const toggleVolunteerActive = useToggleVolunteerActive(selectedAyId);
 
     useEffect(() => {
         const timeout = setTimeout(() => {
@@ -230,6 +232,16 @@ export const AYVolunteersTab = ({ isSuperadmin }: { isSuperadmin?: boolean }) =>
                 actionId={actionId} 
                 setViewProfileId={setViewProfileId} 
                 handleStatusChange={handleStatusChange} 
+                handleToggleActive={async (id: number) => {
+                    setActionId(id);
+                    try {
+                        await toggleVolunteerActive.mutateAsync(id);
+                    } catch (e: any) { 
+                        console.error('Failed to toggle active state', e);
+                    } finally { 
+                        setActionId(null); 
+                    }
+                }}
                 handleDelete={confirmDelete} 
                 selectedAY={selectedAY} 
                 page={page} 

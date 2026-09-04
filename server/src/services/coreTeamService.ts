@@ -188,19 +188,20 @@ export const assignRole = async (ayId: number, input: AssignRoleInput, adminId: 
             throw new RoleAssignmentError(`Only regular volunteers can be assigned to the core team. "${vol.name}" is a backup volunteer.`);
         }
 
-        // Non-coordinator student roles
-        if (role.isUniquePerAy) {
-            const [existing] = await db
-                .select({ id: coreTeamAssignments.id })
-                .top(1).from(coreTeamAssignments)
-                .where(and(
-                    eq(coreTeamAssignments.academicYearId, ayId),
-                    eq(coreTeamAssignments.coreTeamRoleId, role.id),
-                ))
-                ;
-            if (existing) {
-                throw new ConflictError(`Role "${role.name}" is already assigned in academic year "${ay.label}".`);
-            }
+    }
+
+    // ── Uniqueness check for ALL roles ─────────────────────────────────────────
+    if (role.isUniquePerAy) {
+        const [existing] = await db
+            .select({ id: coreTeamAssignments.id })
+            .top(1).from(coreTeamAssignments)
+            .where(and(
+                eq(coreTeamAssignments.academicYearId, ayId),
+                eq(coreTeamAssignments.coreTeamRoleId, role.id),
+            ))
+            ;
+        if (existing) {
+            throw new ConflictError(`Role "${role.name}" is already assigned in academic year "${ay.label}".`);
         }
     }
 
