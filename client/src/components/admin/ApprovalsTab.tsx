@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { usePendingApprovals, useApproveEvent, useRejectEvent, useApproveSlider, useRejectSlider, useApproveInnovativeIdea, useRejectInnovativeIdea, useApproveGallery, useRejectGallery } from '../../hooks/useApprovals';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -23,7 +24,13 @@ export const ApprovalsTab = () => {
     const approveGallery = useApproveGallery();
     const rejectGallery = useRejectGallery();
 
-    const [activeTab, setActiveTab] = useState<'events' | 'sliders' | 'innovativeIdeas' | 'gallery'>('events');
+    const [searchParams] = useSearchParams();
+    const initialTab = (() => {
+        const t = searchParams.get('tab');
+        if (t === 'events' || t === 'sliders' || t === 'innovativeIdeas' || t === 'gallery') return t;
+        return 'events';
+    })();
+    const [activeTab, setActiveTab] = useState<'events' | 'sliders' | 'innovativeIdeas' | 'gallery'>(initialTab);
     const tabRefs = useRef<{ [key: string]: HTMLButtonElement | null }>({});
 
     const TABS = ['events', 'sliders', 'innovativeIdeas', 'gallery'] as const;
@@ -66,8 +73,6 @@ export const ApprovalsTab = () => {
     const handleRejectEvent = (id: number) => runMutation(rejectEvent, id, { successMsg: 'Event rejected', confirmMsg: 'Are you sure you want to reject this event?' });
     const handleApproveSlider = (id: number) => runMutation(approveSlider, id, { successMsg: 'Slider image approved' });
     const handleRejectSlider = (id: number) => runMutation(rejectSlider, id, { successMsg: 'Slider image rejected', confirmMsg: 'Are you sure you want to reject this slider image?' });
-    const handleApproveInnovativeIdea = (id: number) => runMutation(approveInnovativeIdea, id, { successMsg: 'Innovative idea approved' });
-    const handleRejectInnovativeIdea = (id: number) => runMutation(rejectInnovativeIdea, id, { successMsg: 'Innovative idea rejected', confirmMsg: 'Are you sure you want to reject this idea?' });
     const handleApproveGallery = (id: number) => runMutation(approveGallery, id, { successMsg: 'Gallery item approved' });
     const handleRejectGallery = (id: number) => runMutation(rejectGallery, id, { successMsg: 'Gallery item rejected', confirmMsg: 'Are you sure you want to reject this gallery item?' });
 
@@ -214,31 +219,67 @@ export const ApprovalsTab = () => {
                     {innovativeIdeas.length === 0 ? (
                         <div className="text-center py-12 text-muted-foreground bg-gray-50 rounded-lg border border-dashed">No pending innovative ideas.</div>
                     ) : (
-                        innovativeIdeas.map((idea: InnovativeIdea) => (
-                            <Card key={idea.id} className="overflow-hidden shadow-sm">
-                                <div className="flex flex-col sm:flex-row justify-between p-6 gap-4">
-                                    <div className="space-y-2 flex-1">
-                                        <div className="flex items-center gap-2">
-                                            <h3 className="text-xl font-semibold text-gray-900">{idea.title}</h3>
-                                            <Badge variant="outline" className="capitalize">{idea.category}</Badge>
+                        innovativeIdeas.map((idea: InnovativeIdea) => {
+                            const isDeletion = idea.deleteRequested;
+                            const isUpdate = !isDeletion && !!idea.pendingUpdateData;
+                            const approveLabel = isDeletion ? 'Approve Deletion' : isUpdate ? 'Approve Update' : 'Approve';
+                            const rejectLabel = isDeletion ? 'Reject Deletion' : isUpdate ? 'Reject Update' : 'Reject';
+                            const rejectConfirm = isDeletion
+                                ? 'Are you sure you want to reject this deletion request?'
+                                : isUpdate
+                                ? 'Are you sure you want to reject this update request?'
+                                : 'Are you sure you want to reject this idea?';
+                            return (
+                                <Card key={idea.id} className="overflow-hidden shadow-sm">
+                                    <div className="flex flex-col sm:flex-row justify-between p-6 gap-4">
+                                        <div className="space-y-2 flex-1">
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <h3 className="text-xl font-semibold text-gray-900">{idea.title}</h3>
+                                                <Badge variant="outline" className="capitalize">{idea.category}</Badge>
+                                                {isDeletion && (
+                                                    <Badge className="bg-red-100 text-red-700 border-red-200">Deletion Request</Badge>
+                                                )}
+                                                {isUpdate && (
+                                                    <Badge className="bg-blue-100 text-blue-700 border-blue-200">Update Request</Badge>
+                                                )}
+                                                {!isDeletion && !isUpdate && (
+                                                    <Badge className="bg-amber-100 text-amber-700 border-amber-200">New Idea</Badge>
+                                                )}
+                                            </div>
+                                            <p className="text-sm text-gray-500 line-clamp-2">{idea.description}</p>
+                                            <div className="flex gap-4 text-sm text-gray-600">
+                                                <span><strong>Date:</strong> {formatDate(idea.createdAt)}</span>
+                                                <span><strong>Volunteer:</strong> {idea.volunteerName}</span>
+                                            </div>
                                         </div>
-                                        <p className="text-sm text-gray-500 line-clamp-2">{idea.description}</p>
-                                        <div className="flex gap-4 text-sm text-gray-600">
-                                            <span><strong>Date:</strong> {formatDate(idea.createdAt)}</span>
-                                            <span><strong>Volunteer Name:</strong> {idea.volunteerName}</span>
+                                        <div className="flex sm:flex-col justify-end gap-2 shrink-0">
+                                            <Button
+                                                variant="default"
+                                                className={`gap-2 text-white ${isDeletion ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'}`}
+                                                onClick={() => runMutation(approveInnovativeIdea, idea.id, {
+                                                    successMsg: isDeletion ? 'Deletion approved' : isUpdate ? 'Update approved' : 'Idea approved',
+                                                    confirmMsg: isDeletion ? 'Are you sure you want to permanently delete this idea?' : undefined
+                                                })}
+                                                disabled={approveInnovativeIdea.isPending || rejectInnovativeIdea.isPending}
+                                            >
+                                                <Check className="w-4 h-4" /> {approveLabel}
+                                            </Button>
+                                            <Button
+                                                variant="outline"
+                                                className="text-red-600 hover:bg-red-50 hover:text-red-700 gap-2"
+                                                onClick={() => runMutation(rejectInnovativeIdea, idea.id, {
+                                                    successMsg: isDeletion ? 'Deletion rejected' : isUpdate ? 'Update rejected' : 'Idea rejected',
+                                                    confirmMsg: rejectConfirm
+                                                })}
+                                                disabled={approveInnovativeIdea.isPending || rejectInnovativeIdea.isPending}
+                                            >
+                                                <X className="w-4 h-4" /> {rejectLabel}
+                                            </Button>
                                         </div>
                                     </div>
-                                    <div className="flex sm:flex-col justify-end gap-2 shrink-0">
-                                        <Button variant="default" className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2" onClick={() => handleApproveInnovativeIdea(idea.id)} disabled={approveInnovativeIdea.isPending || rejectInnovativeIdea.isPending}>
-                                            <Check className="w-4 h-4" /> Approve
-                                        </Button>
-                                        <Button variant="outline" className="text-red-600 hover:bg-red-50 hover:text-red-700 gap-2" onClick={() => handleRejectInnovativeIdea(idea.id)} disabled={approveInnovativeIdea.isPending || rejectInnovativeIdea.isPending}>
-                                            <X className="w-4 h-4" /> Reject
-                                        </Button>
-                                    </div>
-                                </div>
-                            </Card>
-                        ))
+                                </Card>
+                            );
+                        })
                     )}
                 </div>
             )}

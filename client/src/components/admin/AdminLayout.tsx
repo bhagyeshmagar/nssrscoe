@@ -110,9 +110,14 @@ export const AdminLayout = () => {
                                             <span className="inline-flex items-center justify-center w-5 h-5 rounded text-[10px] font-bold bg-gray-200 text-gray-600 flex-shrink-0">{tab.icon}</span>
                                             {tab.label}
                                         </div>
-                                        {tab.id === 'approvals' && pendingData && pendingData.totalPending > 0 && (
+                                        {tab.id === 'approvals' && pendingData && (pendingData.totalPending - (pendingData.eventRegistrations?.length || 0)) > 0 && (
                                             <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full min-w-[20px] text-center">
-                                                {pendingData.totalPending}
+                                                {pendingData.totalPending - (pendingData.eventRegistrations?.length || 0)}
+                                            </span>
+                                        )}
+                                        {tab.id === 'registrations' && pendingData && (pendingData.eventRegistrations?.length || 0) > 0 && (
+                                            <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full min-w-[20px] text-center">
+                                                {pendingData.eventRegistrations?.length}
                                             </span>
                                         )}
                                     </NavLink>

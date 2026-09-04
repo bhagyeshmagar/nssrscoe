@@ -61,24 +61,33 @@ export const OverviewTab = () => {
 
             {isSuperadmin && pending.totalPending > 0 && (
                 <div className="bg-amber-50 border-l-4 border-amber-500 p-4 rounded-md shadow-sm flex justify-between items-center animate-in fade-in slide-in-from-top-4">
-                    <div className="flex items-center">
-                        <AlertCircle className="h-6 w-6 text-amber-500 mr-3" />
+                    <div className="flex items-start">
+                        <AlertCircle className="h-6 w-6 text-amber-500 mr-3 mt-0.5" />
                         <div>
                             <h3 className="text-amber-800 font-semibold">Pending Approvals Required</h3>
                             <p className="text-amber-700 text-sm">
-                                You have {pending.totalPending} items waiting for your approval
-                                {pending.totalPending > 0 && ' ('}
-                                {[
-                                    pending.events?.length ? `${pending.events.length} Events` : null,
-                                    pending.sliderImages?.length ? `${pending.sliderImages.length} Slider Images` : null,
-                                    pending.innovativeIdeas?.length ? `${pending.innovativeIdeas.length} Innovative Ideas` : null,
-                                    pending.gallery?.length ? `${pending.gallery.length} Gallery Items` : null
-                                ].filter(Boolean).join(', ')}
-                                {pending.totalPending > 0 && ')'}
+                                You have {pending.totalPending} items waiting for your approval:
                             </p>
+                            <div className="flex flex-wrap gap-2 mt-2">
+                                {pending.events?.length > 0 && <span className="bg-amber-200/60 text-amber-800 text-xs px-2.5 py-1 rounded-full font-medium">{pending.events.length} Events</span>}
+                                {pending.sliderImages?.length > 0 && <span className="bg-amber-200/60 text-amber-800 text-xs px-2.5 py-1 rounded-full font-medium">{pending.sliderImages.length} Slider Images</span>}
+                                {pending.innovativeIdeas?.length > 0 && <span className="bg-amber-200/60 text-amber-800 text-xs px-2.5 py-1 rounded-full font-medium">{pending.innovativeIdeas.length} Innovative Ideas</span>}
+                                {pending.gallery?.length > 0 && <span className="bg-amber-200/60 text-amber-800 text-xs px-2.5 py-1 rounded-full font-medium">{pending.gallery.length} Gallery Items</span>}
+                                {(pending.eventRegistrations?.length || 0) > 0 && <span className="bg-amber-200/60 text-amber-800 text-xs px-2.5 py-1 rounded-full font-medium">{pending.eventRegistrations?.length} Event Registrations</span>}
+                            </div>
                         </div>
                     </div>
-                    <Link to="/admin/approvals" className="flex items-center text-amber-800 font-medium hover:text-amber-900 bg-amber-100/50 px-4 py-2 rounded transition-colors">
+                    <Link
+                        to={
+                            pending.events?.length ? '/admin/approvals?tab=events'
+                            : pending.sliderImages?.length ? '/admin/approvals?tab=sliders'
+                            : pending.innovativeIdeas?.length ? '/admin/approvals?tab=innovativeIdeas'
+                            : pending.gallery?.length ? '/admin/approvals?tab=gallery'
+                            : pending.eventRegistrations?.length ? `/admin/registrations?eventId=${pending.eventRegistrations[0]?.eventId}`
+                            : '/admin/approvals?tab=events'
+                        }
+                        className="flex items-center text-amber-800 font-medium hover:text-amber-900 bg-amber-200/60 hover:bg-amber-300/60 px-4 py-2 rounded-lg transition-colors ml-4 self-center whitespace-nowrap"
+                    >
                         Review Now <ChevronRight className="h-4 w-4 ml-1" />
                     </Link>
                 </div>

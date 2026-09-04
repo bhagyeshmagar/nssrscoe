@@ -77,6 +77,7 @@ export const useRequestDeleteIdea = () => {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['volunteerInnovativeIdeas'] });
+            queryClient.invalidateQueries({ queryKey: ['pendingApprovals'] });
         }
     });
 };
@@ -90,6 +91,7 @@ export const useAdminDeleteIdea = () => {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['adminInnovativeIdeas'] });
+            queryClient.invalidateQueries({ queryKey: ['pendingApprovals'] });
         }
     });
 };
@@ -103,6 +105,7 @@ export const useApproveIdea = () => {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['adminInnovativeIdeas'] });
+            queryClient.invalidateQueries({ queryKey: ['pendingApprovals'] });
         }
     });
 };
@@ -116,6 +119,7 @@ export const useRejectIdea = () => {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['adminInnovativeIdeas'] });
+            queryClient.invalidateQueries({ queryKey: ['pendingApprovals'] });
         }
     });
 };

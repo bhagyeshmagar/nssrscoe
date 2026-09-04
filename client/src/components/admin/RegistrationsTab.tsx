@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { CheckCircle, XCircle, Clock, Mail, Download } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useRegistrationsByEvent, useApproveRegistration, useRejectRegistration, useToggleAttendance } from '../../hooks/useRegistrations';
 import { useEvents } from '../../hooks/useEvents';
+import { useSearchParams } from 'react-router-dom';
+import { usePendingApprovals } from '../../hooks/useApprovals';
 
 import { formatDate } from '@/utils/dateFormatter';
 type FilterStatus = 'all' | 'pending' | 'approved' | 'rejected';
@@ -26,10 +28,20 @@ const StatusBadge = ({ status }: { status: string }) => {
 };
 
 export const RegistrationsTab = () => {
+    const [searchParams] = useSearchParams();
+    const eventIdParam = searchParams.get('eventId');
+    
     const { data: events = [] } = useEvents();
-    const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
+    const { data: pendingData } = usePendingApprovals();
+    
+    const [selectedEventId, setSelectedEventId] = useState<number | null>(eventIdParam ? Number(eventIdParam) : null);
     const [actionLoading, setActionLoading] = useState<number | null>(null);
     const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
+    useEffect(() => {
+        if (eventIdParam) {
+            setSelectedEventId(Number(eventIdParam));
+        }
+    }, [eventIdParam]);
 
     const { data: registrations = [], isLoading: loading } = useRegistrationsByEvent(
         selectedEventId ? Number(selectedEventId) : null
@@ -129,11 +141,15 @@ export const RegistrationsTab = () => {
                     className="w-full md:w-1/2 border rounded px-3 py-2"
                 >
                     <option value="">-- Select an Event --</option>
-                    {events.map(e => (
-                        <option key={e.id} value={e.id}>
-                            {e.title} ({formatDate(e.date)}) – {e.type}
-                        </option>
-                    ))}
+                    {events.map(e => {
+                        const pendingCount = pendingData?.eventRegistrations?.filter((r: any) => r.eventId === e.id).length || 0;
+                        const pendingIndicator = pendingCount > 0 ? ` (🔴 ${pendingCount} Pending)` : '';
+                        return (
+                            <option key={e.id} value={e.id}>
+                                {e.title} ({formatDate(e.date)}) – {e.type}{pendingIndicator}
+                            </option>
+                        );
+                    })}
                 </select>
             </div>
 

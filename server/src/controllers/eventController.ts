@@ -60,8 +60,8 @@ export const createEvent = async (req: Request, res: Response) => {
     try {
         const { title, description, location, reportUrl, driveLink, date } = req.body;
 
-        if (!title || !description || !location || !date) {
-            throw new ValidationError('title, description, location, and date are required.');
+        if (!title || !location || !date) {
+            throw new ValidationError('title, location, and date are required.');
         }
 
         const [currentAY] = await db

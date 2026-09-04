@@ -10,6 +10,7 @@ export interface PendingApprovals {
     sliderImages: SliderImageData[];
     innovativeIdeas: InnovativeIdea[];
     gallery: GalleryItem[];
+    eventRegistrations?: any[];
     totalPending: number;
 }
 

@@ -15,9 +15,9 @@ export const dbConfig = {
     },
     pool: {
         min:                2,
-        max:                10,
+        max:                50,
         idleTimeoutMillis:  30_000,
-        acquireTimeoutMillis: 15_000,
+        acquireTimeoutMillis: 30_000,
     },
 };
 
