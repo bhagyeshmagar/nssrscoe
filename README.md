@@ -4,6 +4,11 @@
 
 A full-stack, production-grade web application for the **National Service Scheme (NSS)** club at JSPM Rajarshi Shahu College of Engineering (RSCOE). It operates as both a public-facing informational portal and a comprehensive administrative platform for managing volunteers, events, core teams, attendance, and academic year lifecycles.
 
+> [!IMPORTANT]
+> **Extensive Documentation Available:**
+> - 📖 **[Developer Handbook](HANDBOOK.md)**: Detailed breakdown of the architecture, security posture, database schema, and workflows.
+> - ☁️ **[Azure Deployment Guide](AZURE_DEPLOYMENT_GUIDE.md)**: Complete step-by-step instructions for deploying to Microsoft Azure (App Service, Static Web Apps, and Container Apps) with automated CI/CD.
+
 ---
 
 ## 📑 Table of Contents
@@ -148,6 +153,9 @@ The database is built on **MS SQL Server** and managed by **Drizzle ORM**. Since
 | `notifications` | Per-volunteer in-app notifications. |
 | `meetings` | Core team meeting logs with attendance tracking. |
 | `members` | Public-facing "About" page member records. |
+| `innovative_ideas` | Stores ideas submitted by volunteers. |
+| `achievements` | NSS unit achievements for public display. |
+| `hod_contacts` | Department Head of Department (HOD) contact details. |
 
 ### Academic Year State Machine
 
@@ -214,6 +222,14 @@ The backend exposes **19 route modules** all mounted under `/api`. The pattern i
 | `/api/special-camps/:campId` | Camp CRUD, participants, finalize |
 | `/api/academic-years/:ayId/meetings` | Core team meeting logs |
 | `/api/upload` | File upload via Multer |
+| `/api/innovative-ideas` | Submission and retrieval of volunteer ideas |
+| `/api/achievements` | Management of public NSS achievements |
+| `/api/activity-calendar` | Planned activities timeline |
+| `/api/core-team-dashboard` | Specialized data aggregation for the core team |
+| `/api/hod-contacts` | HOD contact list |
+| `/api/email` | Email logs and sending reports |
+| `/api/notifications` | In-app notifications for volunteers |
+| `/api/meetings` | Core team meeting management |
 
 ---
 
@@ -423,6 +439,10 @@ npm run test:e2e    # Playwright end-to-end tests
 ---
 
 ## 🚀 Production Deployment
+
+> [!TIP]
+> **Deploying to Microsoft Azure?**
+> We have a comprehensive, step-by-step guide specifically for Azure. Please refer to the **[Azure Deployment Guide](AZURE_DEPLOYMENT_GUIDE.md)** which covers Azure App Service, Static Web Apps, Container Apps, and CI/CD via GitHub Actions.
 
 ### 1. Database — Recommended Options
 

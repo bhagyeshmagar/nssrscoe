@@ -97,7 +97,7 @@ const Videos = () => {
                             className="bg-gray-900 rounded-xl overflow-hidden shadow-lg hover:shadow-2xl transition-shadow cursor-pointer group flex flex-col"
                             onClick={() => setSelectedVideo(video)}
                         >
-                            <div className="relative aspect-video">
+                            <div className="relative h-64 w-full bg-black">
                                 <video
                                     src={uploadAPI.getFullUrl(video.url)}
                                     className="w-full h-full object-cover"

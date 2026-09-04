@@ -149,6 +149,15 @@ app.use('/api/admin/innovative-ideas', adminInnovativeIdeaRoutes);
 app.use('/api/achievements', achievementRoutes);
 app.use('/api/admin/achievements', adminAchievementRoutes);
 
+// Serve Frontend in Production (For Docker / Option B)
+if (process.env.NODE_ENV === 'production') {
+    const clientBuildPath = path.join(__dirname, '../../client/dist');
+    app.use(express.static(clientBuildPath));
+    app.get('*', (req, res) => {
+        res.sendFile(path.join(clientBuildPath, 'index.html'));
+    });
+}
+
 // Error handling middleware
 app.use(errorHandler);
 
