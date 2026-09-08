@@ -101,7 +101,22 @@ const requireUnlockedAY = async (ayId: number) => {
 };
 
 const findVolunteer = async (id: number) => {
-    const [v] = await db.select().top(1).from(volunteers).where(eq(volunteers.id, id));
+    // Explicit projection — never fetch passwordHash so it cannot
+    // accidentally be spread into a controller response.
+    const [v] = await db
+        .select({
+            id: volunteers.id,
+            academicYearId: volunteers.academicYearId,
+            name: volunteers.name,
+            email: volunteers.email,
+            isActive: volunteers.isActive,
+            department: volunteers.department,
+            status: volunteers.status,
+            createdById: volunteers.createdById,
+            createdAt: volunteers.createdAt,
+            updatedAt: volunteers.updatedAt,
+        })
+        .top(1).from(volunteers).where(eq(volunteers.id, id));
     if (!v) throw new NotFoundError(`Volunteer ${id} not found.`);
     return v;
 };
@@ -201,7 +216,19 @@ export const listVolunteersForAY = async (ayId: number, filters: ListVolunteerFi
 export const getVolunteerById = async (id: number) => {
     const [row] = await db
         .select({
-            volunteers: volunteers,
+            // Explicit projection — passwordHash is intentionally omitted.
+            // Never use `volunteers: volunteers` (wildcard) here because the
+            // spread on the return line would send the hash to every API consumer.
+            id: volunteers.id,
+            academicYearId: volunteers.academicYearId,
+            name: volunteers.name,
+            email: volunteers.email,
+            isActive: volunteers.isActive,
+            department: volunteers.department,
+            status: volunteers.status,
+            createdById: volunteers.createdById,
+            createdAt: volunteers.createdAt,
+            updatedAt: volunteers.updatedAt,
             profile: volunteerProfiles,
             eventsAttendedCount: sql<number>`(
                 SELECT count(*)
@@ -220,7 +247,8 @@ export const getVolunteerById = async (id: number) => {
         .where(eq(volunteers.id, id))
         ;
     if (!row) throw new NotFoundError(`Volunteer ${id} not found.`);
-    return { ...row.volunteers, profile: row.profile, eventsAttendedCount: row.eventsAttendedCount, isCoreTeam: row.isCoreTeam };
+    // profile is already at the top level — no spread needed, no passwordHash possible
+    return row;
 };
 
 export const getMyAttendance = async (volunteerId: number) => {
@@ -653,13 +681,19 @@ export const importVolunteersFromAY = async (input: ImportVolunteerInput, adminI
 // ── Password ──────────────────────────────────────────────────────────────────
 
 export const changePassword = async (volunteerId: number, currentPassword: string, newPassword: string) => {
-    const [vol] = await db.select().top(1).from(volunteers).where(eq(volunteers.id, volunteerId));
+    // Guard against bcrypt DoS: bcrypt silently truncates at 72 chars, so a
+    // 10,000-char input would block the event loop for several seconds.
+    if (newPassword.length < 8)   throw new ValidationError('New password must be at least 8 characters.');
+    if (newPassword.length > 128)  throw new ValidationError('New password must be no longer than 128 characters.');
+
+    // Fetch only the columns needed for verification — never expose passwordHash in a return value
+    const [vol] = await db
+        .select({ id: volunteers.id, passwordHash: volunteers.passwordHash })
+        .top(1).from(volunteers).where(eq(volunteers.id, volunteerId));
     if (!vol) throw new NotFoundError('Volunteer not found.');
 
     const valid = await bcrypt.compare(currentPassword, vol.passwordHash);
     if (!valid) throw new ValidationError('Current password is incorrect.');
-
-    if (newPassword.length < 8) throw new ValidationError('New password must be at least 8 characters.');
 
     const hash = await bcrypt.hash(newPassword, 10);
     await db.update(volunteers).set({ passwordHash: hash, updatedAt: new Date() }).where(eq(volunteers.id, volunteerId));
