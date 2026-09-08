@@ -62,11 +62,14 @@ A full-stack, production-grade web application for the **National Service Scheme
 | Real-time | Socket.io |
 | Background Jobs | node-cron |
 | Security | Helmet + express-rate-limit |
+| Scaling & Caching | Redis (`ioredis` + `rate-limit-redis`) |
 | Testing | Vitest + Supertest |
 
 ---
 
 ## 🏗️ Architecture Overview
+
+*(Optimized for 10,000+ Concurrent Users)*
 
 ```mermaid
 graph TD
@@ -82,7 +85,7 @@ graph TD
         ReactRouter --> AxiosClient
     end
 
-    subgraph Server ["Express Backend (port 5000)"]
+    subgraph Server ["Express Backend (Horizontal Scaling Ready)"]
         Middleware["Helmet · CORS · Rate Limiter · JWT Guard"]
         Routes["19 Route Modules"]
         Controllers["Controllers (Request/Response)"]
@@ -102,13 +105,19 @@ graph TD
         CronJobs --> Services
     end
 
-    subgraph Database ["MS SQL Server (port 1433)"]
-        MSSQL[(nss_db)]
-        DrizzleORM -- "TDS Protocol" --> MSSQL
+    subgraph Shared State ["Redis Cache (port 6379)"]
+        Redis[(Azure Cache for Redis)]
+        Middleware -. "Rate Limits" .-> Redis
+        SocketServer -. "Pub/Sub Adapter" .-> Redis
     end
 
-    subgraph Storage ["Local Disk / CDN"]
-        Uploads["/uploads directory (Multer)"]
+    subgraph Database ["MS SQL Server (port 1433)"]
+        MSSQL[(nss_db)]
+        DrizzleORM -- "TDS Protocol (Connection Pool)" --> MSSQL
+    end
+
+    subgraph Storage ["Blob Storage / Local Disk"]
+        Uploads["Azure Blob Storage / Local /uploads"]
         Services --> Uploads
     end
 ```
