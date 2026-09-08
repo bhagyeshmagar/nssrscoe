@@ -16,15 +16,16 @@
 7. [API Route Map](#7-api-route-map)
 8. [Feature Development History](#8-feature-development-history)
 9. [Bugs and Fixes](#9-bugs-and-fixes)
-10. [Local Development Setup](#10-local-development-setup)
-11. [Azure Deployment Option A](#11-azure-deployment-option-a-static-web-apps--app-service)
-12. [Azure Deployment Option B Docker](#12-azure-deployment-option-b-container-apps-docker)
-13. [Docker Deployment Local or VPS](#13-docker-deployment-local--vps)
-14. [GitHub Actions CICD](#14-github-actions-cicd)
-15. [Environment Variable Reference](#15-environment-variable-reference)
-16. [npm Scripts Reference](#16-npm-scripts-reference)
-17. [Deployment Troubleshooting](#17-deployment-troubleshooting)
-18. [Developer Workflow Conventions](#18-developer-workflow-conventions)
+10. [Scalability for 10K Concurrent Users](#10-scalability-for-10k-concurrent-users)
+11. [Local Development Setup](#11-local-development-setup)
+12. [Azure Deployment Option A](#12-azure-deployment-option-a-static-web-apps--app-service)
+13. [Azure Deployment Option B Docker](#13-azure-deployment-option-b-container-apps-docker)
+14. [Docker Deployment Local or VPS](#14-docker-deployment-local--vps)
+15. [GitHub Actions CICD](#15-github-actions-cicd)
+16. [Environment Variable Reference](#16-environment-variable-reference)
+17. [npm Scripts Reference](#17-npm-scripts-reference)
+18. [Deployment Troubleshooting](#18-deployment-troubleshooting)
+19. [Developer Workflow Conventions](#19-developer-workflow-conventions)
 
 ---
 
@@ -427,7 +428,24 @@ So `lookupResult.registration.status` was `undefined.status` — crash.
 
 ---
 
-## 10. Local Development Setup
+## 10. Scalability for 10K Concurrent Users
+
+The platform has been audited and optimized to handle 10,000+ concurrent users across 5 architectural phases. All code is present in the repository, but Phase 2 and Phase 3 features are gated behind environment variables so local development remains lightweight.
+
+| Phase | What It Fixes | Infrastructure Required | Environment Variables |
+|---|---|---|---|
+| **Phase 1: Zero-Infra Code Fixes** | - Shrinks global body limit to 50kb (anti-DoS)<br>- Sets `UV_THREADPOOL_SIZE=16` to prevent `bcrypt` from starving async I/O<br>- Wraps multi-step DB inserts in transactions | None (Code only) | `UV_THREADPOOL_SIZE=16` |
+| **Phase 2: Azure Blob Uploads** | Prevents file loss on App Service restarts. Scales across multiple server instances. | Azure Blob Storage | `AZURE_STORAGE_CONNECTION_STRING`<br>`AZURE_STORAGE_CONTAINER` |
+| **Phase 3: Redis Shared State** | - Backs rate limiters with Redis (avoids per-instance limits bypassing protection)<br>- Backs Socket.IO with Redis Adapter (rooms work across instances) | Azure Cache for Redis | `REDIS_URL` |
+| **Phase 4: DB Pool & Query Tuning** | - Caps DB connections via env var (fails fast on timeout)<br>- Uses `uuidv7()` for visitor passes to completely eliminate collision retries<br>- Parallelizes cron job meeting fetching (fixes N+1 loop) | Azure SQL Tier Match | `DB_POOL_MAX` |
+| **Phase 5: Admin Cache Tuning** | Forces critical admin data (volunteer list, pending approvals) to bypass `staleTime` and refetch on window focus to prevent multi-admin data corruption. | None (Code only) | None |
+
+> [!TIP]
+> **To activate true horizontal scaling**, you must provision a Redis instance and an Azure Storage account, then populate the environment variables. If these variables are omitted, the server gracefully falls back to local memory and local disk (suitable for dev and single-instance deployments).
+
+---
+
+## 11. Local Development Setup
 
 ### Prerequisites
 
@@ -516,7 +534,7 @@ cd client && npm run dev    # http://localhost:5173
 
 ---
 
-## 11. Azure Deployment Option A: Static Web Apps + App Service
+## 12. Azure Deployment Option A (Static Web Apps + App Service)
 
 Best for production. Frontend on CDN (fast global), backend as managed Linux app.
 
@@ -594,7 +612,7 @@ ALLOWED_ORIGINS=https://your-app.azurestaticapps.net
 
 ---
 
-## 12. Azure Deployment Option B: Container Apps Docker
+## 13. Azure Deployment Option B (Container Apps / Docker)
 
 Best for full portability. React + Express in one Docker image.
 
@@ -654,7 +672,7 @@ if (process.env.NODE_ENV === 'production') {
 
 ---
 
-## 13. Docker Deployment Local / VPS
+## 14. Docker Deployment (Local / VPS)
 
 ### Root .env File
 
@@ -693,7 +711,7 @@ docker exec -it nss_server npx tsx src/scripts/seedAll.ts
 
 ---
 
-## 14. GitHub Actions CICD
+## 15. GitHub Actions CI/CD
 
 File: `.github/workflows/azure-static-web-apps.yml`
 
@@ -725,7 +743,7 @@ Any push to `main` that changes files in `client/**`. Backend-only pushes do NOT
 
 ---
 
-## 15. Environment Variable Reference
+## 16. Environment Variable Reference
 
 ### Server (server/.env)
 
@@ -751,7 +769,7 @@ Any push to `main` that changes files in `client/**`. Backend-only pushes do NOT
 
 ---
 
-## 16. npm Scripts Reference
+## 17. npm Scripts Reference
 
 ### Server
 
@@ -776,7 +794,7 @@ Any push to `main` that changes files in `client/**`. Backend-only pushes do NOT
 
 ---
 
-## 17. Deployment Troubleshooting
+## 18. Deployment Troubleshooting
 
 | Symptom | Likely Cause | Fix |
 |---|---|---|
@@ -808,7 +826,7 @@ docker logs -f nss_server
 
 ---
 
-## 18. Developer Workflow Conventions
+## 19. Developer Workflow Conventions
 
 ### Adding a New Feature (Full Stack)
 
@@ -858,4 +876,4 @@ await logAudit({
 
 ---
 
-*Last updated: September 2026. Maintained by the NSS RSCOE development team.*
+*Last updated: September 2026. Maintained by Bhagyesh Magar and NSS RSCOE Development Team.*
