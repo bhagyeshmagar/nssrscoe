@@ -50,7 +50,7 @@ export const requireAdmin = async (req: Request, res: Response, next: NextFuncti
     try {
         const [admin] = await db.select().top(1).from(admins).where(eq(admins.id, authReq.user.id));
         if (!admin) {
-            return res.status(403).json({ message: 'Admin account no longer exists' });
+            return res.status(403).json({ success: false, message: 'Admin account no longer exists.' });
         }
         
         // Ensure the role and isSuperadmin on the request object matches the fresh DB state,

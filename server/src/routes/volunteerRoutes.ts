@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import express from 'express';
-import { authenticateToken, requireAdmin } from '../middleware/auth';
+import { authenticateToken, requireAdmin, requireVolunteer } from '../middleware/auth';
 import { requireAYUnlocked } from '../middleware/ayLock';
 import * as volCtrl from '../controllers/volunteerController';
 
@@ -70,14 +70,17 @@ ayVolunteerRouter.patch(
 );
 
 // ── Volunteer self-service (flat routes under /api/volunteers) ─────────────────
-// Mounted at /api/volunteers
+// Mounted at /api/volunteers.
+// requireVolunteer enforces: role === 'volunteer', isActive, AY not locked/archived.
 
-router.get('/me',           authenticateToken, volCtrl.getMyProfile);
-router.get('/me/attendance', authenticateToken, volCtrl.getMyAttendance);
-router.put('/me/profile',   richTextJson, authenticateToken, volCtrl.updateMyProfile);
-router.put('/me/password',  authenticateToken, volCtrl.updateMyPassword);
+router.get('/me',            authenticateToken, requireVolunteer, volCtrl.getMyProfile);
+router.get('/me/attendance', authenticateToken, requireVolunteer, volCtrl.getMyAttendance);
+router.put('/me/profile',    richTextJson, authenticateToken, requireVolunteer, volCtrl.updateMyProfile);
+router.put('/me/password',   authenticateToken, requireVolunteer, volCtrl.updateMyPassword);
 
-router.get('/public',       authenticateToken, volCtrl.getPublicVolunteers);
-router.get('/experiences',  volCtrl.getExperiences);
+// /public is volunteer-facing (used in the core team dashboard to show peers);
+// restrict to volunteers so admins cannot use a volunteer JWT to enumerate profiles.
+router.get('/public',        authenticateToken, requireVolunteer, volCtrl.getPublicVolunteers);
+router.get('/experiences',   volCtrl.getExperiences); // fully public — no auth needed
 
 export default router;
