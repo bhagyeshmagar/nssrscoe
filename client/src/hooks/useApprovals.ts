@@ -23,6 +23,9 @@ export const usePendingApprovals = (options?: { enabled?: boolean }) => {
         },
         retry: false,
         enabled: options?.enabled ?? true,
+        staleTime: 0,             // Always re-fetch on mount — badge must be accurate
+        refetchInterval: 30_000,  // Poll every 30s as backup to invalidateQueries
+        refetchOnWindowFocus: true,
     });
 };
 

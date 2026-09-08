@@ -3,26 +3,61 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { authenticateToken, requireAdmin } from '../middleware/auth';
+import { BlobServiceClient } from '@azure/storage-blob';
 
 const router = Router();
 
-// Ensure uploads directory exists
+// ── Storage backend ───────────────────────────────────────────────────────────
+// In production (AZURE_STORAGE_CONNECTION_STRING set): stream directly to Azure Blob.
+// In dev (env var absent): fall back to local disk so local dev needs no Azure account.
+
 const uploadsDir = path.join(__dirname, '../../uploads');
-if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(uploadsDir, { recursive: true });
+
+const getBlobContainerClient = () => {
+    const connStr = process.env.AZURE_STORAGE_CONNECTION_STRING;
+    const container = process.env.AZURE_STORAGE_CONTAINER || 'nss-uploads';
+    if (!connStr) return null;
+    return BlobServiceClient.fromConnectionString(connStr).getContainerClient(container);
+};
+
+const containerClient = getBlobContainerClient();
+const USE_AZURE = !!containerClient;
+
+if (!USE_AZURE) {
+    if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+    console.log('[upload] Azure Blob not configured — using local disk storage');
+} else {
+    console.log('[upload] Azure Blob storage enabled');
 }
 
-// Configure multer for file storage
-const storage = multer.diskStorage({
-    destination: (_req, _file, cb) => {
-        cb(null, uploadsDir);
+// Shared filename generator
+const buildBlobName = (file: Express.Multer.File): string => {
+    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+    const ext = path.extname(file.originalname).toLowerCase();
+    return `${file.fieldname}-${uniqueSuffix}${ext}`;
+};
+
+// Azure Blob storage engine
+const azureEngine: multer.StorageEngine = {
+    _handleFile(_req: any, file: any, cb: any) {
+        const blobName = buildBlobName(file);
+        const blockBlobClient = containerClient!.getBlockBlobClient(blobName);
+        blockBlobClient
+            .uploadStream(file.stream, undefined, undefined, {
+                blobHTTPHeaders: { blobContentType: file.mimetype },
+            })
+            .then(() => cb(null, { filename: blobName, url: blockBlobClient.url, size: 0 }))
+            .catch(cb);
     },
-    filename: (_req, file, cb) => {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-        const ext = path.extname(file.originalname).toLowerCase();
-        // Use only the field name + timestamp + random — never the original name (path traversal prevention)
-        cb(null, `${file.fieldname}-${uniqueSuffix}${ext}`);
+    _removeFile(_req: any, file: any, cb: any) {
+        containerClient!.deleteBlob(file.filename).then(() => cb(null)).catch(cb);
     },
+};
+
+// Local disk storage engine (dev fallback)
+const diskEngine = multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, uploadsDir),
+    filename: (_req, file, cb) => cb(null, buildBlobName(file)),
 });
 
 // Allowed extension → MIME pairs (both must match)
@@ -50,30 +85,23 @@ const ALLOWED_TYPES: Record<string, string> = {
 const fileFilter = (_req: Express.Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
     const ext  = path.extname(file.originalname).toLowerCase();
     const expectedMime = ALLOWED_TYPES[ext];
-
-    // Both extension AND MIME type must be valid and consistent
-    if (expectedMime && file.mimetype === expectedMime) {
-        return cb(null, true);
-    }
-    // Allow image/jpg as alias for image/jpeg
-    if (ext === '.jpg' && file.mimetype === 'image/jpg') {
-        return cb(null, true);
-    }
+    if (expectedMime && file.mimetype === expectedMime) return cb(null, true);
+    if (ext === '.jpg' && file.mimetype === 'image/jpg') return cb(null, true);
     cb(new Error('Only allowed file types are accepted (images, videos, documents).'));
 };
 
 const upload = multer({
-    storage,
+    storage: USE_AZURE ? azureEngine : diskEngine,
     fileFilter,
-    limits: { fileSize: 100 * 1024 * 1024 }, // 100 MB global limit (restricted for non-videos below)
+    limits: { fileSize: 100 * 1024 * 1024 },
 });
 
 import rateLimit from 'express-rate-limit';
 
 // Strict rate limiter for uploads — prevents DoS from bulk large file uploads
 const uploadRateLimiter = rateLimit({
-    windowMs: 5 * 60 * 1000, // 5 minutes
-    max: 50, // 50 uploads per 5 minutes per IP
+    windowMs: 5 * 60 * 1000,
+    max: 50,
     message: { success: false, message: 'Too many file uploads. Please wait a few minutes before trying again.' },
     standardHeaders: true,
     legacyHeaders: false,
@@ -103,14 +131,24 @@ router.post('/single', uploadRateLimiter, (req, res, next) => {
         // Custom size enforcement: 10MB limit for non-videos
         const isVideo = req.file.mimetype.startsWith('video/');
         if (!isVideo && req.file.size > 10 * 1024 * 1024) {
-            fs.promises.unlink(req.file.path).catch(e => console.error('Cleanup error', e));
+            // Cleanup: Azure Blob or local disk
+            if (USE_AZURE) {
+                containerClient!.deleteBlob(req.file.filename).catch(e => console.error('Cleanup error', e));
+            } else {
+                fs.promises.unlink((req.file as any).path).catch(e => console.error('Cleanup error', e));
+            }
             return res.status(400).json({ success: false, message: 'File too large. Maximum size for non-video files is 10 MB.' });
         }
+
+        // URL: Azure returns an absolute https URL; local disk returns a relative /uploads/ path
+        const url = USE_AZURE
+            ? (req.file as any).url
+            : `/uploads/${req.file.filename}`;
 
         return res.json({
             success: true,
             data: {
-                url: `/uploads/${req.file.filename}`,
+                url,
                 filename: req.file.filename,
                 originalName: req.file.originalname,
                 size: req.file.size,
@@ -141,17 +179,20 @@ router.post('/multiple', uploadRateLimiter, (req, res) => {
         }
 
         const uploadedFiles = req.files as Express.Multer.File[];
-        
+
         // Custom size enforcement: 10MB limit for non-videos
         const overLimitFiles = uploadedFiles.filter(f => !f.mimetype.startsWith('video/') && f.size > 10 * 1024 * 1024);
         if (overLimitFiles.length > 0) {
-            // Cleanup all uploaded files in this batch
-            Promise.all(uploadedFiles.map(f => fs.promises.unlink(f.path).catch(e => console.error('Cleanup error', e))));
+            if (USE_AZURE) {
+                Promise.all(uploadedFiles.map(f => containerClient!.deleteBlob(f.filename).catch(e => console.error('Cleanup error', e))));
+            } else {
+                Promise.all(uploadedFiles.map(f => fs.promises.unlink((f as any).path).catch(e => console.error('Cleanup error', e))));
+            }
             return res.status(400).json({ success: false, message: 'One or more files are too large. Maximum size for non-video files is 10 MB.' });
         }
 
         const files = uploadedFiles.map(file => ({
-            url: `/uploads/${file.filename}`,
+            url: USE_AZURE ? (file as any).url : `/uploads/${file.filename}`,
             filename: file.filename,
             originalName: file.originalname,
             size: file.size,
@@ -163,28 +204,26 @@ router.post('/multiple', uploadRateLimiter, (req, res) => {
 
 // Delete a file — sanitise filename to prevent path traversal
 router.delete('/:filename', requireAdmin, async (req, res) => {
-    // Strip any directory components — only allow plain filenames
     const rawFilename = req.params.filename;
     const filename = path.basename(rawFilename);
 
-    // Reject if the sanitised name differs (indicates traversal attempt) or is empty
     if (!filename || filename !== rawFilename || filename.startsWith('.')) {
         return res.status(400).json({ success: false, message: 'Invalid filename.' });
     }
 
-    const filePath = path.join(uploadsDir, filename);
-
-    // Double-check the resolved path is still inside uploadsDir
-    if (!filePath.startsWith(uploadsDir + path.sep) && filePath !== uploadsDir) {
-        return res.status(400).json({ success: false, message: 'Invalid filename.' });
-    }
-
-    if (!fs.existsSync(filePath)) {
-        return res.status(404).json({ success: false, message: 'File not found.' });
-    }
-
     try {
-        await fs.promises.unlink(filePath);
+        if (USE_AZURE) {
+            await containerClient!.deleteBlob(filename);
+        } else {
+            const filePath = path.join(uploadsDir, filename);
+            if (!filePath.startsWith(uploadsDir + path.sep) && filePath !== uploadsDir) {
+                return res.status(400).json({ success: false, message: 'Invalid filename.' });
+            }
+            if (!fs.existsSync(filePath)) {
+                return res.status(404).json({ success: false, message: 'File not found.' });
+            }
+            await fs.promises.unlink(filePath);
+        }
         return res.json({ success: true, message: 'File deleted successfully.' });
     } catch (err) {
         console.error('[upload] Delete error:', err);

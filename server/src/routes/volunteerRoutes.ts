@@ -1,7 +1,12 @@
 import { Router } from 'express';
+import express from 'express';
 import { authenticateToken, requireAdmin } from '../middleware/auth';
 import { requireAYUnlocked } from '../middleware/ayLock';
 import * as volCtrl from '../controllers/volunteerController';
+
+// Rich-text routes (profile with experience field, bulk import CSV) need more than the global 50kb limit
+const richTextJson = express.json({ limit: '200kb' });
+
 
 const router = Router();
 
@@ -69,7 +74,7 @@ ayVolunteerRouter.patch(
 
 router.get('/me',           authenticateToken, volCtrl.getMyProfile);
 router.get('/me/attendance', authenticateToken, volCtrl.getMyAttendance);
-router.put('/me/profile',   authenticateToken, volCtrl.updateMyProfile);
+router.put('/me/profile',   richTextJson, authenticateToken, volCtrl.updateMyProfile);
 router.put('/me/password',  authenticateToken, volCtrl.updateMyPassword);
 
 router.get('/public',       authenticateToken, volCtrl.getPublicVolunteers);

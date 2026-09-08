@@ -14,10 +14,16 @@ export const dbConfig = {
         encrypt: true, // Required by SQL Server and modern tedious driver
     },
     pool: {
-        min:                2,
-        max:                50,
-        idleTimeoutMillis:  30_000,
-        acquireTimeoutMillis: 30_000,
+        min: 2,
+        // Rule of thumb: DB_POOL_MAX per instance × number of instances must not
+        // exceed your Azure SQL tier's max concurrent session limit.
+        // Azure SQL Basic: 30  | Standard S1: 60  | Standard S3: 600
+        // Default 20 per instance allows up to 3 instances on Standard S1.
+        max: parseInt(process.env.DB_POOL_MAX || '20', 10),
+        idleTimeoutMillis:   30_000,
+        // Fail fast (10s) rather than queuing forever — surfaces overload sooner
+        // so the caller gets a clear 503 instead of an eventual timeout cascade.
+        acquireTimeoutMillis: 10_000,
     },
 };
 

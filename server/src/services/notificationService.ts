@@ -32,12 +32,16 @@ export const createNotification = async (input: CreateNotificationInput) => {
 export const createBulkNotifications = async (inputs: CreateNotificationInput[]) => {
     if (inputs.length === 0) return [];
     const created = await db.insert(notifications).output().values(inputs);
-    
-    // Emit to each volunteer
-    for (const notif of created) {
-        emitToVolunteer(notif.volunteerId, 'new_notification', notif);
-    }
-    
+
+    // Defer Socket.IO emits so the bulk INSERT result is returned to the caller
+    // immediately. The emits run in the next event loop iteration — this prevents
+    // a 500-notification loop from blocking other requests during the cron tick.
+    setImmediate(() => {
+        for (const notif of created) {
+            emitToVolunteer(notif.volunteerId, 'new_notification', notif);
+        }
+    });
+
     return created;
 };
 

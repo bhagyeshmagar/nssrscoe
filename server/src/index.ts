@@ -1,3 +1,8 @@
+// Must be set before any I/O is initialized so the libuv thread pool
+// is large enough to handle concurrent bcrypt operations without starving
+// other async I/O (DB queries, file reads, socket events).
+process.env.UV_THREADPOOL_SIZE = process.env.UV_THREADPOOL_SIZE || '16';
+
 import express, { Express, Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -97,7 +102,10 @@ app.use(cors({
     credentials: true,
 }));
 
-app.use(express.json({ limit: '1mb' }));
+// Global body limit kept small (50kb) to prevent DoS via large payloads on
+// unauthenticated public endpoints. Routes that need more (e.g. rich text fields)
+// apply their own express.json({ limit: '200kb' }) middleware locally.
+app.use(express.json({ limit: '50kb' }));
 
 // Apply general rate limiting to all API routes
 app.use('/api', apiRateLimiter);

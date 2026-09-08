@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { randomBytes } from 'crypto';
+import { uuidv7 } from 'uuidv7';
 import { db } from '../db';
 import { eventRegistrations, events } from '../db/schema';
 import { eq, and, sql, count } from 'drizzle-orm';
@@ -11,10 +11,8 @@ import { sendVolunteeringPassEmail } from '../services/emailService';
 import { z } from 'zod';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-/** Cryptographically random pass ID: NSS-XXXXXX (6 hex chars = 16M combinations) */
-const generateVisitorPassId = (): string =>
-    `NSS-${randomBytes(3).toString('hex').toUpperCase()}`;
+// UUID v7 is time-ordered and cryptographically unique by construction.
+// No collision is possible at any realistic scale — the retry loop is gone.
 
 const getClientOrigin = (req: Request): string => {
     if (process.env.CLIENT_URL) return process.env.CLIENT_URL;
@@ -52,40 +50,23 @@ export const createRegistration = asyncHandler(async (req: Request, res: Respons
         throw new ConflictError('You have already registered for this event.');
     }
 
-    // Generate a unique visitor pass ID (retry up to 5 times on collision — extremely rare
-    // given the 16M-combination space; a collision on attempt 5 is treated as a genuine failure).
-    let visitorPassId = generateVisitorPassId();
-    let inserted: typeof eventRegistrations.$inferSelect | undefined;
-
-    for (let attempt = 0; attempt < 5; attempt++) {
-        try {
-            [inserted] = await db
-                .insert(eventRegistrations)
-                .output().values({
-                    eventId: data.eventId,
-                    name: data.name,
-                    email: data.email,
-                    phone: data.phone,
-                    department: data.department,
-                    year: data.year,
-                    visitorPassId,
-                    status: 'pending',
-                });
-            break;
-        } catch (error: any) {
-            // MSSQL unique constraint violation. Since we already checked
-            // (eventId, email) above, a 2627 here almost certainly means a
-            // visitorPassId collision — retry with a freshly generated ID.
-            if (error.number === 2627 && attempt < 4) {
-                visitorPassId = generateVisitorPassId();
-                continue;
-            }
-            throw error;
-        }
-    }
+    // UUID v7 is time-ordered and globally unique — no collision loop needed.
+    const visitorPassId = uuidv7();
+    const [inserted] = await db
+        .insert(eventRegistrations)
+        .output().values({
+            eventId: data.eventId,
+            name: data.name,
+            email: data.email,
+            phone: data.phone,
+            department: data.department,
+            year: data.year,
+            visitorPassId,
+            status: 'pending',
+        });
 
     if (!inserted) {
-        throw new ConflictError('Could not generate a unique visitor pass. Please try again.');
+        throw new ConflictError('Registration could not be saved. Please try again.');
     }
 
     created(res, inserted, 'Registration submitted successfully. Awaiting admin approval.');

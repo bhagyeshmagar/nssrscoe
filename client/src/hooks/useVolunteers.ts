@@ -21,6 +21,8 @@ export const useVolunteersByAY = (ayId: number | null, filters?: VolunteerFilter
             return response.data.data;
         },
         enabled: !!ayId,
+        staleTime: 0,              // Admin data must always be fresh
+        refetchOnWindowFocus: true, // Re-fetch when admin returns to the tab
     });
 };
 
