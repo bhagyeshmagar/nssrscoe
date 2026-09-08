@@ -26,6 +26,7 @@ export const useApproveRegistration = () => {
         mutationFn: (id: number) => registrationsAPI.approve(id),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: registrationKeys.all });
+            queryClient.invalidateQueries({ queryKey: ['pendingApprovals'] });
             toast.success('Registration approved successfully');
         },
         onError: (error: AxiosError<{ message?: string }>) => {
@@ -41,6 +42,7 @@ export const useRejectRegistration = () => {
         mutationFn: (id: number) => registrationsAPI.reject(id),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: registrationKeys.all });
+            queryClient.invalidateQueries({ queryKey: ['pendingApprovals'] });
             toast.success('Registration rejected successfully');
         },
         onError: (error: AxiosError<{ message?: string }>) => {

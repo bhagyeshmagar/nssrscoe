@@ -2,7 +2,6 @@ import { useState, useRef } from 'react';
 import html2canvas from 'html2canvas';
 import { Search, Loader2, Clock, XCircle, CheckCircle, Download, Hash } from 'lucide-react';
 import { registrationsAPI } from '../../services/api';
-import type { EventData, EventRegistration } from '../../services/api';
 
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -15,7 +14,7 @@ export const PassLookup = () => {
     const [lookupId, setLookupId] = useState('');
     const [lookupLoading, setLookupLoading] = useState(false);
     const [lookupError, setLookupError] = useState('');
-    const [lookupResult, setLookupResult] = useState<{ registration: EventRegistration; event: EventData } | null>(null);
+    const [lookupResult, setLookupResult] = useState<any | null>(null);
 
     const passRef = useRef<HTMLDivElement>(null);
     const [downloading, setDownloading] = useState(false);
@@ -28,7 +27,7 @@ export const PassLookup = () => {
         setLookupResult(null);
         try {
             const res = await registrationsAPI.getByVisitorId(lookupId.trim());
-            const payload = (res.data as any).data as { registration: EventRegistration; event: EventData };
+            const payload = (res.data as any).data;
             setLookupResult(payload);
         } catch {
             setLookupError('Pass ID not found. Please check and try again.');
@@ -90,7 +89,7 @@ export const PassLookup = () => {
 
                 {lookupResult && (
                     <div className="mt-6">
-                        {lookupResult.registration.status === 'approved' ? (
+                        {lookupResult.status === 'approved' ? (
                             <div className="flex flex-col items-center gap-4">
                                 <div className="flex items-center gap-2 bg-green-50 border border-green-200 text-green-700 rounded-xl px-4 py-2.5 text-sm font-medium w-full">
                                     <CheckCircle className="w-4 h-4 flex-shrink-0" />
@@ -98,8 +97,8 @@ export const PassLookup = () => {
                                 </div>
                                 <div ref={passRef} className="w-full">
                                     <PassCard
-                                        reg={lookupResult.registration}
-                                        eventTitle={lookupResult.event?.title || 'NSS Event'}
+                                        reg={lookupResult as any}
+                                        eventTitle={lookupResult.eventTitle || 'NSS Event'}
                                     />
                                 </div>
                                 <Button
@@ -111,21 +110,23 @@ export const PassLookup = () => {
                                     {downloading ? 'Preparing…' : 'Download Pass (PNG)'}
                                 </Button>
                             </div>
-                        ) : lookupResult.registration.status === 'pending' ? (
-                            <div className="flex items-start gap-3 bg-yellow-50 border border-yellow-200 text-yellow-700 rounded-xl px-4 py-4 text-sm">
-                                <Clock className="w-5 h-5 flex-shrink-0 mt-0.5" />
-                                <div>
-                                    <p className="font-semibold mb-1">Registration Pending Approval</p>
-                                    <p>Your registration for <strong>{lookupResult.event?.title}</strong> is still being reviewed by the admin. You will receive an email once approved.</p>
-                                </div>
+                        ) : null}
+                        {lookupResult.status === 'pending' && (
+                            <div className="flex flex-col items-center justify-center py-6">
+                                <Clock className="w-12 h-12 text-yellow-500 mb-4 opacity-80" />
+                                <h3 className="text-xl font-semibold text-yellow-800">Approval Pending</h3>
+                                <p className="text-sm text-yellow-700 text-center mt-2 px-4 max-w-sm">
+                                    Your registration is <strong className="font-bold">pending admin approval</strong>. Your pass will be ready to view or download once approved.
+                                </p>
                             </div>
-                        ) : (
-                            <div className="flex items-start gap-3 bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-4 text-sm">
-                                <XCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
-                                <div>
-                                    <p className="font-semibold mb-1">Registration Not Approved</p>
-                                    <p>Unfortunately your registration was not approved. Please contact the NSS team at nssrscoe073@gmail.com for more information.</p>
-                                </div>
+                        )}
+                        {lookupResult.status === 'rejected' && (
+                            <div className="flex flex-col items-center justify-center py-6">
+                                <XCircle className="w-12 h-12 text-red-500 mb-4 opacity-80" />
+                                <h3 className="text-xl font-semibold text-red-800">Registration Rejected</h3>
+                                <p className="text-sm text-red-700 text-center mt-2 px-4 max-w-sm">
+                                    Unfortunately, your registration for this event was not approved.
+                                </p>
                             </div>
                         )}
                     </div>

@@ -78,7 +78,8 @@ export const updateVolunteer = async (req: Request, res: Response) => {
 export const deleteVolunteer = async (req: Request, res: Response) => {
     try {
         const adminId = getAdminId(req);
-        await volService.deleteVolunteer(positiveIntParam.parse(req.params.id), adminId);
+        const { password } = req.body;
+        await volService.deleteVolunteer(positiveIntParam.parse(req.params.id), adminId, password);
         noContent(res);
     } catch (err) { handleError(res, err); }
 };

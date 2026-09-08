@@ -75,9 +75,9 @@ export const useUpdateVolunteer = (ayId: number | null) => {
 export const useDeleteVolunteer = (ayId: number | null) => {
     const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: (id: number) => {
+        mutationFn: ({ id, password }: { id: number, password?: string }) => {
             if (!ayId) throw new Error("Academic Year ID is required");
-            return volunteersAPI.delete(ayId, id);
+            return volunteersAPI.delete(ayId, id, password);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: volunteerKeys.all });

@@ -12,6 +12,7 @@ import {
     meetingAttendance,
     meetings,
     coreTeamAssignments,
+    admins,
 } from '../db/schema';
 import {
     NotFoundError,
@@ -483,20 +484,31 @@ export const toggleVolunteerActive = async (id: number, adminId: number) => {
     });
 };
 
-export const deleteVolunteer = async (id: number, adminId: number) => {
+export const deleteVolunteer = async (id: number, adminId: number, passwordStr?: string) => {
     const vol = await findVolunteer(id);
     await requireUnlockedAY(vol.academicYearId);
 
+    // Verify admin is superadmin and password is correct
+    const [admin] = await db.select().top(1).from(admins).where(eq(admins.id, adminId));
+    if (!admin) throw new NotFoundError('Admin not found.');
+    if (!admin.isSuperadmin) {
+        throw new ForbiddenError('Only superadmins can permanently delete volunteers.');
+    }
+    if (!passwordStr) {
+        throw new ValidationError('Superadmin password is required for this action.');
+    }
+    const isValid = await bcrypt.compare(passwordStr, admin.passwordHash);
+    if (!isValid) {
+        throw new ForbiddenError('Invalid superadmin password.');
+    }
+
     return await db.transaction(async (tx) => {
-        const [updated] = await tx
-            .update(volunteers)
-            .set({ isActive: false, updatedAt: new Date() })
-            .where(eq(volunteers.id, id))
-            .output();
+        // Since we are doing a hard delete, we delete from volunteer_profiles first (cascade should handle it, but just to be safe if cascade isn't set up on all related tables).
+        // Actually, let's just delete the volunteer, and foreign keys with ON DELETE CASCADE will handle it, or we manually delete if needed.
+        // Wait, schema.ts says volunteerId on volunteerProfiles has onDelete: 'cascade'.
+        await tx.delete(volunteers).where(eq(volunteers.id, id));
 
-        await logAudit({ action: 'volunteer.delete', entityType: 'volunteer', entityId: id, performedById: adminId, academicYearId: vol.academicYearId }, tx);
-
-        return updated;
+        await logAudit({ action: 'volunteer.hard_delete', entityType: 'volunteer', entityId: id, performedById: adminId, academicYearId: vol.academicYearId }, tx);
     });
 };
 

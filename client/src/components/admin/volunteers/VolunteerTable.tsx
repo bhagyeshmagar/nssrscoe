@@ -45,13 +45,13 @@ export const VolunteerTable = ({
                                 <td className="px-4 py-3">
                                     <div className="flex gap-1 flex-wrap">
                                         <button onClick={() => setViewProfileId(v.id)} disabled={actionId === v.id} className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-700 hover:bg-blue-200 disabled:opacity-50">View</button>
-                                        {selectedAY && !selectedAY.isLocked && (
+                                        {isSuperadmin && selectedAY && !selectedAY.isLocked && (
                                             <>
-                                                <button onClick={() => handleStatusChange(v.id, v.status === 'regular' ? 'backup' : 'regular')} disabled={actionId === v.id} className="text-xs px-2 py-1 rounded bg-yellow-100 text-yellow-700 hover:bg-yellow-200 disabled:opacity-50">→ {v.status === 'regular' ? 'Backup' : 'Regular'}</button>
-                                                <button onClick={() => handleToggleActive(v.id)} disabled={actionId === v.id} className="text-xs px-2 py-1 rounded bg-purple-100 text-purple-700 hover:bg-purple-200 disabled:opacity-50">{v.isActive ? 'Deactivate' : 'Activate'}</button>
-                                                <button onClick={() => handleDelete(v.id)} disabled={actionId === v.id} className="text-xs px-2 py-1 rounded bg-red-100 text-red-700 hover:bg-red-200 disabled:opacity-50">Del</button>
+                                                {<button onClick={() => handleStatusChange(v.id, v.status === 'regular' ? 'backup' : 'regular')} disabled={actionId === v.id} className="text-xs px-2 py-1 rounded bg-yellow-100 text-yellow-700 hover:bg-yellow-200 disabled:opacity-50">→ {v.status === 'regular' ? 'Backup' : 'Regular'}</button>}
+                                                {<button onClick={() => handleToggleActive(v.id)} disabled={actionId === v.id} className="text-xs px-2 py-1 rounded bg-purple-100 text-purple-700 hover:bg-purple-200 disabled:opacity-50">{v.isActive ? 'Deactivate' : 'Activate'}</button>}
+                                                {<button onClick={() => handleDelete(v.id)} disabled={actionId === v.id} className="text-xs px-2 py-1 rounded bg-red-100 text-red-700 hover:bg-red-200 disabled:opacity-50">Del</button>}
                                             </>
-                                        )}
+                                        )}  
                                     </div>
                                 </td>
                             </tr>

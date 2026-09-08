@@ -70,12 +70,14 @@ export function useFlash() {
 }
 
 export function useAYSelector(years: AcademicYear[], currentAY: AcademicYear | null) {
-    const [selectedAyId, setSelectedAyId] = useState<number>(currentAY?.id ?? (years[0]?.id || 0));
+    const defaultId = currentAY?.id ?? years.find(y => y.isCurrent)?.id ?? years[0]?.id ?? 0;
+    const [selectedAyId, setSelectedAyId] = useState<number>(defaultId);
     
     useEffect(() => {
         const stillExists = years.some(y => y.id === selectedAyId);
         if ((!selectedAyId || !stillExists) && years.length > 0) {
-            setSelectedAyId(currentAY?.id ?? years[0].id);
+            const fallbackId = currentAY?.id ?? years.find(y => y.isCurrent)?.id ?? years[0]?.id;
+            setSelectedAyId(fallbackId);
         }
     }, [currentAY, years, selectedAyId]);
 

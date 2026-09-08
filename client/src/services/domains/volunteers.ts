@@ -156,8 +156,8 @@ export const volunteersAPI = {
         api.get<VolunteerWithProfile>(`/academic-years/${ayId}/volunteers/${id}`),
     update:      (ayId: number, id: number, data: Partial<CreateVolunteerData>) =>
         api.put<VolunteerData>(`/academic-years/${ayId}/volunteers/${id}`, data),
-    delete:      (ayId: number, id: number) =>
-        api.delete(`/academic-years/${ayId}/volunteers/${id}`),
+    delete:      (ayId: number, id: number, password?: string) =>
+        api.delete(`/academic-years/${ayId}/volunteers/${id}`, { data: { password } }),
     changeStatus:(ayId: number, id: number, status: 'regular' | 'backup') =>
         api.patch<VolunteerData>(`/academic-years/${ayId}/volunteers/${id}/status`, { status }),
     toggleActive:(ayId: number, id: number) =>

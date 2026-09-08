@@ -32,6 +32,7 @@ export const ProfileTab = ({ setMessage }: { setMessage: (msg: { type: 'success'
         emailId: '',
         profilePhotoUrl: '',
         experienceText: '',
+        isExperienceApproved: false,
         portfolioChoices: '',
     });
 
@@ -57,6 +58,7 @@ export const ProfileTab = ({ setMessage }: { setMessage: (msg: { type: 'success'
                     emailId: data.profile.emailId || data.email || '',
                     profilePhotoUrl: data.profile.profilePhotoUrl || '',
                     experienceText: data.profile.experienceText || '',
+                    isExperienceApproved: data.profile.isExperienceApproved ?? false,
                     portfolioChoices: data.profile.portfolioChoices || '',
                 });
             } else {

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { volunteersAPI, attendanceAPI } from '../../../services/api';
 import type { VolunteerWithProfile, VolunteerAttendanceRecord, CreateVolunteerData } from '../../../services/api';
 import { useFlash, useAYSelector } from '../Shared';
@@ -18,10 +19,12 @@ import {
     useCreateVolunteer, 
     useDeleteVolunteer, 
     useChangeVolunteerStatus,
-    useToggleVolunteerActive
+    useToggleVolunteerActive,
+    volunteerKeys
 } from '../../../hooks/useVolunteers';
 
 export const AYVolunteersTab = ({ isSuperadmin }: { isSuperadmin?: boolean }) => {
+    const queryClient = useQueryClient();
     const { data: years = [] } = useAcademicYears();
     // We don't have currentAY directly without another query, but useAYSelector will just pick the first year if no currentAY is provided, or we can use useCurrentAcademicYear.
     const { selectedAyId, setSelectedAyId, selectedAY } = useAYSelector(years, null);
@@ -34,7 +37,7 @@ export const AYVolunteersTab = ({ isSuperadmin }: { isSuperadmin?: boolean }) =>
     const [exportStatus, setExportStatus] = useState<'idle' | 'loading' | 'ready'>('idle');
     const [exportData, setExportData] = useState<VolunteerWithProfile[]>([]);
     const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
-    
+    const [deletePassword, setDeletePassword] = useState('');
     const generatePassword = () => Math.random().toString(36).slice(-8);
     const { msg, flash } = useFlash();
     const [actionId, setActionId] = useState<number | null>(null);
@@ -101,11 +104,15 @@ export const AYVolunteersTab = ({ isSuperadmin }: { isSuperadmin?: boolean }) =>
     };
 
     const executeDelete = async () => {
-        if (!deleteConfirmId) return;
+        if (!deleteConfirmId || !deletePassword) {
+            toast.error('Superadmin password is required for hard delete.');
+            return;
+        }
         setActionId(deleteConfirmId);
         try { 
-            await deleteVolunteer.mutateAsync(deleteConfirmId); 
+            await deleteVolunteer.mutateAsync({ id: deleteConfirmId, password: deletePassword }); 
             setDeleteConfirmId(null);
+            setDeletePassword('');
         } catch (e: any) { 
             // Error handled by mutation
         } finally {
@@ -130,8 +137,7 @@ export const AYVolunteersTab = ({ isSuperadmin }: { isSuperadmin?: boolean }) =>
         try {
             await volunteersAPI.approveExperience(selectedAyId!, id);
             toast.success('Experience text approved and is now public.');
-            // Refetch could be done via invalidateQueries here, but since it's a niche action...
-            // A simple page reload for the list or let the view refresh
+            queryClient.invalidateQueries({ queryKey: volunteerKeys.all });
         } catch (e: any) {
             flash('err', e.response?.data?.message ?? 'Failed to approve experience.');
         } finally {
@@ -253,15 +259,24 @@ export const AYVolunteersTab = ({ isSuperadmin }: { isSuperadmin?: boolean }) =>
             {deleteConfirmId && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
-                        <h3 className="text-xl font-bold text-gray-800 mb-4">Confirm Deletion</h3>
-                        <p className="text-gray-600 mb-6">
-                            Are you sure you want to delete this volunteer? This action will mark them as inactive. 
-                            As a superadmin, you can still view their attendance records but they will not be considered active.
+                        <h3 className="text-xl font-bold text-red-600 mb-4">Hard Delete Volunteer</h3>
+                        <p className="text-gray-600 mb-4 text-sm">
+                            This action will <strong className="text-gray-800">permanently delete</strong> the volunteer from the database, including all their profile data and associated records. This cannot be undone.
                         </p>
+                        <div className="mb-6">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Superadmin Password</label>
+                            <input 
+                                type="password" 
+                                value={deletePassword} 
+                                onChange={e => setDeletePassword(e.target.value)}
+                                placeholder="Enter your superadmin password"
+                                className="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-red-500"
+                            />
+                        </div>
                         <div className="flex justify-end gap-3">
-                            <button onClick={() => setDeleteConfirmId(null)} className="px-4 py-2 font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">Cancel</button>
-                            <button onClick={executeDelete} disabled={actionId === deleteConfirmId} className="px-4 py-2 font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors">
-                                {actionId === deleteConfirmId ? 'Deleting...' : 'Delete Volunteer'}
+                            <button onClick={() => { setDeleteConfirmId(null); setDeletePassword(''); }} className="px-4 py-2 font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">Cancel</button>
+                            <button onClick={executeDelete} disabled={actionId === deleteConfirmId || !deletePassword} className="px-4 py-2 font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors">
+                                {actionId === deleteConfirmId ? 'Deleting...' : 'Hard Delete'}
                             </button>
                         </div>
                     </div>
