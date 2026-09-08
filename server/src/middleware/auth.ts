@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { db } from '../db';
-import { admins, volunteers } from '../db/schema';
+import { admins, volunteers, academicYears } from '../db/schema';
 import { eq } from 'drizzle-orm';
 import { AppError } from '../lib/errors';
 
@@ -87,18 +87,37 @@ export const requireSuperAdmin = async (req: Request, res: Response, next: NextF
 export const requireVolunteer = async (req: Request, res: Response, next: NextFunction) => {
     const authReq = req as AuthRequest;
     if (!authReq.user || authReq.user.role !== 'volunteer') {
-        return res.status(403).json({ success: false, message: 'Volunteer access required' });
+        return res.status(403).json({ success: false, message: 'Volunteer access required.' });
     }
     
     try {
-        const [volunteer] = await db.select().top(1).from(volunteers).where(eq(volunteers.id, authReq.user.id));
-        if (!volunteer || !volunteer.isActive) {
-            return res.status(403).json({ success: false, message: 'Volunteer account no longer exists or is inactive' });
+        // Join academicYears so we can enforce AY-level access in one query.
+        // This prevents a volunteer from continuing to use the portal for up to
+        // 24 hours (JWT lifetime) after their AY is locked or archived.
+        const [row] = await db
+            .select({
+                volunteer: volunteers,
+                ay: { isLocked: academicYears.isLocked, isArchived: academicYears.isArchived },
+            })
+            .from(volunteers)
+            .innerJoin(academicYears, eq(volunteers.academicYearId, academicYears.id))
+            .where(eq(volunteers.id, authReq.user.id));
+        // id is the primary key — at most one row returned, no .top() needed
+
+        if (!row || !row.volunteer.isActive) {
+            return res.status(403).json({ success: false, message: 'Volunteer account no longer exists or is inactive.' });
         }
+        if (row.ay.isArchived) {
+            return res.status(403).json({ success: false, message: 'Your academic year has been archived. Access to the volunteer portal is no longer available for this year.' });
+        }
+        if (row.ay.isLocked) {
+            return res.status(403).json({ success: false, message: 'Your academic year is locked. Please contact your admin if you need access.' });
+        }
+
         next();
     } catch (err) {
         console.error('[requireVolunteer] Error:', err);
-        return res.status(500).json({ success: false, message: 'Error verifying volunteer permissions' });
+        return res.status(500).json({ success: false, message: 'Error verifying volunteer permissions.' });
     }
 };
 

@@ -42,6 +42,7 @@ import adminInnovativeIdeaRoutes from './routes/adminInnovativeIdeaRoutes';
 import achievementRoutes from './routes/achievementRoutes';
 import adminAchievementRoutes from './routes/adminAchievementRoutes';
 import { apiRateLimiter } from './middleware/rateLimiter';
+import { cachePublicData, cacheImmutableFile } from './middleware/cache';
 
 dotenv.config();
 
@@ -110,8 +111,10 @@ app.use(express.json({ limit: '50kb' }));
 // Apply general rate limiting to all API routes
 app.use('/api', apiRateLimiter);
 
-// Serve uploaded files statically
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+// Serve uploaded files statically — mark as immutable so browsers and CDNs
+// cache them permanently (filenames contain a timestamp so content-changes
+// always produce a new URL).
+app.use('/uploads', cacheImmutableFile, express.static(path.join(__dirname, '../uploads')));
 
 app.get('/', (req: Request, res: Response) => {
     res.send('Express + TypeScript Server is running');
@@ -127,22 +130,27 @@ app.use('/api/academic-years/:ayId/core-team',     ayCoreTeamRouter);
 app.use('/api/academic-years/:ayId/attendance',    ayAttendanceRouter);
 app.use('/api/academic-years/:ayId/special-camps', ayCampsRouter);
 
-// ── Flat / self-service routes ────────────────────────────────────────────────
+// ── Public routes — apply CDN-friendly cache headers ────────────────────────
+// These are GET-only endpoints with no auth. At scale a CDN will serve 100K
+// users from a single cached origin response.
+app.use('/api/events',           cachePublicData, eventRoutes);
+app.use('/api/gallery',          cachePublicData, galleryRoutes);
+app.use('/api/members',          cachePublicData, membersRoutes);
+app.use('/api/achievements',     cachePublicData, achievementRoutes);
+app.use('/api/slider',           cachePublicData, sliderRoutes);
+app.use('/api/hod-contacts',     cachePublicData, hodRoutes);
+app.use('/api/innovative-ideas', cachePublicData, innovativeIdeaRoutes);
+
+// ── Auth, admin, and private routes (no public caching) ──────────────────────
 app.use('/api/auth',          authRoutes);
 app.use('/api/admins',        adminRoutes);
 app.use('/api/audit-logs',    auditRoutes);
-app.use('/api/events',        eventRoutes);
-app.use('/api/slider',        sliderRoutes);
-app.use('/api/gallery',       galleryRoutes);
-app.use('/api/members',       membersRoutes);
 app.use('/api/settings',      settingsRoutes);
 app.use('/api/approvals',     approvalsRoutes);
 app.use('/api/upload',        uploadRoutes);
 app.use('/api/event-images',  eventImagesRoutes);
-
 app.use('/api/registrations', registrationRoutes);
 app.use('/api/activity-calendar', activityCalendarRoutes);
-
 app.use('/api/volunteers',    volunteerRoutes);     // /me, /me/profile, /me/password, /public, /experiences
 app.use('/api/core-team',     coreTeamRoutes);      // /roles
 app.use('/api/attendance',    attendanceRoutes);    // /sessions/:id, /sessions/:id/records
@@ -150,12 +158,9 @@ app.use('/api/special-camps', specialCampRoutes);   // /:campId, /:campId/partic
 app.use('/api/core-team-dashboard', coreTeamDashboardRoutes);
 app.use('/api',               meetingRoutes);       // handles both /academic-years/:ayId/meetings and /meetings/:id
 app.use('/api',               notificationRoutes);  // handles /volunteers/me/notifications
-app.use('/api/hod-contacts',  hodRoutes);           // HOD contact management
-app.use('/api/email',         emailRoutes);          // email logs, stats, send-report
-app.use('/api/innovative-ideas', innovativeIdeaRoutes);
+app.use('/api/email',         emailRoutes);         // email logs, stats, send-report
 app.use('/api/admin/innovative-ideas', adminInnovativeIdeaRoutes);
-app.use('/api/achievements', achievementRoutes);
-app.use('/api/admin/achievements', adminAchievementRoutes);
+app.use('/api/admin/achievements',     adminAchievementRoutes);
 
 // Serve Frontend in Production (For Docker / Option B)
 if (process.env.NODE_ENV === 'production') {

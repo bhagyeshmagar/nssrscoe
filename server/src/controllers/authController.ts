@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { db } from '../db';
-import { admins, volunteers } from '../db/schema';
+import { admins, volunteers, academicYears } from '../db/schema';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { eq } from 'drizzle-orm';
@@ -49,13 +49,31 @@ export const login = async (req: Request, res: Response) => {
             }
         }
 
-        // Check volunteer table
-        const [volunteer] = await db.select().top(1).from(volunteers)
+        // Check volunteer table — fetch with the volunteer's AY in a single join
+        const [row] = await db
+            .select({
+                volunteer: volunteers,
+                ay: { isLocked: academicYears.isLocked, isArchived: academicYears.isArchived },
+            })
+            .from(volunteers)
+            .innerJoin(academicYears, eq(volunteers.academicYearId, academicYears.id))
             .where(eq(volunteers.email, normalizedEmail));
+        // email is UNIQUE — at most one row returned, no .top() needed
 
-        if (volunteer) {
+        if (row) {
+            const { volunteer, ay } = row;
+
             if (!volunteer.isActive) {
                 return res.status(403).json({ success: false, message: 'Your account has been deactivated. Please contact admin.' });
+            }
+
+            // Prevent volunteers from locked or archived academic years from logging in.
+            // Locked AY = year is closed for mutations; Archived AY = year is fully retired.
+            if (ay.isArchived) {
+                return res.status(403).json({ success: false, message: 'Your academic year has been archived. Access to the volunteer portal is no longer available for this year.' });
+            }
+            if (ay.isLocked) {
+                return res.status(403).json({ success: false, message: 'Your academic year is locked. Please contact your admin if you need access.' });
             }
 
             const validPassword = await bcrypt.compare(password, volunteer.passwordHash);
