@@ -1,6 +1,6 @@
 # Azure Setup and Deployment Guide
 
-This guide details two standard methods for deploying the NSS RSCOE platform to Microsoft Azure. 
+This guide details two standard methods for deploying the NSS RSCOE platform to Microsoft Azure.
 
 - **Option A**: Azure Static Web Apps (Frontend) + Azure App Service (Backend)
 - **Option B**: Azure Container Apps (Dockerized Full-Stack)
@@ -8,6 +8,7 @@ This guide details two standard methods for deploying the NSS RSCOE platform to 
 ---
 
 ## Prerequisites
+
 1. An active Azure Subscription.
 2. The Azure CLI installed locally (`az login`).
 3. An Azure SQL Database instance provisioned and running.
@@ -20,6 +21,7 @@ This guide details two standard methods for deploying the NSS RSCOE platform to 
 In this architecture, the React frontend is served globally via a fast CDN (Static Web Apps), and the Node.js Express server is hosted on a Linux App Service.
 
 ### Step 1: Deploying the Backend (Azure App Service)
+
 1. **Create the App Service**:
    - Go to Azure Portal > Create a resource > **Web App**.
    - Publish: **Code**.
@@ -35,6 +37,7 @@ In this architecture, the React frontend is served globally via a fast CDN (Stat
    - Use the **Deployment Center** in Azure to link your GitHub repository, selecting the `/server` folder as the root.
 
 ### Step 2: Deploying the Frontend (Azure Static Web Apps)
+
 1. **Create the Static Web App**:
    - Go to Azure Portal > Create a resource > **Static Web App**.
    - Choose your GitHub repository.
@@ -55,21 +58,27 @@ In this architecture, the React frontend is served globally via a fast CDN (Stat
 In this architecture, the entire application (Frontend + Backend) is built into a single Docker image and deployed to Azure Container Apps. The Express backend serves the static React files.
 
 ### Step 1: Build the Docker Image
+
 A `Dockerfile` has been provided in the root of the repository. It builds the React frontend, copies it into the backend's static directory, and runs the Node.js server.
 
 ### Step 2: Push to Azure Container Registry (ACR)
+
 1. Create an Azure Container Registry (ACR) in the Azure Portal.
 2. Login to ACR via CLI: `az acr login --name <RegistryName>`
-3. Build and tag the image: 
+3. Build and tag the image:
+
    ```bash
    docker build -t <RegistryName>.azurecr.io/nssrscoe:latest .
    ```
+
 4. Push the image:
+
    ```bash
    docker push <RegistryName>.azurecr.io/nssrscoe:latest
    ```
 
 ### Step 3: Deploy to Azure Container Apps
+
 1. Create a new **Container App** in the Azure Portal.
 2. Select **Use existing image** and point it to the ACR image you just pushed.
 3. Under **Environment Variables**, inject all variables required by `server/env.template`.
@@ -80,7 +89,9 @@ A `Dockerfile` has been provided in the root of the repository. It builds the Re
 ## 🚀 Azure Optimizations Applied to this Repository
 
 To make this project Azure-ready, the following optimizations exist in the codebase:
-1. **Drizzle ORM Azure SQL SSL**: The database connection string `options.encrypt` is explicitly set to `true`, which is strictly required by Azure SQL.
+
+1. **Drizzle ORM Azure SQL SSL**: The database connection string `options.
+encrypt` is explicitly set to `true`, which is strictly required by Azure SQL.
 2. **Dynamic Port Binding**: The Express server listens on `process.env.PORT`, allowing Azure App Service to dynamically assign ports (usually 8080).
 3. **Static File Serving (Docker)**: The `index.ts` has been optimized to serve static files from `client/dist` if running in a containerized environment (Option B).
 4. **Helmet Trust Proxies**: Azure sits behind load balancers. Express is configured to trust proxies so IP-based rate limiting (`express-rate-limit`) works correctly in the cloud.
