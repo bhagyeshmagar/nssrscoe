@@ -14,7 +14,7 @@ const createSessionSchema = z.object({
 
 const markAttendanceSchema = z.object({
     records: z.array(z.object({
-        volunteerId: positiveIntParam,
+        volunteerId: z.coerce.number().int().positive(),
         status: z.enum(['present', 'absent', 'late']),
         notes: z.string().max(500).optional()
     })).min(1, 'At least one attendance record is required')
