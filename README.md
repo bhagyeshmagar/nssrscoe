@@ -367,7 +367,8 @@ npm run db:push
 ```
 
 You should see output like:
-```
+
+```text
 ✓ Table `admins` created
 ✓ Table `academic_years` created
 ✓ Table `volunteers` created
@@ -383,7 +384,8 @@ npm run db:seed:all
 ```
 
 Output should confirm:
-```
+
+```text
 ✅ Core team roles seeded
 ✅ Site settings seeded  
 ✅ Superadmin account created
@@ -462,6 +464,7 @@ npm run test:e2e    # Playwright end-to-end tests
 | **Self-hosted VPS** (Windows Server + MSSQL) | Full control | You manage patching & backups |
 
 For production, update `drizzle.config.ts` to disable `trustServerCertificate`:
+
 ```typescript
 options: {
   trustServerCertificate: false,  // ← enforce TLS in production
@@ -524,6 +527,7 @@ server {
 ```
 
 After setting up Nginx, secure with SSL:
+
 ```bash
 sudo apt install certbot python3-certbot-nginx
 sudo certbot --nginx -d api.nssjspm.com

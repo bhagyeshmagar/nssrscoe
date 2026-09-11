@@ -319,6 +319,7 @@ All routes prefixed with `/api`.
 **Root Cause**: mssql pool not configured with min/max and timeout settings causing exhaustion.
 
 **Fix**: Added explicit pool config in `server/src/db/index.ts`:
+
 ```typescript
 { pool: { min: 0, max: 10 }, options: { encrypt: true, connectTimeout: 30000 } }
 ```
@@ -360,6 +361,7 @@ All routes prefixed with `/api`.
 **Symptom**: Delete only set `isActive = false`. Business requirement changed to real DB deletion.
 
 **Fix**:
+
 - `volunteerService.ts`: issue actual `DELETE` SQL statement instead of UPDATE.
 - Added `bcrypt.compare` re-verification of superadmin password before deleting.
 - `volunteerController.ts`: extract `password` from `req.body`.
@@ -388,16 +390,21 @@ All routes prefixed with `/api`.
 **Symptom**: Searching for a pass ID crashed the entire page.
 
 **Root Cause**: Backend `getRegistrationByVisitorId` returns a FLAT object:
+
 ```json
 { "name": "...", "status": "approved", "eventTitle": "...", "visitorPassId": "..." }
 ```
+
 Frontend `PassLookup.tsx` expected a NESTED structure:
+
 ```typescript
 { registration: EventRegistration; event: EventData }
 ```
+
 So `lookupResult.registration.status` was `undefined.status` — crash.
 
 **Fix**:
+
 - Updated `PassLookup.tsx` state type to `any`.
 - Changed all references from `lookupResult.registration.status` to `lookupResult.status`.
 - Changed `lookupResult.event?.title` to `lookupResult.eventTitle`.
@@ -519,8 +526,8 @@ Default credentials after seed (change immediately):
 | Username | Role | Password |
 |---|---|---|
 | superadmin | Superadmin | changeme |
-| admin@email.com | Superadmin | changeme |
-| nsspo@email.com | Admin | changeme |
+| <admin@email.com> | Superadmin | changeme |
+| <nsspo@email.com> | Admin | changeme |
 
 ### Step 6: Start Dev Servers
 
@@ -661,6 +668,7 @@ Multi-stage build:
 3. Stage 3: combines both. Express serves the API at `/api/*` AND serves React static files for all other routes in production.
 
 The key code in `server/src/index.ts`:
+
 ```typescript
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, '../../client/dist')));
