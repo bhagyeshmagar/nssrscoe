@@ -1,6 +1,8 @@
+/// <reference types="node" />
 import { vi } from 'vitest';
 
 process.env.JWT_SECRET = 'test_secret_must_be_at_least_32_chars_long';
+
 
 // We mock the database to prevent integration tests from hitting real MSSQL.
 // IMPORTANT: every method in a Drizzle query chain must be listed here.

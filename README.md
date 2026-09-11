@@ -6,6 +6,7 @@ A full-stack, production-grade web application for the **National Service Scheme
 
 > [!IMPORTANT]
 > **Extensive Documentation Available:**
+>
 > - 📖 **[Developer Handbook](HANDBOOK.md)**: Detailed breakdown of the architecture, security posture, database schema, and workflows.
 > - ☁️ **[Azure Deployment Guide](AZURE_DEPLOYMENT_GUIDE.md)**: Complete step-by-step instructions for deploying to Microsoft Azure (App Service, Static Web Apps, and Container Apps) with automated CI/CD.
 
@@ -186,6 +187,7 @@ An Academic Year flows through exactly these states in order:
 The backend exposes **19 route modules** all mounted under `/api`. The pattern is AY-scoped for core data:
 
 ### Academic Year Routes (`/api/academic-years`)
+
 | Method | Endpoint | Description |
 |---|---|---|
 | `GET` | `/api/academic-years` | List all academic years |
@@ -196,6 +198,7 @@ The backend exposes **19 route modules** all mounted under `/api`. The pattern i
 | `PATCH` | `/api/academic-years/:id/archive` | Archive a locked AY |
 
 ### AY-Scoped Volunteers (`/api/academic-years/:ayId/volunteers`)
+
 | Method | Endpoint | Description |
 |---|---|---|
 | `GET` | `/` | List volunteers with filters (dept, status, search, isActive) + pagination |
@@ -205,6 +208,7 @@ The backend exposes **19 route modules** all mounted under `/api`. The pattern i
 | `DELETE` | `/:id` | Remove volunteer from AY |
 
 ### AY-Scoped Core Team (`/api/academic-years/:ayId/core-team`)
+
 | Method | Endpoint | Description |
 |---|---|---|
 | `GET` | `/` | List all core team assignments for this AY |
@@ -212,6 +216,7 @@ The backend exposes **19 route modules** all mounted under `/api`. The pattern i
 | `DELETE` | `/:id` | Remove an assignment |
 
 ### AY-Scoped Attendance (`/api/academic-years/:ayId/attendance`)
+
 | Method | Endpoint | Description |
 |---|---|---|
 | `GET` | `/sessions` | List attendance sessions |
@@ -220,6 +225,7 @@ The backend exposes **19 route modules** all mounted under `/api`. The pattern i
 | `PUT` | `/sessions/:id/records` | Bulk-upsert attendance records |
 
 ### Other Key Routes
+
 | Route Prefix | Description |
 |---|---|
 | `/api/auth` | Login, logout, password change for admins |
@@ -298,12 +304,14 @@ This section is the most critical part. Follow every step precisely.
 ### Step 1 — Install MS SQL Server
 
 Download the **Developer** or **Express** edition (free) from Microsoft:
-- https://www.microsoft.com/en-us/sql-server/sql-server-downloads
+
+- <https://www.microsoft.com/en-us/sql-server/sql-server-downloads>
 
 During installation, choose **"New SQL Server stand-alone installation"** and use the default **SQLEXPRESS** instance name.
 
 Also install **SQL Server Management Studio (SSMS)**:
-- https://learn.microsoft.com/en-us/sql/ssms/download-sql-server-management-studio-ssms
+
+- <https://learn.microsoft.com/en-us/sql/ssms/download-sql-server-management-studio-ssms>
 
 ### Step 2 — Enable SQL Server Authentication Mode
 
@@ -659,24 +667,31 @@ nssrscoe/
 ## ✨ Key Features & Design Decisions
 
 ### Academic Year Lifecycle
+
 The entire platform is scoped to an **Academic Year (AY)**. This mirrors how NSS actually operates — each year has its own cohort of volunteers, core team, events, and camps. Data from previous years is preserved and read-only via the archive system.
 
 ### Volunteer Cap Enforcement
+
 Each AY has a configurable `volunteerCap` (default: 100). Volunteers are either `regular` (counts toward cap) or `backup` (overflow list). The cap prevents over-enrollment and is enforced at the service layer.
 
 ### Participant Snapshotting for Special Camps
+
 When a Special Camp is **finalized**, a point-in-time snapshot of each participant's profile is taken (stored in `snap_*` columns on `special_camp_participants`). This ensures that historical camp records remain accurate even if a volunteer's profile is later updated or deleted.
 
 ### RBAC (Role-Based Access Control)
+
 Three tiers:
+
 - **Superadmin** — Full access including AY locking/unlocking, admin management, and audit logs.
 - **Admin (Core Team)** — Manages volunteers, events, attendance within the current AY.
 - **Volunteer** — Self-service only (view own profile, update password, view notifications).
 
 ### Drizzle ORM on MS SQL
+
 MS SQL has no `ENUM` type. All enumerated values use `NVARCHAR` + `CHECK` constraints at the DB level, backed by `as const` TypeScript arrays for type safety. The `drizzle-orm/mssql-core` dialect is used — **never mix with `drizzle-orm/pg-core`**.
 
 ### Audit Logging
+
 Every significant admin action (creating volunteers, locking AYs, approving registrations) is written to `audit_logs` with a JSON `details` payload containing before/after context. This is append-only and never deleted.
 
 ---

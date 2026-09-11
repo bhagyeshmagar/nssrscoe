@@ -591,8 +591,8 @@ RESEND_API_KEY=re_xxx
 ALLOWED_ORIGINS=https://your-app.azurestaticapps.net
 ```
 
-3. Startup Command: `npm run start`
-4. Deployment Center: GitHub → main branch → App root `/server`
+1. Startup Command: `npm run start`
+2. Deployment Center: GitHub → main branch → App root `/server`
 
 ### Step 4: Deploy Frontend to Static Web Apps
 
@@ -663,6 +663,7 @@ az containerapp create \
 ### How the Dockerfile Works
 
 Multi-stage build:
+
 1. Stage 1: builds React to `client/dist`
 2. Stage 2: installs server Node.js dependencies
 3. Stage 3: combines both. Express serves the API at `/api/*` AND serves React static files for all other routes in production.
@@ -738,7 +739,7 @@ Any push to `main` that changes files in `client/**`. Backend-only pushes do NOT
 | Secret | Value |
 |---|---|
 | AZURE_STATIC_WEB_APPS_API_TOKEN | Azure Portal → Static Web App → Manage deployment token |
-| VITE_API_URL | Backend URL e.g. https://nss-rscoe-api.azurewebsites.net |
+| VITE_API_URL | Backend URL e.g. <https://nss-rscoe-api.azurewebsites.net> |
 
 ### Troubleshooting
 
