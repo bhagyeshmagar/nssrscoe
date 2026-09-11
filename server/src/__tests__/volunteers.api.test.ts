@@ -13,6 +13,10 @@ vi.mock('../middleware/auth', async (importOriginal) => {
             req.user = { id: 1, role: 'volunteer' };
             next();
         },
+        // requireVolunteer was added to /public after this test was written.
+        // We bypass the real DB check here; individual tests that need to
+        // exercise AY-lock/archive logic should test requireVolunteer separately.
+        requireVolunteer: (req: any, res: any, next: any) => next(),
         requireAdmin: (req: any, res: any, next: any) => next(),
         requireSuperAdmin: (req: any, res: any, next: any) => next(),
     };

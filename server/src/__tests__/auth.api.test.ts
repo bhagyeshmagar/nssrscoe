@@ -24,9 +24,10 @@ describe('Auth API Integration Tests', () => {
         });
 
         it('should return 401 for non-existent user', async () => {
-            // Mock db.select().top(1).from().where().fetch() to return empty array
+            // Volunteer login now does: .select().from().innerJoin().where()
             const mockWhere = vi.fn().mockResolvedValue([]);
-            const mockFrom = vi.fn().mockReturnValue({ where: mockWhere });
+            const mockInnerJoin = vi.fn().mockReturnValue({ where: mockWhere });
+            const mockFrom = vi.fn().mockReturnValue({ innerJoin: mockInnerJoin, where: mockWhere });
             const mockTop = vi.fn().mockReturnValue({ from: mockFrom });
             const mockSelect = vi.fn().mockReturnValue({ from: mockFrom, top: mockTop });
             (db.select as any) = mockSelect;
@@ -48,14 +49,23 @@ describe('Auth API Integration Tests', () => {
                 role: 'volunteer',
                 isActive: true
             };
+            // Login checks admin first (.top(1).from().where()), then volunteer
+            // with a join (.from().innerJoin().where()). Wire both paths.
+            const mockAdminWhere = vi.fn().mockResolvedValue([]);           // admin not found
+            const mockAdminFrom = vi.fn().mockReturnValue({ where: mockAdminWhere });
+            const mockAdminTop = vi.fn().mockReturnValue({ from: mockAdminFrom });
 
-            const mockWhere = vi.fn()
-                .mockResolvedValueOnce([]) // Admin check
-                .mockResolvedValueOnce([mockUser]); // Volunteer check
-            const mockFrom = vi.fn().mockReturnValue({ where: mockWhere });
-            const mockTop = vi.fn().mockReturnValue({ from: mockFrom });
-            const mockSelect = vi.fn().mockReturnValue({ from: mockFrom, top: mockTop });
-            (db.select as any) = mockSelect;
+            const mockVolWhere = vi.fn().mockResolvedValue([{             // volunteer found
+                volunteer: mockUser,
+                ay: { isLocked: false, isArchived: false },
+            }]);
+            const mockVolInnerJoin = vi.fn().mockReturnValue({ where: mockVolWhere });
+            const mockVolFrom = vi.fn().mockReturnValue({ innerJoin: mockVolInnerJoin, where: mockVolWhere });
+
+            // select() is called twice; first call → admin path, second → volunteer path
+            (db.select as any) = vi.fn()
+                .mockReturnValueOnce({ top: mockAdminTop, from: mockAdminFrom })
+                .mockReturnValueOnce({ from: mockVolFrom });
 
             const res = await request(app)
                 .post('/api/auth/login')
